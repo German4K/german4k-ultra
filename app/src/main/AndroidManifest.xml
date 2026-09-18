@@ -22,9 +22,7 @@
          API 30–32 opens the system "Files and media" screen, which also lists
          "Allow management of all files" because MANAGE is declared. -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
-        tools:ignore="ScopedStorage" />
+    <!-- German4K Ultra: no "all files" access. Downloads and backups use the app folder (StorageAccess.defaultRoot). -->
 
     <!-- TV-first app, but allow non-TV installs too: touchscreen optional, and leanback is NOT required
          (required=true blocked plain phones / non-TV armv7a boxes that don't report the leanback feature). -->
