@@ -2,6 +2,9 @@ package tv.own.owntv.features.setup
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +35,11 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -193,9 +201,21 @@ private fun LoginView(answer: German4kPanelAnswer, onLogin: (String, String) -> 
     Spacer(Modifier.height(6.dp))
     Text(stringResource(R.string.g4k_way_login_body), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, textAlign = TextAlign.Center)
     Spacer(Modifier.height(20.dp))
+    // OwnTV's pill text field is built for D-pad focus; on a touch device (tablet, phone) a tap does not
+    // move the IME into the second field. Touch devices get plain fields instead.
+    val context = LocalContext.current
+    val isTv = remember(context) {
+        (context.getSystemService(android.content.Context.UI_MODE_SERVICE) as android.app.UiModeManager).currentModeType ==
+            android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
+    }
     Column(Modifier.width(460.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        OwnTVTextField(user, { user = it }, label = stringResource(R.string.g4k_username), modifier = Modifier.fillMaxWidth(), focusRequester = first)
-        OwnTVTextField(pass, { pass = it }, label = stringResource(R.string.g4k_password), modifier = Modifier.fillMaxWidth(), keyboardType = KeyboardType.Password)
+        if (isTv) {
+            OwnTVTextField(user, { user = it }, label = stringResource(R.string.g4k_username), modifier = Modifier.fillMaxWidth(), focusRequester = first)
+            OwnTVTextField(pass, { pass = it }, label = stringResource(R.string.g4k_password), modifier = Modifier.fillMaxWidth(), keyboardType = KeyboardType.Password)
+        } else {
+            TouchField(user, { user = it }, label = stringResource(R.string.g4k_username), keyboardType = KeyboardType.Text)
+            TouchField(pass, { pass = it }, label = stringResource(R.string.g4k_password), keyboardType = KeyboardType.Password, password = true)
+        }
     }
     Spacer(Modifier.height(20.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -220,5 +240,24 @@ private fun Problem(title: String, body: String, onRetry: () -> Unit, onManual: 
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         OwnTVButton(stringResource(R.string.g4k_retry_button), onClick = onRetry, modifier = Modifier.focusRequester(fr))
         if (onManual != null) OwnTVButton(stringResource(R.string.g4k_manual_button), onClick = onManual, style = OwnTVButtonStyle.SECONDARY)
+    }
+}
+
+@Composable
+private fun TouchField(value: String, onValueChange: (String) -> Unit, label: String, keyboardType: KeyboardType, password: Boolean = false) {
+    val colors = OwnTVTheme.colors
+    Column(Modifier.fillMaxWidth()) {
+        Text(label, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+        Spacer(Modifier.height(4.dp))
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            textStyle = TextStyle(color = colors.onSurface, fontSize = 18.sp),
+            cursorBrush = SolidColor(colors.primary),
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+            visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
+            modifier = Modifier.fillMaxWidth().border(1.dp, colors.primary, RoundedCornerShape(12.dp)).padding(horizontal = 16.dp, vertical = 14.dp),
+        )
     }
 }
