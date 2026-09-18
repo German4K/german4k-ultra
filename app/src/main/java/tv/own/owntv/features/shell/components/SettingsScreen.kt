@@ -2041,6 +2041,9 @@ internal fun AboutDialog(onDismiss: () -> Unit) {
             BrandLockup(markSize = 48, textSize = 30)
             Spacer(Modifier.height(6.dp))
             Text(stringResource(R.string.settings_about_version, tv.own.owntv.BuildConfig.VERSION_NAME), style = MaterialTheme.typography.titleMedium, color = colors.primary)
+            // German4K: access expiry from the panel answer.
+            val g4kAnswer by org.koin.compose.koinInject<tv.own.owntv.core.german4k.German4kProvisioner>().answer.collectAsStateWithLifecycle()
+            g4kAnswer?.expireDate?.takeIf { it.isNotBlank() }?.let { Text(stringResource(R.string.g4k_about_expires, it), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant) }
             Spacer(Modifier.height(14.dp))
             Text(
                 stringResource(R.string.settings_about_description_full),

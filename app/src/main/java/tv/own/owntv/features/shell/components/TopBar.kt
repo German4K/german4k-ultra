@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -130,6 +131,7 @@ fun TopBar(
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             audioBar?.invoke()
             if (weatherInfo != null) WeatherChip(info = weatherInfo, fahrenheit = weatherFahrenheit)
+            German4kExpiryChip()
             ClockChip()
             if (playlistName.isNotBlank()) {
                 PlaylistChip(
@@ -233,6 +235,19 @@ private fun ContinueChip(label: String, icon: OwnTVIcon, onClick: () -> Unit, vi
                     ),
             )
         }
+    }
+}
+
+/** German4K: "Expires in N days" from 7 days before the access ends — display-only, like the clock. */
+@Composable
+private fun German4kExpiryChip() {
+    val provisioner: tv.own.owntv.core.german4k.German4kProvisioner = org.koin.compose.koinInject()
+    val answer by provisioner.answer.collectAsStateWithLifecycle()
+    val days = answer?.let { with(tv.own.owntv.features.setup.German4kDays) { it.daysLeft() } } ?: return
+    val colors = OwnTVTheme.colors
+    val shape = RoundedCornerShape(TopBarChipCorner)
+    Box(Modifier.clip(shape).glass(GlassSurface.TOPBAR, colors.primary.copy(alpha = 0.25f), shape, frostScale = TopBarFrost, condenseChrome = true).padding(horizontal = 14.dp, vertical = 7.dp)) {
+        Text(if (days == 0) stringResource(R.string.g4k_expires_today) else stringResource(R.string.g4k_expires_chip, days), style = MaterialTheme.typography.labelLarge, color = colors.primary, fontWeight = FontWeight.Bold)
     }
 }
 

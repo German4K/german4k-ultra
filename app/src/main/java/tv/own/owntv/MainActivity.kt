@@ -120,6 +120,8 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         pendingDeepLink = LauncherDeepLink.parse(intent.data)
+        // Debug builds: `adb shell am start … --es g4k_note_test verlaengern|abgelaufen|wartung` shows a sample hint.
+        intent.getStringExtra("g4k_note_test")?.let { get<tv.own.owntv.core.german4k.German4kProvisioner>().debugTestNote(it) }
         Log.d(TAG, "onNewIntent deepLinkHost=${intent.data?.host} deepLinkType=${pendingDeepLink?.javaClass?.simpleName ?: "none"}")
     }
 
@@ -175,6 +177,8 @@ class MainActivity : ComponentActivity() {
         // postSplashScreenTheme (Theme.OwnTV), so the activity ends up in the same theme as before.
         val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
+        // Debug builds: `adb shell am start … --es g4k_note_test verlaengern|abgelaufen|wartung` (see onNewIntent).
+        intent?.getStringExtra("g4k_note_test")?.let { get<tv.own.owntv.core.german4k.German4kProvisioner>().debugTestNote(it) }
         val splashDeadline = SystemClock.uptimeMillis() + SPLASH_TIMEOUT_MS
         splash.setKeepOnScreenCondition { !contentReady && SystemClock.uptimeMillis() < splashDeadline }
         pendingDeepLink = LauncherDeepLink.parse(intent.data)
@@ -468,6 +472,8 @@ class MainActivity : ComponentActivity() {
                             // frame is safer than rendering protected content if a new state is added.
                             else -> Unit
                         }
+                        // German4K: panel hints (renew, maintenance) and the access lock draw over the shell.
+                        if (shellReady && (activeProfileId ?: -1L) >= 0L) tv.own.owntv.features.setup.German4kOverlays()
                         } // end foreground Box (above the background layer)
                     }
                     } // end LocalizedContent
