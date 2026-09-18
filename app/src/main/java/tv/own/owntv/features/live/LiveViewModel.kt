@@ -1427,8 +1427,12 @@ class LiveViewModel(
      *  → `.m3u8` swap — except on a channel already caught having no working `.m3u8`, which goes back
      *  to the `.ts` its panel does serve. See [LiveStreamQuirks.rememberNoHlsVariant]. */
     private fun tuneUrl(channel: ChannelEntity, source: SourceEntity?): String =
-        if (forceTsForExo == channel.streamUrl || LiveStreamQuirks.lacksHlsVariant(channel.streamUrl)) channel.streamUrl
-        else channel.playStreamUrl(source)
+        // German4K Multi-DNS: the URL to tune lives on the host currently preferred for this line, so the
+        // "already playing this URL" promotion below sees a DIFFERENT url after a host switch and reloads.
+        tv.own.owntv.core.german4k.German4kHostFailover.rewrite(
+            if (forceTsForExo == channel.streamUrl || LiveStreamQuirks.lacksHlsVariant(channel.streamUrl)) channel.streamUrl
+            else channel.playStreamUrl(source),
+        )
 
     /** The channel whose ladder is on an explicit `.ts` rung, so [tuneUrl] serves the original stream
      *  even before the "no HLS variant" lesson has been written (the rung must not depend on that order).
@@ -1742,8 +1746,17 @@ class LiveViewModel(
     /** The preference the current ladder was armed with — a host switch re-arms with the same one. */
     private var ladderPreference: tv.own.owntv.core.player.EnginePreference? = null
 
-    private suspend fun armLadder(channel: ChannelEntity, preference: tv.own.owntv.core.player.EnginePreference) {
+    /** The channel whose tune already switched host once: stale errors from the engine instance that
+     *  was torn down arrive right after the switch and must not demote the fresh host or switch again. */
+    private var hostSwitchedFor: String? = null
+
+    /** When the last host switch happened: errors that arrive within [HOST_SWITCH_GRACE_MS] belong to the
+     *  engine instance the switch tore down and are ignored instead of spending a rung on the new host. */
+    private var hostSwitchAtMs = 0L
+
+    private suspend fun armLadder(channel: ChannelEntity, preference: tv.own.owntv.core.player.EnginePreference, keepHostSwitch: Boolean = false) {
         ladderPreference = preference
+        if (!keepHostSwitch) hostSwitchedFor = null
         forceTsForExo = null
         ladder.arm(
             channel.streamUrl,
@@ -1839,13 +1852,21 @@ class LiveViewModel(
         // German4K Multi-DNS: when the failure looks like the HOST (timeout, 5xx, connection gone, or the tune
         // never opened within its budget), switch to the alternative host and start the tune over there —
         // before spending engine/format rungs on a server that is not answering.
-        if (!isRequestRefusal(reason) && (outOfTime || tv.own.owntv.core.german4k.German4kHostFailover.looksLikeHostFailure(reason)) &&
-            tv.own.owntv.core.german4k.German4kHostFailover.demote(channel.streamUrl, reason)
+        if (hostSwitchedFor == channel.streamUrl && nowMs - hostSwitchAtMs < HOST_SWITCH_GRACE_MS) {
+            engineLog("'${channel.name}' ignoring stale failure right after host switch ($reason)")
+            return true
+        }
+        // Demote the host this tune actually used (rewrite = the preferred host at tune time), once per tune.
+        if (!isRequestRefusal(reason) && hostSwitchedFor != channel.streamUrl &&
+            (outOfTime || tv.own.owntv.core.german4k.German4kHostFailover.looksLikeHostFailure(reason)) &&
+            tv.own.owntv.core.german4k.German4kHostFailover.demote(tv.own.owntv.core.german4k.German4kHostFailover.rewrite(channel.streamUrl), reason)
         ) {
+            hostSwitchedFor = channel.streamUrl
+            hostSwitchAtMs = nowMs
             val pref = ladderPreference ?: tv.own.owntv.core.player.EnginePreference.firstOn(!_liveOnExo.value)
             engineLog("'${channel.name}' switching host ($reason)")
             recordLadderEvent(tv.own.owntv.player.PlayerFailureReason.LIVE_FALLBACK, channel, "host switch — $reason")
-            armLadder(channel, pref)
+            armLadder(channel, pref, keepHostSwitch = true)
             if (_liveOnExo.value) {
                 switchToExo(channel)
             } else {
@@ -2410,6 +2431,8 @@ class LiveViewModel(
         liveCountFlow(key, c.profileId, c.sourceIds, hiddenCats, channelDao, customCategoryDao)
 
     private companion object {
+        /** Stale-failure window after a German4K host switch (see [hostSwitchAtMs]). */
+        const val HOST_SWITCH_GRACE_MS = 2_000L
         const val ENGINE_TAG = "LiveEngine"
 
         /** How long a channel must stay tuned before it counts as watched — see [recordLiveHistory]. */
