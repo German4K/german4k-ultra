@@ -96,6 +96,18 @@ class OwnTVApp : Application(), SingletonImageLoader.Factory, androidx.work.Conf
         // user can export from Settings, instead of being lost with the process.
         tv.own.owntv.core.util.CrashRecorder.diagnostics = { tv.own.owntv.player.LiveDiagnosticsLog.snapshot() }
         tv.own.owntv.core.util.CrashRecorder.install(this)
+        // German4K: woher der Fehlerbericht kommt, den German4kDiagnose an uns schickt. Core kennt
+        // player-core nicht (bewusst keine Abhängigkeit), also reicht die App den Zugriff herein —
+        // dieselbe Bauart wie CrashRecorder.diagnostics eine Zeile darüber.
+        tv.own.owntv.core.german4k.German4kDiagnose.berichtGeber = {
+            val eintraege = tv.own.owntv.player.PlaybackErrorLog.read(this@OwnTVApp).take(10).map { e ->
+                tv.own.owntv.core.german4k.German4kDiagnose.Wiedergabe(
+                    zeitMs = e.atMs, art = e.kind.name, engine = e.engine, live = e.live,
+                    grund = e.reason?.toString(), spec = e.spec, roh = e.raw,
+                )
+            }
+            tv.own.owntv.core.german4k.German4kDiagnose.wiedergabeText(eintraege, tv.own.owntv.player.LiveDiagnosticsLog.snapshot())
+        }
         // Core learns a panel's session limit while syncing; the engine is what acts on it. Registered
         // before Koin so the very first source flow already reaches the player (see LiveSessionLimit).
         tv.own.owntv.core.player.LiveSessionLimit.report = tv.own.owntv.player.LiveStreamQuirks::rememberSessionLimit

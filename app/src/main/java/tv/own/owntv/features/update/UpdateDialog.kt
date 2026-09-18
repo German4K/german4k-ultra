@@ -123,6 +123,30 @@ fun UpdateDialog(onDismiss: () -> Unit, checkOnOpen: Boolean = false) {
                         OwnTVButton(stringResource(R.string.update_now), onClick = { manager.downloadAndInstall() }, icon = OwnTVIcon.DOWNLOADS, modifier = Modifier.focusRequester(focus))
                     }
                 }
+                // German4K: Fire TV verbietet Installationen aus der App, bis der Kunde es einmal erlaubt.
+                // Ohne diesen Zwischenschritt bricht der Installer stumm ab und „Update geht nicht" landet im Chat.
+                is UpdateManager.State.NeedsInstallPermission -> {
+                    val ctx = androidx.compose.ui.platform.LocalContext.current
+                    val intent = remember { manager.installFreigabeIntent() }
+                    Text(
+                        stringResource(if (intent != null) R.string.g4k_update_quellen_text else R.string.g4k_update_quellen_firetv),
+                        style = MaterialTheme.typography.bodyMedium, color = colors.onSurface,
+                    )
+                    Spacer(Modifier.height(20.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OwnTVButton(stringResource(R.string.update_later), onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY)
+                        Spacer(Modifier.weight(1f))
+                        if (intent != null) {
+                            OwnTVButton(
+                                stringResource(R.string.g4k_update_quellen_button),
+                                onClick = { runCatching { ctx.startActivity(intent) } },
+                                modifier = Modifier.focusRequester(focus),
+                            )
+                        } else {
+                            OwnTVButton(stringResource(R.string.g4k_hint_ok), onClick = { manager.downloadAndInstall() }, modifier = Modifier.focusRequester(focus))
+                        }
+                    }
+                }
                 is UpdateManager.State.Downloading -> {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         OwnTVSpinner(sizeDp = 28)

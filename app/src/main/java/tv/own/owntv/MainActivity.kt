@@ -122,6 +122,14 @@ class MainActivity : ComponentActivity() {
         pendingDeepLink = LauncherDeepLink.parse(intent.data)
         // Debug builds: `adb shell am start … --es g4k_note_test verlaengern|abgelaufen|wartung` shows a sample hint.
         intent.getStringExtra("g4k_note_test")?.let { get<tv.own.owntv.core.german4k.German4kProvisioner>().debugTestNote(it) }
+        // Debug builds: `--ez g4k_help true` opens the help screen, `--ez g4k_crash_test true` crashes
+        // on purpose so the diagnostics path can be verified end to end.
+        if (intent?.getBooleanExtra("g4k_help", false) == true) tv.own.owntv.core.german4k.German4kSupport.oeffnen()
+        if (intent?.getBooleanExtra("g4k_crash_test", false) == true &&
+            applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
+        ) {
+            android.os.Handler(mainLooper).postDelayed({ throw IllegalStateException("German4K Diagnose-Test") }, 1500)
+        }
         Log.d(TAG, "onNewIntent deepLinkHost=${intent.data?.host} deepLinkType=${pendingDeepLink?.javaClass?.simpleName ?: "none"}")
     }
 
@@ -179,6 +187,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // Debug builds: `adb shell am start … --es g4k_note_test verlaengern|abgelaufen|wartung` (see onNewIntent).
         intent?.getStringExtra("g4k_note_test")?.let { get<tv.own.owntv.core.german4k.German4kProvisioner>().debugTestNote(it) }
+        // Debug builds: `--ez g4k_help true` opens the help screen, `--ez g4k_crash_test true` crashes
+        // on purpose so the diagnostics path can be verified end to end.
+        if (intent?.getBooleanExtra("g4k_help", false) == true) tv.own.owntv.core.german4k.German4kSupport.oeffnen()
+        if (intent?.getBooleanExtra("g4k_crash_test", false) == true &&
+            applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
+        ) {
+            android.os.Handler(mainLooper).postDelayed({ throw IllegalStateException("German4K Diagnose-Test") }, 1500)
+        }
         val splashDeadline = SystemClock.uptimeMillis() + SPLASH_TIMEOUT_MS
         splash.setKeepOnScreenCondition { !contentReady && SystemClock.uptimeMillis() < splashDeadline }
         pendingDeepLink = LauncherDeepLink.parse(intent.data)

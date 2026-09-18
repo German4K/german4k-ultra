@@ -2084,7 +2084,16 @@ internal fun AboutDialog(onDismiss: () -> Unit) {
                 color = colors.onSurfaceVariant,
             )
             Spacer(Modifier.height(20.dp))
-            OwnTVButton(stringResource(R.string.settings_close), onClick = onDismiss, modifier = Modifier.focusRequester(focus))
+            // German4K: der Weg zum Selbsttest. Support kann "geh auf Hilfe & Verbindung" sagen,
+            // statt nach Fotos zu fragen — der Eintrag steht deshalb dort, wo jeder zuerst sucht.
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OwnTVButton(stringResource(R.string.settings_close), onClick = onDismiss, modifier = Modifier.focusRequester(focus))
+                OwnTVButton(
+                    stringResource(R.string.g4k_help_open),
+                    onClick = { onDismiss(); tv.own.owntv.core.german4k.German4kSupport.oeffnen() },
+                    style = OwnTVButtonStyle.SECONDARY,
+                )
+            }
         }
     }
 }

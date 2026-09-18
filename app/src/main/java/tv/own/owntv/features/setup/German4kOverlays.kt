@@ -44,6 +44,7 @@ import tv.own.owntv.R
 import tv.own.owntv.core.companion.CompanionLink
 import tv.own.owntv.core.german4k.German4kPanelAnswer
 import tv.own.owntv.core.german4k.German4kProvisioner
+import tv.own.owntv.core.german4k.German4kSupport
 import tv.own.owntv.ui.components.OwnTVButton
 import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.OwnTVIcon
@@ -59,6 +60,11 @@ fun German4kOverlays() {
     val provisioner: German4kProvisioner = koinInject()
     val answer by provisioner.answer.collectAsStateWithLifecycle()
     val state by provisioner.state.collectAsStateWithLifecycle()
+    val hilfe by German4kSupport.sichtbar.collectAsStateWithLifecycle()
+    if (hilfe) {
+        German4kSupportScreen(onBack = German4kSupport::schliessen)
+        return
+    }
     val a = answer ?: return
     val scope = rememberCoroutineScope()
     var hidden by remember { mutableStateOf<String?>(null) }
@@ -70,6 +76,16 @@ fun German4kOverlays() {
         LockOverlay(a, onRetry = provisioner::provision)
         return
     }
+    // Uhrzeit: der Programmführer sieht bei falscher Gerätezeit verschoben aus, und niemand sucht
+    // den Fehler in der Uhr des Fernsehers. Einmal am Tag, und nur wenn es wirklich weit daneben ist.
+    val uhrId = remember(a.serverTime) { uhrHinweisId(a) }
+    var uhrGesehen by remember(uhrId) { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(uhrId) { uhrGesehen = if (uhrId == null) true else provisioner.hinweisSchonGesehen(uhrId) }
+    if (uhrId != null && uhrGesehen == false && hidden != uhrId) {
+        UhrHinweis(onOk = { hidden = uhrId; scope.launch { provisioner.hinweisGesehen(uhrId) } })
+        return
+    }
+
     val showTypes = setOf("verlaengern", "wartung", "info", "abgelaufen")
     if (a.noteTyp !in showTypes || a.noteContent.isBlank()) return
     val mustShow = a.noteTyp == "wartung"
@@ -80,6 +96,34 @@ fun German4kOverlays() {
         onOk = { hidden = a.noteId; scope.launch { provisioner.hinweisGesehen(a.noteId) } },
         onLater = { hidden = a.noteId },
     )
+}
+
+/** Hint id for a device clock that is more than five minutes away from ours, or null when it is fine. */
+private fun uhrHinweisId(a: German4kPanelAnswer): String? {
+    if (a.serverTime.isBlank()) return null
+    val server = runCatching { java.time.Instant.parse(a.serverTime).toEpochMilli() }.getOrNull() ?: return null
+    val abweichung = kotlin.math.abs(System.currentTimeMillis() - server) / 1000
+    return if (abweichung >= 300) "uhr:${java.time.LocalDate.now()}" else null
+}
+
+@Composable
+private fun UhrHinweis(onOk: () -> Unit) {
+    val colors = OwnTVTheme.colors
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    BackHandler { onOk() }
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.72f)).focusGroup(), contentAlignment = Alignment.Center) {
+        Column(
+            modifier = Modifier.widthIn(max = 720.dp).clip(RoundedCornerShape(28.dp)).background(colors.surfaceContainer).padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(stringResource(R.string.g4k_fehler_uhrzeit_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = colors.onSurface, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(12.dp))
+            Text(stringResource(R.string.g4k_uhr_hinweis), style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(24.dp))
+            OwnTVButton(stringResource(R.string.g4k_hint_ok), onClick = onOk, modifier = Modifier.focusRequester(focus))
+        }
+    }
 }
 
 @Composable
@@ -144,7 +188,10 @@ private fun LockOverlay(a: German4kPanelAnswer, onRetry: () -> Unit) {
             Spacer(Modifier.height(10.dp))
             Text(stringResource(R.string.g4k_contact), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
             Spacer(Modifier.height(24.dp))
-            OwnTVButton(stringResource(R.string.g4k_retry_button_short), onClick = onRetry, modifier = Modifier.focusRequester(focus))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OwnTVButton(stringResource(R.string.g4k_retry_button_short), onClick = onRetry, modifier = Modifier.focusRequester(focus))
+                OwnTVButton(stringResource(R.string.g4k_help_open), onClick = German4kSupport::oeffnen, style = OwnTVButtonStyle.SECONDARY)
+            }
         }
     }
 }

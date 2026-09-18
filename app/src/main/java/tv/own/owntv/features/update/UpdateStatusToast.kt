@@ -82,6 +82,14 @@ fun UpdateStatusToast(onDone: () -> Unit, onViewChangelog: () -> Unit, modifier:
                 updateFailureText(s.failure),
                 style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
             )
+            // German4K: die Freigabe für „unbekannte Quellen" wird im Dialog erklärt, nicht im Toast —
+            // hier reicht derselbe Hinweis wie bei einer verfügbaren Version.
+            is UpdateManager.State.NeedsInstallPermission -> {
+                BackHandler { onDone() }
+                Text(stringResource(R.string.update_available), style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
+                Spacer(Modifier.height(4.dp))
+                Text(stringResource(R.string.g4k_update_quellen_button), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+            }
             is UpdateManager.State.Available -> {
                 BackHandler { onDone() } // Back = Later
                 Text(stringResource(R.string.update_available), style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
