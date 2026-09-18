@@ -48,7 +48,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import android.graphics.BlurMaskFilter
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -122,6 +121,17 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import androidx.compose.foundation.layout.widthIn
 import java.util.Calendar
+
+/**
+ * German4K: background for live-channel hero cards. Channel logos are small, so OwnTV blurred them up
+ * as a backdrop — on Fire OS below Android 12 the blur is a no-op and the logo shows enlarged and
+ * cropped. A brand gradient is consistent across every channel and costs no frames.
+ */
+private val German4kLiveCardBrush = Brush.verticalGradient(
+    0f to Color(0xFF7C3AED),
+    0.55f to Color(0xFF2A1454),
+    1f to Color(0xFF0B0614),
+)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -1281,13 +1291,7 @@ private fun HeroRowSection(
                                     val cardImageUrl = expandedImageUrl ?: imageUrl
                                     if (!cardImageUrl.isNullOrBlank()) {
                                         if (item is HeroItem.LiveHero) {
-                                            AsyncImage(
-                                                model = cardImageUrl,
-                                                contentDescription = null,
-                                                modifier = Modifier.fillMaxSize().blur(20.dp),
-                                                contentScale = ContentScale.Crop,
-                                                alpha = 0.5f,
-                                            )
+                                            Box(Modifier.fillMaxSize().background(German4kLiveCardBrush))
                                             AsyncImage(
                                                 model = cardImageUrl,
                                                 contentDescription = null,
@@ -1330,13 +1334,7 @@ private fun HeroRowSection(
                                     ) {
                                         if (!imageUrl.isNullOrBlank()) {
                                             if (item is HeroItem.LiveHero) {
-                                                AsyncImage(
-                                                    model = imageUrl,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.fillMaxSize().blur(20.dp),
-                                                    contentScale = ContentScale.Crop,
-                                                    alpha = 0.5f,
-                                                )
+                                                Box(Modifier.fillMaxSize().background(German4kLiveCardBrush))
                                                 AsyncImage(
                                                     model = imageUrl,
                                                     contentDescription = null,
@@ -1435,13 +1433,7 @@ private fun HeroRowSection(
                                 val artUrl = expandedHeroImageUrl(expandedItem, expandedMeta)
                                 if (!artUrl.isNullOrBlank()) {
                                     if (expandedItem is HeroItem.LiveHero) {
-                                        AsyncImage(
-                                            model = artUrl,
-                                            contentDescription = null,
-                                            modifier = Modifier.fillMaxSize().blur(20.dp),
-                                            contentScale = ContentScale.Crop,
-                                            alpha = 0.5f,
-                                        )
+                                        Box(Modifier.fillMaxSize().background(German4kLiveCardBrush))
                                         AsyncImage(
                                             model = artUrl,
                                             contentDescription = null,

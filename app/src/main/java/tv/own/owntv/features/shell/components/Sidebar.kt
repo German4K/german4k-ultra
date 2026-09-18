@@ -317,16 +317,16 @@ private fun NowPlayingItem(
  */
 @Composable
 private fun AppLogo(modifier: Modifier = Modifier) {
+    // German4K: the round website logo replaces the play-mark; the accent ring keeps the rail geometry.
     val colors = OwnTVTheme.colors
-    Box(
+    androidx.compose.foundation.Image(
+        painter = androidx.compose.ui.res.painterResource(R.drawable.g4k_logo_rund),
+        contentDescription = null,
         modifier = modifier
             .size(56.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .border(width = 2.dp, color = colors.primary, shape = RoundedCornerShape(20.dp)),
-        contentAlignment = Alignment.Center,
-    ) {
-        OwnTVIcon(icon = OwnTVIcon.PLAY, tint = colors.primary, modifier = Modifier.size(26.dp), filled = true)
-    }
+            .clip(CircleShape)
+            .border(width = 2.dp, color = colors.primary, shape = CircleShape),
+    )
 }
 
 @Composable

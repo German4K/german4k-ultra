@@ -10,7 +10,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Typography
 
 /**
- * Popup typography is separate from the main interface. Lora remains the default, while the user
+ * Popup typography is separate from the main interface. German4K: the system sans is the default (same face as the main UI), while the user
  * may choose any bundled family without changing the popup host's established geometry scaling.
  */
 private val LocalPopupTypographyApplied = compositionLocalOf { false }

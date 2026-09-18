@@ -94,7 +94,7 @@ fun OwnTVTheme(
     focusBorderWidthDp: Int = 2,
     animationLevel: AnimationLevel = AnimationLevel.FULL,
     mainFontFamily: AppFontFamily = AppFontFamily.SYSTEM_SANS,
-    popupFontFamily: AppFontFamily = AppFontFamily.LORA,
+    popupFontFamily: AppFontFamily = AppFontFamily.SYSTEM_SANS,
     popupFontSizePercent: Int = PopupFontScale.DEFAULT,
     popupSizePercent: Int = PopupSizeScale.DEFAULT,
     content: @Composable () -> Unit,
