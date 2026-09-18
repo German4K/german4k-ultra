@@ -1739,7 +1739,11 @@ class LiveViewModel(
 
     /** Reset the ladder for a fresh tune of [channel]. Rungs already climbed are forgotten — a new tune
      *  is a new chance, including for a channel that ended the last one on its final rung. */
+    /** The preference the current ladder was armed with — a host switch re-arms with the same one. */
+    private var ladderPreference: tv.own.owntv.core.player.EnginePreference? = null
+
     private suspend fun armLadder(channel: ChannelEntity, preference: tv.own.owntv.core.player.EnginePreference) {
+        ladderPreference = preference
         forceTsForExo = null
         ladder.arm(
             channel.streamUrl,
@@ -1832,6 +1836,24 @@ class LiveViewModel(
         // added later cannot silently reintroduce the false lesson.
         val nowMs = android.os.SystemClock.elapsedRealtime()
         val outOfTime = ladder.expired(nowMs)
+        // German4K Multi-DNS: when the failure looks like the HOST (timeout, 5xx, connection gone, or the tune
+        // never opened within its budget), switch to the alternative host and start the tune over there —
+        // before spending engine/format rungs on a server that is not answering.
+        if (!isRequestRefusal(reason) && (outOfTime || tv.own.owntv.core.german4k.German4kHostFailover.looksLikeHostFailure(reason)) &&
+            tv.own.owntv.core.german4k.German4kHostFailover.demote(channel.streamUrl, reason)
+        ) {
+            val pref = ladderPreference ?: tv.own.owntv.core.player.EnginePreference.firstOn(!_liveOnExo.value)
+            engineLog("'${channel.name}' switching host ($reason)")
+            recordLadderEvent(tv.own.owntv.player.PlayerFailureReason.LIVE_FALLBACK, channel, "host switch — $reason")
+            armLadder(channel, pref)
+            if (_liveOnExo.value) {
+                switchToExo(channel)
+            } else {
+                mpvHandoffJob?.cancel()
+                mpvHandoffJob = viewModelScope.launch { fallbackToMpv(channel, reason) }
+            }
+            return true
+        }
         val next = ladder.advance(failureWasAboutFormat = !isRequestRefusal(reason), nowMs = nowMs) ?: run {
             val detail = if (outOfTime) {
                 "$reason — gave up after ${ladderBudgetMs.value / 1000}s"
