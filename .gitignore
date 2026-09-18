@@ -54,3 +54,7 @@ future_work/
 # JVM crash dumps from a Gradle daemon (never worth committing)
 hs_err_pid*.log
 replay_pid*.log
+
+# German4K build output (scripts/app/build-ultra.sh)
+/german4k-ultra.apk
+/german4k-ultra.apk.idsig
