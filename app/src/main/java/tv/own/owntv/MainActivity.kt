@@ -298,6 +298,8 @@ class MainActivity : ComponentActivity() {
             // "Refresh on startup" — re-sync sources once the active profile is known.
             LaunchedEffect(activeProfileId) {
                 if ((activeProfileId ?: -1L) >= 0L) viewModel.checkAutoRefresh(includeStartup = true)
+                // German4K panel: refresh credentials/hosts silently on every start (expiry, Multi-DNS, withdrawn lines).
+                if ((activeProfileId ?: -1L) >= 0L) get<tv.own.owntv.core.german4k.German4kProvisioner>().provision()
             }
 
             OwnTVTheme(
@@ -385,6 +387,7 @@ class MainActivity : ComponentActivity() {
 
                         Box(modifier = Modifier.fillMaxSize()) {
                         val profile = activeProfileId
+                        var g4kManual by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
                         when {
                             profile == null || !profilesLoaded -> Unit // active id / Room list loading
                             // Adding a profile from the gate → onboard the new profile.
@@ -394,7 +397,13 @@ class MainActivity : ComponentActivity() {
                                 onCancel = { gateSession.cancelAddingProfile() },
                                 modifier = Modifier.fillMaxSize(),
                             )
-                            // First run (no profile yet) → full onboarding.
+                            // First run (no profile yet): German4K panel provisions the device (zero setup);
+                            // "Set up manually" falls through to OwnTV's onboarding wizard.
+                            profile < 0L && !g4kManual -> tv.own.owntv.features.setup.German4kSetup(
+                                onReady = { profileId -> if (profileId != null) gateSession.authenticateProfile(profileId) },
+                                onManual = { g4kManual = true },
+                                modifier = Modifier.fillMaxSize(),
+                            )
                             profile < 0L -> Onboarding(
                                 firstRun = true,
                                 onDone = { profileId -> gateSession.authenticateProfile(profileId) },

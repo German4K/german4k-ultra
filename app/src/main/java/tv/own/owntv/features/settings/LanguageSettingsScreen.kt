@@ -318,13 +318,7 @@ fun LanguageSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         )
         Spacer(Modifier.height(12.dp))
 
-        Spacer(Modifier.height(16.dp))
-        OwnTVButton(
-            label = stringResource(R.string.settings_language_help_translate),
-            onClick = { showContribution = true },
-            modifier = Modifier.fillMaxWidth(),
-            style = OwnTVButtonStyle.SECONDARY,
-        )
+        // German4K Ultra: kein Weblate-Aufruf (white-label).
         Spacer(Modifier.height(12.dp))
         Divider()
         Spacer(Modifier.height(12.dp))

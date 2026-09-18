@@ -93,10 +93,10 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:host="play"
-                    android:scheme="owntv" />
+                    android:scheme="german4k" />
                 <data
                     android:host="open"
-                    android:scheme="owntv" />
+                    android:scheme="german4k" />
             </intent-filter>
         </activity>
 

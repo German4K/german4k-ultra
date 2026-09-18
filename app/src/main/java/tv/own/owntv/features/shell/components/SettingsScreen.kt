@@ -2020,8 +2020,8 @@ private fun FocusHighlightDialog(
 
 
 /** Widened for More's About pane, which shows the same repository line the dialog does. */
-internal const val GITHUB_REPO = "github.com/ahXN00/OwnTV"
-private const val TELEGRAM_LINK = "t.me/owntvplayer"
+internal const val GITHUB_REPO = "github.com/German4K/german4k-ultra"
+private const val TELEGRAM_LINK = "german4k.com"
 
 /** About OwnTV: version, license, author and project link — all readable on screen (no TV browser). */
 @Composable
@@ -2068,7 +2068,7 @@ internal fun AboutDialog(onDismiss: () -> Unit) {
                 }
                 Box(Modifier.clip(RoundedCornerShape(10.dp)).background(Color.White).padding(6.dp)) {
                     Image(
-                        painter = androidx.compose.ui.res.painterResource(tv.own.owntv.R.drawable.telegram_qr),
+                        painter = androidx.compose.ui.res.painterResource(tv.own.owntv.R.drawable.kontakt_qr),
                         contentDescription = stringResource(R.string.settings_telegram_qr),
                         modifier = Modifier.size(120.dp),
                     )
