@@ -2090,7 +2090,10 @@ internal fun AboutDialog(onDismiss: () -> Unit) {
             // FlowRow statt Row: vier Knöpfe nebeneinander passen auf 1080p knapp und auf einem
             // 720p-Fire-TV-Stick nicht mehr — der letzte würde am Rand abgeschnitten. Umbrechen
             // lassen ist hier richtiger, als Texte zu kürzen.
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 OwnTVButton(stringResource(R.string.settings_close), onClick = onDismiss, modifier = Modifier.focusRequester(focus))
                 OwnTVButton(
                     stringResource(R.string.g4k_help_open),
