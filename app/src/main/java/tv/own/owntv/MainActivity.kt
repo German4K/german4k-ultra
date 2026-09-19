@@ -172,6 +172,11 @@ class MainActivity : ComponentActivity() {
         // Staleness-based auto refresh on resume (interval modes only — STARTUP is cold-start only). The
         // ViewModel throttles this internally so a quick toggle doesn't re-run the check.
         shellViewModel.checkAutoRefresh(includeStartup = false)
+        // German4K: Favoriten und Einstellungen nachziehen, wenn die App aus dem Hintergrund zurückkommt.
+        // Auf einem Fernseher läuft die App wochenlang, ohne je neu zu starten — ohne das hier bekäme
+        // ein solches Gerät nie mit, was am Tablet markiert wurde. Der Provisioner bremst sich selbst
+        // (30 Sekunden), ein kurzes Weg-und-zurück löst also nichts aus.
+        get<tv.own.owntv.core.german4k.German4kProvisioner>().provision()
     }
 
     /**
