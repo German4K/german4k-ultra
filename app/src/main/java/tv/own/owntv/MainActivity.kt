@@ -122,6 +122,8 @@ class MainActivity : ComponentActivity() {
         pendingDeepLink = LauncherDeepLink.parse(intent.data)
         // Debug builds: `adb shell am start … --es g4k_note_test verlaengern|abgelaufen|wartung` shows a sample hint.
         intent.getStringExtra("g4k_note_test")?.let { get<tv.own.owntv.core.german4k.German4kProvisioner>().debugTestNote(it) }
+        // Debug builds: `--ei g4k_test 4` tut so, als liefe ein Test mit vier Reststunden.
+        intent.getIntExtra("g4k_test", 0).takeIf { it > 0 }?.let { get<tv.own.owntv.core.german4k.German4kProvisioner>().debugTestzugang(it) }
         // Debug builds: `--ez g4k_help true` opens the help screen, `--ez g4k_crash_test true` crashes
         // on purpose so the diagnostics path can be verified end to end.
         if (intent?.getBooleanExtra("g4k_help", false) == true) tv.own.owntv.core.german4k.German4kSupport.oeffnen()
@@ -201,6 +203,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // Debug builds: `adb shell am start … --es g4k_note_test verlaengern|abgelaufen|wartung` (see onNewIntent).
         intent?.getStringExtra("g4k_note_test")?.let { get<tv.own.owntv.core.german4k.German4kProvisioner>().debugTestNote(it) }
+        intent?.getIntExtra("g4k_test", 0)?.takeIf { it > 0 }?.let { get<tv.own.owntv.core.german4k.German4kProvisioner>().debugTestzugang(it) }
         // Debug builds: `--ez g4k_help true` opens the help screen, `--ez g4k_crash_test true` crashes
         // on purpose so the diagnostics path can be verified end to end.
         if (intent?.getBooleanExtra("g4k_help", false) == true) tv.own.owntv.core.german4k.German4kSupport.oeffnen()

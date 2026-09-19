@@ -111,7 +111,7 @@ fun German4kOverlays() {
         return
     }
 
-    val showTypes = setOf("verlaengern", "wartung", "info", "abgelaufen")
+    val showTypes = setOf("verlaengern", "wartung", "info", "abgelaufen", "test")
     if (a.noteTyp !in showTypes || a.noteContent.isBlank()) return
     val mustShow = a.noteTyp == "wartung"
     if (hidden == a.noteId || (!mustShow && seen != false)) return
@@ -289,7 +289,13 @@ private fun HintDialog(a: German4kPanelAnswer, onOk: () -> Unit, onLater: () -> 
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     BackHandler { onLater() }
     val renew = a.noteTyp == "verlaengern" || a.noteTyp == "abgelaufen"
-    val qrUrl = if (renew) a.verlaengernUrl else ""
+    // Ein Testkunde kann nichts verlängern — sein QR führt zum Kauf, nicht auf die Verlängern-Seite.
+    val test = a.noteTyp == "test"
+    val qrUrl = when {
+        test -> a.test?.kaufenUrl.orEmpty()
+        renew -> a.verlaengernUrl
+        else -> ""
+    }
     val qr = remember(qrUrl) { qrUrl.takeIf { it.isNotBlank() }?.let { CompanionLink.renderQr(it, 360) } }
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.72f)).focusGroup(), contentAlignment = Alignment.Center) {
         Column(
@@ -305,7 +311,11 @@ private fun HintDialog(a: German4kPanelAnswer, onOk: () -> Unit, onLater: () -> 
                         Image(bitmap = it.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Fit,
                             modifier = Modifier.size(150.dp).clip(RoundedCornerShape(12.dp)).background(Color.White).padding(6.dp))
                         Spacer(Modifier.height(6.dp))
-                        Text(stringResource(R.string.g4k_hint_qr_renew), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.width(220.dp))
+                        Text(
+                            stringResource(if (test) R.string.g4k_hint_qr_kaufen else R.string.g4k_hint_qr_renew),
+                            style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant,
+                            textAlign = TextAlign.Center, modifier = Modifier.width(220.dp),
+                        )
                     }
                 }
             }

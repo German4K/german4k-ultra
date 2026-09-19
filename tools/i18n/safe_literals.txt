@@ -42,6 +42,7 @@
 4	json	app/src/main/java/tv/own/owntv/MainActivity.kt	g4k_no4k
 2	technical	app/src/main/java/tv/own/owntv/MainActivity.kt	g4k_note_test
 2	json	app/src/main/java/tv/own/owntv/MainActivity.kt	g4k_stoerung_test
+2	technical	app/src/main/java/tv/own/owntv/MainActivity.kt	g4k_test
 2	technical	app/src/main/java/tv/own/owntv/MainActivity.kt	none
 1	log	app/src/main/java/tv/own/owntv/MainActivity.kt	onCreate deepLinkHost=${intent.data?.host} deepLinkType=${pendingDeepLink?.javaClass?.simpleName ?: "none"}
 1	log	app/src/main/java/tv/own/owntv/MainActivity.kt	onNewIntent deepLinkHost=${intent.data?.host} deepLinkType=${pendingDeepLink?.javaClass?.simpleName ?: "none"}
@@ -456,6 +457,7 @@
 1	empty	app/src/main/java/tv/own/owntv/features/setup/German4kOverlays.kt	\0
 3	protocol	app/src/main/java/tv/own/owntv/features/setup/German4kOverlays.kt	abgelaufen
 1	protocol	app/src/main/java/tv/own/owntv/features/setup/German4kOverlays.kt	info
+2	json	app/src/main/java/tv/own/owntv/features/setup/German4kOverlays.kt	test
 1	technical	app/src/main/java/tv/own/owntv/features/setup/German4kOverlays.kt	uhr:${java.time.LocalDate.now()}
 2	protocol	app/src/main/java/tv/own/owntv/features/setup/German4kOverlays.kt	verlaengern
 3	protocol	app/src/main/java/tv/own/owntv/features/setup/German4kOverlays.kt	wartung

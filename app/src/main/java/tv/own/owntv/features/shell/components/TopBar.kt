@@ -238,16 +238,30 @@ private fun ContinueChip(label: String, icon: OwnTVIcon, onClick: () -> Unit, vi
     }
 }
 
-/** German4K: "Expires in N days" from 7 days before the access ends — display-only, like the clock. */
+/**
+ * German4K: „Läuft in N Tagen ab" ab sieben Tagen vor Schluss — nur Anzeige, wie die Uhr.
+ *
+ * Läuft ein Test, steht hier stattdessen „Test · noch N h". Tage wären dort die falsche Einheit:
+ * ein Test dauert 24 Stunden, und „läuft in 0 Tagen ab" sagt niemandem, wie viel Abend noch bleibt.
+ */
 @Composable
 private fun German4kExpiryChip() {
     val provisioner: tv.own.owntv.core.german4k.German4kProvisioner = org.koin.compose.koinInject()
     val answer by provisioner.answer.collectAsStateWithLifecycle()
-    val days = answer?.let { with(tv.own.owntv.features.setup.German4kDays) { it.daysLeft() } } ?: return
+    val a = answer ?: return
+    val test = a.test
+    val days = with(tv.own.owntv.features.setup.German4kDays) { a.daysLeft() }
+    if (test == null && days == null) return
     val colors = OwnTVTheme.colors
     val shape = RoundedCornerShape(TopBarChipCorner)
+    val text = when {
+        test != null && test.stundenOffen <= 1 -> stringResource(R.string.g4k_test_chip_bald)
+        test != null -> stringResource(R.string.g4k_test_chip, test.stundenOffen)
+        days == 0 -> stringResource(R.string.g4k_expires_today)
+        else -> stringResource(R.string.g4k_expires_chip, days ?: 0)
+    }
     Box(Modifier.clip(shape).glass(GlassSurface.TOPBAR, colors.primary.copy(alpha = 0.25f), shape, frostScale = TopBarFrost, condenseChrome = true).padding(horizontal = 14.dp, vertical = 7.dp)) {
-        Text(if (days == 0) stringResource(R.string.g4k_expires_today) else stringResource(R.string.g4k_expires_chip, days), style = MaterialTheme.typography.labelLarge, color = colors.primary, fontWeight = FontWeight.Bold)
+        Text(text, style = MaterialTheme.typography.labelLarge, color = colors.primary, fontWeight = FontWeight.Bold)
     }
 }
 
