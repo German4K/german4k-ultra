@@ -125,6 +125,7 @@ class MainActivity : ComponentActivity() {
         // Debug builds: `--ez g4k_help true` opens the help screen, `--ez g4k_crash_test true` crashes
         // on purpose so the diagnostics path can be verified end to end.
         if (intent?.getBooleanExtra("g4k_help", false) == true) tv.own.owntv.core.german4k.German4kSupport.oeffnen()
+        if (intent?.getBooleanExtra("g4k_kunde", false) == true) tv.own.owntv.core.german4k.German4kSupport.kundeOeffnen()
         intent?.getStringExtra("g4k_stoerung_test")?.let {
             tv.own.owntv.core.german4k.German4kStoerung.melde("Testsender", it)
         }
@@ -202,6 +203,7 @@ class MainActivity : ComponentActivity() {
         // Debug builds: `--ez g4k_help true` opens the help screen, `--ez g4k_crash_test true` crashes
         // on purpose so the diagnostics path can be verified end to end.
         if (intent?.getBooleanExtra("g4k_help", false) == true) tv.own.owntv.core.german4k.German4kSupport.oeffnen()
+        if (intent?.getBooleanExtra("g4k_kunde", false) == true) tv.own.owntv.core.german4k.German4kSupport.kundeOeffnen()
         intent?.getStringExtra("g4k_stoerung_test")?.let {
             tv.own.owntv.core.german4k.German4kStoerung.melde("Testsender", it)
         }

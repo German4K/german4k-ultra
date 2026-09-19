@@ -2093,6 +2093,11 @@ internal fun AboutDialog(onDismiss: () -> Unit) {
                     onClick = { onDismiss(); tv.own.owntv.core.german4k.German4kSupport.oeffnen() },
                     style = OwnTVButtonStyle.SECONDARY,
                 )
+                OwnTVButton(
+                    stringResource(R.string.g4k_kunde_titel),
+                    onClick = { onDismiss(); tv.own.owntv.core.german4k.German4kSupport.kundeOeffnen() },
+                    style = OwnTVButtonStyle.SECONDARY,
+                )
             }
         }
     }

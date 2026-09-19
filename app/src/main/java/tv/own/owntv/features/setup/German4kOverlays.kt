@@ -70,6 +70,11 @@ fun German4kOverlays() {
         German4kSupportScreen(onBack = German4kSupport::schliessen)
         return
     }
+    val kunde by German4kSupport.kundeSichtbar.collectAsStateWithLifecycle()
+    if (kunde) {
+        German4kKundeScreen(onBack = German4kSupport::kundeSchliessen)
+        return
+    }
     val dolby by German4kDolby.hinweis.collectAsStateWithLifecycle()
     dolby?.let { titel ->
         DolbyHinweis(titel, onOk = German4kDolby::schliessen)
