@@ -193,6 +193,7 @@ private fun schrittZeile(s: German4kHealth.Schritt): String {
         German4kHealth.KEY_PANEL -> R.string.g4k_schritt_panel
         German4kHealth.KEY_HOST -> R.string.g4k_schritt_host
         German4kHealth.KEY_STREAM -> R.string.g4k_schritt_stream
+        German4kHealth.KEY_SPRUNG -> R.string.g4k_schritt_sprung
         else -> R.string.g4k_schritt_uhr
     }
     val name = stringResource(res)
@@ -208,6 +209,7 @@ private fun klasseTitel(k: German4kHealth.Klasse): String = stringResource(
         German4kHealth.Klasse.ZWANGSPORTAL -> R.string.g4k_fehler_zwangsportal_title
         German4kHealth.Klasse.ROUTER_SPERRE -> R.string.g4k_fehler_router_sperre_title
         German4kHealth.Klasse.ANBIETER_SPERRE -> R.string.g4k_fehler_anbieter_sperre_title
+        German4kHealth.Klasse.VPN_FILTER -> R.string.g4k_fehler_vpn_filter_title
         German4kHealth.Klasse.HOST_AUSFALL -> R.string.g4k_fehler_host_ausfall_title
         German4kHealth.Klasse.LEITUNG_BELEGT -> R.string.g4k_fehler_leitung_belegt_title
         German4kHealth.Klasse.ABGELAUFEN -> R.string.g4k_fehler_abgelaufen_title
@@ -225,6 +227,7 @@ private fun klasseText(k: German4kHealth.Klasse): String = stringResource(
         German4kHealth.Klasse.ZWANGSPORTAL -> R.string.g4k_fehler_zwangsportal_body
         German4kHealth.Klasse.ROUTER_SPERRE -> R.string.g4k_fehler_router_sperre_body
         German4kHealth.Klasse.ANBIETER_SPERRE -> R.string.g4k_fehler_anbieter_sperre_body
+        German4kHealth.Klasse.VPN_FILTER -> R.string.g4k_fehler_vpn_filter_body
         German4kHealth.Klasse.HOST_AUSFALL -> R.string.g4k_fehler_host_ausfall_body
         German4kHealth.Klasse.LEITUNG_BELEGT -> R.string.g4k_fehler_leitung_belegt_body
         German4kHealth.Klasse.ABGELAUFEN -> R.string.g4k_fehler_abgelaufen_body

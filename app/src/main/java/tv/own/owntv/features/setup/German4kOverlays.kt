@@ -191,6 +191,7 @@ private fun stoerungTitel(k: German4kHealth.Klasse): String = stringResource(
         German4kHealth.Klasse.HOST_AUSFALL -> R.string.g4k_fehler_host_ausfall_title
         German4kHealth.Klasse.ROUTER_SPERRE -> R.string.g4k_fehler_router_sperre_title
         German4kHealth.Klasse.ANBIETER_SPERRE -> R.string.g4k_fehler_anbieter_sperre_title
+        German4kHealth.Klasse.VPN_FILTER -> R.string.g4k_fehler_vpn_filter_title
         German4kHealth.Klasse.KEIN_NETZ -> R.string.g4k_fehler_kein_netz_title
         else -> R.string.g4k_fehler_unbekannt_title
     },
@@ -206,6 +207,7 @@ private fun stoerungText(k: German4kHealth.Klasse): String = stringResource(
         German4kHealth.Klasse.HOST_AUSFALL -> R.string.g4k_fehler_host_ausfall_body
         German4kHealth.Klasse.ROUTER_SPERRE -> R.string.g4k_fehler_router_sperre_body
         German4kHealth.Klasse.ANBIETER_SPERRE -> R.string.g4k_fehler_anbieter_sperre_body
+        German4kHealth.Klasse.VPN_FILTER -> R.string.g4k_fehler_vpn_filter_body
         German4kHealth.Klasse.KEIN_NETZ -> R.string.g4k_fehler_kein_netz_body
         else -> R.string.g4k_fehler_unbekannt_body
     },
