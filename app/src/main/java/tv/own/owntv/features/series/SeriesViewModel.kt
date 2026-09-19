@@ -956,6 +956,21 @@ class SeriesViewModel(
         viewModelScope.launch {
             val pid = currentProfileId()
             if (pid != null && !tv.own.owntv.core.content.AdultCategoryClassifier.allows(pid, show.categoryId, profileDao, categoryDao)) return@launch
+            // German4K: unsere beste Serienfassung ist Dolby Vision Profil 5 und hat keinen Rückfall auf
+            // normales HDR — auf einem Fernseher ohne DV läuft sie grün-lila. Einmal am Tag ein Satz dazu,
+            // bevor der Kunde den Titel für kaputt hält (siehe German4kDolby).
+            runCatching {
+                // Die Gerätefähigkeiten stehen seit dem Start fest (German4kDiagnose fragt sie ab);
+                // ohne Messung sagen wir nichts und lassen den Kunden schauen.
+                tv.own.owntv.core.german4k.German4kDeviceCaps.letzte()?.let { caps ->
+                    tv.own.owntv.core.german4k.German4kDolby.pruefe(
+                        rubrik = show.categoryId?.let { categoryDao.getById(it)?.name },
+                        titel = show.name,
+                        geraetKannDolby = caps.dolbyVision,
+                        heute = java.time.LocalDate.now().toString(),
+                    )
+                }
+            }
             // External player (global toggle): launch only the selected episode (external players are
             // single-item — no prev/next queue). History is still recorded; resume position and the
             // in-app HUD/progress tick are not, since OwnTV can't observe the external app.

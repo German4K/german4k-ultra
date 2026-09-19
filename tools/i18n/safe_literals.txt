@@ -35,6 +35,7 @@
 1	performance	app/src/main/java/tv/own/owntv/MainActivity.kt	destination-ready
 1	performance	app/src/main/java/tv/own/owntv/MainActivity.kt	first-composition
 2	json	app/src/main/java/tv/own/owntv/MainActivity.kt	g4k_crash_test
+2	json	app/src/main/java/tv/own/owntv/MainActivity.kt	g4k_dolby_test
 2	json	app/src/main/java/tv/own/owntv/MainActivity.kt	g4k_help
 4	json	app/src/main/java/tv/own/owntv/MainActivity.kt	g4k_no4k
 2	technical	app/src/main/java/tv/own/owntv/MainActivity.kt	g4k_note_test

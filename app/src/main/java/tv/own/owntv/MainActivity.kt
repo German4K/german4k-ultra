@@ -128,6 +128,10 @@ class MainActivity : ComponentActivity() {
         intent?.getStringExtra("g4k_stoerung_test")?.let {
             tv.own.owntv.core.german4k.German4kStoerung.melde("Testsender", it)
         }
+        intent?.getStringExtra("g4k_dolby_test")?.let {
+            tv.own.owntv.core.german4k.German4kDolby.zuruecksetzen()
+            tv.own.owntv.core.german4k.German4kDolby.pruefe(null, it.replace('-', ' '), geraetKannDolby = false, heute = java.time.LocalDate.now().toString())
+        }
         if (intent?.hasExtra("g4k_no4k") == true &&
             applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
         ) {
@@ -200,6 +204,10 @@ class MainActivity : ComponentActivity() {
         if (intent?.getBooleanExtra("g4k_help", false) == true) tv.own.owntv.core.german4k.German4kSupport.oeffnen()
         intent?.getStringExtra("g4k_stoerung_test")?.let {
             tv.own.owntv.core.german4k.German4kStoerung.melde("Testsender", it)
+        }
+        intent?.getStringExtra("g4k_dolby_test")?.let {
+            tv.own.owntv.core.german4k.German4kDolby.zuruecksetzen()
+            tv.own.owntv.core.german4k.German4kDolby.pruefe(null, it.replace('-', ' '), geraetKannDolby = false, heute = java.time.LocalDate.now().toString())
         }
         if (intent?.hasExtra("g4k_no4k") == true &&
             applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0

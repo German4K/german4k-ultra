@@ -43,6 +43,7 @@ import org.koin.compose.koinInject
 import tv.own.owntv.R
 import tv.own.owntv.core.companion.CompanionLink
 import tv.own.owntv.core.german4k.German4kPanelAnswer
+import tv.own.owntv.core.german4k.German4kDolby
 import tv.own.owntv.core.german4k.German4kHealth
 import tv.own.owntv.core.german4k.German4kDeviceId
 import tv.own.owntv.core.german4k.German4kPanelClient
@@ -67,6 +68,11 @@ fun German4kOverlays() {
     val hilfe by German4kSupport.sichtbar.collectAsStateWithLifecycle()
     if (hilfe) {
         German4kSupportScreen(onBack = German4kSupport::schliessen)
+        return
+    }
+    val dolby by German4kDolby.hinweis.collectAsStateWithLifecycle()
+    dolby?.let { titel ->
+        DolbyHinweis(titel, onOk = German4kDolby::schliessen)
         return
     }
     val stoerung by German4kStoerung.lage.collectAsStateWithLifecycle()
@@ -105,6 +111,31 @@ fun German4kOverlays() {
         onOk = { hidden = a.noteId; scope.launch { provisioner.hinweisGesehen(a.noteId) } },
         onLater = { hidden = a.noteId },
     )
+}
+
+/** Dolby Vision auf einem Fernseher ohne Dolby Vision — einmal am Tag, dann darf er weiterschauen. */
+@Composable
+private fun DolbyHinweis(titel: String, onOk: () -> Unit) {
+    val colors = OwnTVTheme.colors
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    BackHandler { onOk() }
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.78f)).focusGroup(), contentAlignment = Alignment.Center) {
+        Column(
+            modifier = Modifier.widthIn(max = 780.dp).clip(RoundedCornerShape(28.dp)).background(colors.surfaceContainer).padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(stringResource(R.string.g4k_dolby_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = colors.onSurface, textAlign = TextAlign.Center)
+            if (titel.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text(titel, style = MaterialTheme.typography.bodyMedium, color = colors.primary)
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(stringResource(R.string.g4k_dolby_body), style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.widthIn(max = 640.dp))
+            Spacer(Modifier.height(24.dp))
+            OwnTVButton(stringResource(R.string.g4k_dolby_ok), onClick = onOk, modifier = Modifier.focusRequester(focus))
+        }
+    }
 }
 
 /**
