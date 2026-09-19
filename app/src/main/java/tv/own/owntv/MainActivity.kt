@@ -128,6 +128,11 @@ class MainActivity : ComponentActivity() {
         intent?.getStringExtra("g4k_stoerung_test")?.let {
             tv.own.owntv.core.german4k.German4kStoerung.melde("Testsender", it)
         }
+        if (intent?.hasExtra("g4k_no4k") == true &&
+            applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
+        ) {
+            tv.own.owntv.core.german4k.German4kDeviceCaps.debugKein4k = intent.getBooleanExtra("g4k_no4k", false)
+        }
         if (intent?.getBooleanExtra("g4k_crash_test", false) == true &&
             applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
         ) {
@@ -195,6 +200,11 @@ class MainActivity : ComponentActivity() {
         if (intent?.getBooleanExtra("g4k_help", false) == true) tv.own.owntv.core.german4k.German4kSupport.oeffnen()
         intent?.getStringExtra("g4k_stoerung_test")?.let {
             tv.own.owntv.core.german4k.German4kStoerung.melde("Testsender", it)
+        }
+        if (intent?.hasExtra("g4k_no4k") == true &&
+            applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
+        ) {
+            tv.own.owntv.core.german4k.German4kDeviceCaps.debugKein4k = intent.getBooleanExtra("g4k_no4k", false)
         }
         if (intent?.getBooleanExtra("g4k_crash_test", false) == true &&
             applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0

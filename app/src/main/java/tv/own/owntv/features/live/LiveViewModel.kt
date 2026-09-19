@@ -1448,6 +1448,15 @@ class LiveViewModel(
      *  so the in-flight rebuild it owns isn't killed by its own play. */
     private suspend fun playChannel(channel: ChannelEntity) {
         val pid = currentProfileId() ?: return
+        // German4K: 363 Sender liegen nur in UHD vor, und ein Stick ohne 4K-Decoder scheitert daran
+        // jedes Mal — verlässlich, und für den Kunden sieht der Sender kaputt aus. Wenn dieselbe
+        // Sendung in einer spielbaren Fassung in der Liste steht, nehmen wir gleich die; zehn Sekunden
+        // schwarzes Bild vorweg helfen niemandem.
+        g4kStattUhd(channel)?.let { ersatz ->
+            engineLog("'${channel.name}' → '${ersatz.name}' (kein 4K-Decoder auf diesem Gerät)")
+            playChannel(ersatz)
+            return
+        }
         if (!tv.own.owntv.core.content.AdultCategoryClassifier.allows(pid, channel.categoryId, profileDao, categoryDao)) return
         // Live TV set to play externally: hand the channel over instead of tuning an in-app engine.
         // History is still recorded, so the channel shows up in History/Recently watched either way.
@@ -1748,6 +1757,36 @@ class LiveViewModel(
 
     /** The channel whose tune already switched host once: stale errors from the engine instance that
      *  was torn down arrive right after the switch and must not demote the fresh host or switch again. */
+    /** Einmal je Abstimmung auf eine andere Qualitätsstufe ausweichen — nicht durch alle durchfallen. */
+    private var g4kVarianteVersucht = false
+
+    /** Kann dieses Gerät 4K entschlüsseln? Einmal ermittelt, danach aus dem Zwischenspeicher. */
+    private val g4kVierK: Boolean by lazy { tv.own.owntv.core.german4k.German4kDeviceCaps.get(appContext).hevc4k }
+
+    /** Die Geschwister dieses Senders aus dem Katalog — dieselbe Sendung, andere Qualitätsstufe. */
+    private suspend fun g4kGeschwister(channel: ChannelEntity): List<tv.own.owntv.core.german4k.German4kVariants.Variante> {
+        val basis = tv.own.owntv.core.german4k.German4kVariants.basis(channel.name)
+        if (basis.isEmpty()) return emptyList()
+        return runCatching { channelDao.geschwister(channel.sourceId, basis) }
+            .getOrDefault(emptyList())
+            .map { tv.own.owntv.core.german4k.German4kVariants.Variante(it.id, it.name, tv.own.owntv.core.german4k.German4kVariants.stufe(it.name)) }
+    }
+
+    /** Die nächste spielbare Fassung, oder null. */
+    private suspend fun g4kAusweich(channel: ChannelEntity): ChannelEntity? {
+        val wahl = tv.own.owntv.core.german4k.German4kVariants
+            .ausweich(channel.name, g4kGeschwister(channel), g4kVierK)
+            .firstOrNull() ?: return null
+        return runCatching { channelDao.getById(wahl.id) }.getOrNull()
+    }
+
+    /** Statt eines UHD-Senders auf einem Gerät ohne 4K gleich die beste spielbare Fassung. */
+    private suspend fun g4kStattUhd(channel: ChannelEntity): ChannelEntity? {
+        val wahl = tv.own.owntv.core.german4k.German4kVariants
+            .besserGleichSo(channel.name, g4kGeschwister(channel), g4kVierK) ?: return null
+        return runCatching { channelDao.getById(wahl.id) }.getOrNull()
+    }
+
     private var hostSwitchedFor: String? = null
 
     /** When the last host switch happened: errors that arrive within [HOST_SWITCH_GRACE_MS] belong to the
@@ -1756,7 +1795,7 @@ class LiveViewModel(
 
     private suspend fun armLadder(channel: ChannelEntity, preference: tv.own.owntv.core.player.EnginePreference, keepHostSwitch: Boolean = false) {
         ladderPreference = preference
-        if (!keepHostSwitch) hostSwitchedFor = null
+        if (!keepHostSwitch) { hostSwitchedFor = null; g4kVarianteVersucht = false }
         forceTsForExo = null
         ladder.arm(
             channel.streamUrl,
@@ -1876,6 +1915,19 @@ class LiveViewModel(
             return true
         }
         val next = ladder.advance(failureWasAboutFormat = !isRequestRefusal(reason), nowMs = nowMs) ?: run {
+            // German4K: bevor der Fehlerbildschirm kommt — gibt es dieselbe Sendung in einer anderen
+            // Qualität? Für fast 2.000 Basisnamen ja. Einmal je Abstimmung, sonst hangelt sich die App
+            // bei einem tatsächlich toten Sender durch alle Stufen.
+            if (!g4kVarianteVersucht && !isRequestRefusal(reason)) {
+                val ersatz = g4kAusweich(channel)
+                if (ersatz != null) {
+                    g4kVarianteVersucht = true
+                    engineLog("'${channel.name}' → '${ersatz.name}' (andere Qualitätsstufe nach: $reason)")
+                    recordLadderEvent(tv.own.owntv.player.PlayerFailureReason.LIVE_FALLBACK, channel, "Qualitätsstufe — $reason")
+                    viewModelScope.launch { playChannel(ersatz) }
+                    return true
+                }
+            }
             val detail = if (outOfTime) {
                 "$reason — gave up after ${ladderBudgetMs.value / 1000}s"
             } else {
