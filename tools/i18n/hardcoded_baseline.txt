@@ -27,6 +27,8 @@
 1	app/src/main/java/tv/own/owntv/features/customize/MoveToCategoryDialog.kt	☑
 1	app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt	ALL
 1	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	'${channel.name}' switching host ($reason)
+1	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	'${channel.name}' → '${ersatz.name}' (andere Qualitätsstufe nach: $reason)
+1	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	'${channel.name}' → '${ersatz.name}' (kein 4K-Decoder auf diesem Gerät)
 1	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	mpv handoff for '${channel.name}' abandoned — the channel changed while ExoPlayer released
 1	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	starting mpv for '${channel.name}' — reason=$reason
 8	app/src/main/java/tv/own/owntv/features/settings/DnsSettingsScreen.kt	\0

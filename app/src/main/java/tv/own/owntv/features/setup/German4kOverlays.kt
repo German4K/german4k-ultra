@@ -70,6 +70,11 @@ fun German4kOverlays() {
         German4kSupportScreen(onBack = German4kSupport::schliessen)
         return
     }
+    val bereiche by German4kSupport.bereicheSichtbar.collectAsStateWithLifecycle()
+    if (bereiche) {
+        German4kBereicheScreen(onBack = German4kSupport::bereicheSchliessen)
+        return
+    }
     val kunde by German4kSupport.kundeSichtbar.collectAsStateWithLifecycle()
     if (kunde) {
         German4kKundeScreen(onBack = German4kSupport::kundeSchliessen)

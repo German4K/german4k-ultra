@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -2086,7 +2087,10 @@ internal fun AboutDialog(onDismiss: () -> Unit) {
             Spacer(Modifier.height(20.dp))
             // German4K: der Weg zum Selbsttest. Support kann "geh auf Hilfe & Verbindung" sagen,
             // statt nach Fotos zu fragen — der Eintrag steht deshalb dort, wo jeder zuerst sucht.
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // FlowRow statt Row: vier Knöpfe nebeneinander passen auf 1080p knapp und auf einem
+            // 720p-Fire-TV-Stick nicht mehr — der letzte würde am Rand abgeschnitten. Umbrechen
+            // lassen ist hier richtiger, als Texte zu kürzen.
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OwnTVButton(stringResource(R.string.settings_close), onClick = onDismiss, modifier = Modifier.focusRequester(focus))
                 OwnTVButton(
                     stringResource(R.string.g4k_help_open),
@@ -2096,6 +2100,11 @@ internal fun AboutDialog(onDismiss: () -> Unit) {
                 OwnTVButton(
                     stringResource(R.string.g4k_kunde_titel),
                     onClick = { onDismiss(); tv.own.owntv.core.german4k.German4kSupport.kundeOeffnen() },
+                    style = OwnTVButtonStyle.SECONDARY,
+                )
+                OwnTVButton(
+                    stringResource(R.string.g4k_bereiche_titel),
+                    onClick = { onDismiss(); tv.own.owntv.core.german4k.German4kSupport.bereicheOeffnen() },
                     style = OwnTVButtonStyle.SECONDARY,
                 )
             }
