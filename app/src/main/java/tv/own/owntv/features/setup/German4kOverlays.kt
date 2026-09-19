@@ -43,7 +43,11 @@ import org.koin.compose.koinInject
 import tv.own.owntv.R
 import tv.own.owntv.core.companion.CompanionLink
 import tv.own.owntv.core.german4k.German4kPanelAnswer
+import tv.own.owntv.core.german4k.German4kHealth
+import tv.own.owntv.core.german4k.German4kDeviceId
+import tv.own.owntv.core.german4k.German4kPanelClient
 import tv.own.owntv.core.german4k.German4kProvisioner
+import tv.own.owntv.core.german4k.German4kStoerung
 import tv.own.owntv.core.german4k.German4kSupport
 import tv.own.owntv.ui.components.OwnTVButton
 import tv.own.owntv.ui.components.OwnTVButtonStyle
@@ -63,6 +67,11 @@ fun German4kOverlays() {
     val hilfe by German4kSupport.sichtbar.collectAsStateWithLifecycle()
     if (hilfe) {
         German4kSupportScreen(onBack = German4kSupport::schliessen)
+        return
+    }
+    val stoerung by German4kStoerung.lage.collectAsStateWithLifecycle()
+    stoerung?.let { lage ->
+        StoerungDialog(lage, onClose = German4kStoerung::schliessen)
         return
     }
     val a = answer ?: return
@@ -97,6 +106,110 @@ fun German4kOverlays() {
         onLater = { hidden = a.noteId },
     )
 }
+
+/**
+ * Was der Kunde statt „Source error: response code: 458" sieht.
+ *
+ * Ein Satz zur Lage und höchstens drei Knöpfe. Bei belegter Leitung steht „Verbindung freigeben"
+ * vorn — das ist der Fall, der sonst vier Chatnachrichten kostet, und der Reset kostet nichts.
+ */
+@Composable
+private fun StoerungDialog(lage: German4kStoerung.Lage, onClose: () -> Unit) {
+    val colors = OwnTVTheme.colors
+    val panel: German4kPanelClient = koinInject()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    BackHandler { onClose() }
+
+    var laeuft by remember { mutableStateOf(false) }
+    var meldung by remember { mutableStateOf<String?>(null) }
+    val belegt = lage.klasse == German4kHealth.Klasse.LEITUNG_BELEGT
+
+    Box(
+        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.78f)).focusGroup(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier.widthIn(max = 780.dp).clip(RoundedCornerShape(28.dp)).background(colors.surfaceContainer).padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                stoerungTitel(lage.klasse),
+                style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold,
+                color = colors.onSurface, textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(10.dp))
+            Text(lage.sender, style = MaterialTheme.typography.bodyMedium, color = colors.primary)
+            Spacer(Modifier.height(10.dp))
+            Text(
+                meldung ?: stoerungText(lage.klasse),
+                style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant,
+                textAlign = TextAlign.Center, modifier = Modifier.widthIn(max = 620.dp),
+            )
+            Spacer(Modifier.height(24.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (belegt && meldung == null) {
+                    OwnTVButton(
+                        stringResource(if (laeuft) R.string.g4k_stoerung_laeuft else R.string.g4k_stoerung_freigeben),
+                        onClick = {
+                            if (!laeuft) {
+                                laeuft = true
+                                scope.launch {
+                                    val (ok, grund) = panel.sendReset(
+                                        German4kDeviceId.get(context),
+                                        tv.own.owntv.core.CoreBuildInfo.versionName,
+                                    )
+                                    laeuft = false
+                                    meldung = grund ?: if (ok) context.getString(R.string.g4k_stoerung_freigegeben) else null
+                                }
+                            }
+                        },
+                        modifier = Modifier.focusRequester(focus),
+                    )
+                }
+                OwnTVButton(
+                    stringResource(R.string.g4k_stoerung_pruefen),
+                    onClick = { onClose(); German4kSupport.oeffnen() },
+                    style = if (belegt && meldung == null) OwnTVButtonStyle.SECONDARY else OwnTVButtonStyle.PRIMARY,
+                    modifier = if (belegt && meldung == null) Modifier else Modifier.focusRequester(focus),
+                )
+                OwnTVButton(stringResource(R.string.g4k_stoerung_zu), onClick = onClose, style = OwnTVButtonStyle.SECONDARY)
+            }
+        }
+    }
+}
+
+@Composable
+private fun stoerungTitel(k: German4kHealth.Klasse): String = stringResource(
+    when (k) {
+        German4kHealth.Klasse.LEITUNG_BELEGT -> R.string.g4k_fehler_leitung_belegt_title
+        German4kHealth.Klasse.ABGELAUFEN -> R.string.g4k_fehler_abgelaufen_title
+        German4kHealth.Klasse.LAND_GESPERRT -> R.string.g4k_fehler_land_gesperrt_title
+        German4kHealth.Klasse.ZWANGSPORTAL -> R.string.g4k_fehler_zwangsportal_title
+        German4kHealth.Klasse.HOST_AUSFALL -> R.string.g4k_fehler_host_ausfall_title
+        German4kHealth.Klasse.ROUTER_SPERRE -> R.string.g4k_fehler_router_sperre_title
+        German4kHealth.Klasse.ANBIETER_SPERRE -> R.string.g4k_fehler_anbieter_sperre_title
+        German4kHealth.Klasse.KEIN_NETZ -> R.string.g4k_fehler_kein_netz_title
+        else -> R.string.g4k_fehler_unbekannt_title
+    },
+)
+
+@Composable
+private fun stoerungText(k: German4kHealth.Klasse): String = stringResource(
+    when (k) {
+        German4kHealth.Klasse.LEITUNG_BELEGT -> R.string.g4k_fehler_leitung_belegt_body
+        German4kHealth.Klasse.ABGELAUFEN -> R.string.g4k_fehler_abgelaufen_body
+        German4kHealth.Klasse.LAND_GESPERRT -> R.string.g4k_fehler_land_gesperrt_body
+        German4kHealth.Klasse.ZWANGSPORTAL -> R.string.g4k_fehler_zwangsportal_body
+        German4kHealth.Klasse.HOST_AUSFALL -> R.string.g4k_fehler_host_ausfall_body
+        German4kHealth.Klasse.ROUTER_SPERRE -> R.string.g4k_fehler_router_sperre_body
+        German4kHealth.Klasse.ANBIETER_SPERRE -> R.string.g4k_fehler_anbieter_sperre_body
+        German4kHealth.Klasse.KEIN_NETZ -> R.string.g4k_fehler_kein_netz_body
+        else -> R.string.g4k_fehler_unbekannt_body
+    },
+)
 
 /** Hint id for a device clock that is more than five minutes away from ours, or null when it is fine. */
 private fun uhrHinweisId(a: German4kPanelAnswer): String? {

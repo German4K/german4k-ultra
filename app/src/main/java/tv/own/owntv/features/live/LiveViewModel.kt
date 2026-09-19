@@ -1917,6 +1917,9 @@ class LiveViewModel(
      * is showing is the one told to give up, because that is the one the HUD is reading.
      */
     private fun abandonTune(channel: ChannelEntity, detail: String) {
+        // German4K: aus dem technischen Grund einen Satz machen, den der Kunde versteht — und bei
+        // „Leitung belegt" den Knopf anbieten, der es löst (German4kStoerung → German4kOverlays).
+        tv.own.owntv.core.german4k.German4kStoerung.melde(channel.name, detail)
         val reason = "'${channel.name}': $detail"
         if (_liveOnExo.value) previewEngine.abandon(reason) else player.abandonLive(reason)
     }
