@@ -838,6 +838,9 @@ class SettingsViewModel(
         settings.ambientGlowPulse.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
     fun setAmbientGlowPulse(enabled: Boolean) { viewModelScope.launch { settings.setAmbientGlowPulse(enabled) } }
 
+    val g4kDetailseite: StateFlow<Boolean> = settings.g4kDetailseite.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    fun setG4kDetailseite(an: Boolean) { viewModelScope.launch { settings.setG4kDetailseite(an) } }
+
     // Weather chip: visibility toggle + manual location override (for VPN users).
     val weatherEnabled: StateFlow<Boolean> =
         settings.weatherEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)

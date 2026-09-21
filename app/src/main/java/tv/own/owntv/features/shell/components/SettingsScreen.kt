@@ -304,6 +304,7 @@ fun SettingsScreen(
     val livePreview by settingsVm.livePreviewEnabled.collectAsStateWithLifecycle()
     val livePreviewPanelActive by settingsVm.livePreviewPanelActive.collectAsStateWithLifecycle()
     val previewAudio by settingsVm.livePreviewAudio.collectAsStateWithLifecycle()
+    val g4kDetailseite by settingsVm.g4kDetailseite.collectAsStateWithLifecycle()
     val hdr by settingsVm.hdrEnabled.collectAsStateWithLifecycle()
     val autoFrameRate by settingsVm.autoFrameRate.collectAsStateWithLifecycle()
     val surroundMode by settingsVm.surroundMode.collectAsStateWithLifecycle()
@@ -479,6 +480,14 @@ fun SettingsScreen(
             chip = stringResource(if (channelNumbers) R.string.common_on else R.string.common_off),
             chipTone = if (channelNumbers) TileTone.PRIMARY else TileTone.SECONDARY,
             onClick = { settingsVm.setDirectTune(!channelNumbers) },
+        ),
+        RootRow(
+            "quick_g4k_detailseite", TileTone.PRIMARY, OwnTVIcon.MOVIES,
+            title = stringResource(R.string.g4k_detailseite_titel),
+            desc = stringResource(R.string.g4k_detailseite_text),
+            chip = stringResource(if (g4kDetailseite) R.string.common_on else R.string.common_off),
+            chipTone = if (g4kDetailseite) TileTone.PRIMARY else TileTone.SECONDARY,
+            onClick = { settingsVm.setG4kDetailseite(!g4kDetailseite) },
         ),
         RootRow(
             "quick_hdr", TileTone.SECONDARY, OwnTVIcon.VIDEO,
@@ -1028,6 +1037,8 @@ fun SettingsScreen(
             SettingsSearchEntry(videoPlayerGroup, stringResource(R.string.settings_quick_channel_numbers), stringResource(R.string.settings_search_keywords_channel_numbers), OwnTVIcon.LIVE_TV, TileTone.PRIMARY,
                 chip = if (channelNumbers) stringResource(R.string.common_on) else stringResource(R.string.common_off), chipTone = if (channelNumbers) TileTone.PRIMARY else TileTone.SECONDARY, showChevron = false) { settingsVm.setDirectTune(!channelNumbers) },
             SettingsSearchEntry(videoPlayerGroup, stringResource(R.string.settings_mini_player_root), stringResource(R.string.settings_search_keywords_mini), OwnTVIcon.PIP, TileTone.TERTIARY) { openMiniPlayer = true; open(SettingsTab.VIDEO) },
+            SettingsSearchEntry(videoPlayerGroup, stringResource(R.string.g4k_detailseite_titel), stringResource(R.string.g4k_detailseite_titel), OwnTVIcon.MOVIES, TileTone.PRIMARY,
+                chip = if (g4kDetailseite) stringResource(R.string.common_on) else stringResource(R.string.common_off), chipTone = if (g4kDetailseite) TileTone.PRIMARY else TileTone.SECONDARY, showChevron = false) { settingsVm.setG4kDetailseite(!g4kDetailseite) },
             SettingsSearchEntry(videoPlayerGroup, stringResource(R.string.settings_quick_hdr), stringResource(R.string.settings_search_keywords_hdr), OwnTVIcon.VIDEO, TileTone.PRIMARY,
                 chip = if (hdr) stringResource(R.string.common_on) else stringResource(R.string.common_off), chipTone = if (hdr) TileTone.PRIMARY else TileTone.SECONDARY, showChevron = false) { settingsVm.setHdrEnabled(!hdr) },
             SettingsSearchEntry(videoPlayerGroup, stringResource(R.string.settings_auto_frame_rate), stringResource(R.string.settings_search_keywords_afr), OwnTVIcon.VIDEO, TileTone.PRIMARY,
