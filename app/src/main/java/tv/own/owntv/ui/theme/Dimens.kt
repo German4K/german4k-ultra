@@ -7,6 +7,10 @@ object Dimens {
     val ScreenPaddingH = 32.dp
     val ScreenPaddingV = 24.dp
 
+    // German4K: Die Detailseite steht ohne Seitenleiste und ohne Rail da, deshalb braucht sie mehr
+    // Luft zum Bildrand als die Shell-Flaechen — sonst klebt der grosse Titel am Rahmen des Fernsehers.
+    val DetailSeitenRand = 48.dp
+
     // Layer 1 — MD3 navigation panel. Expands to a drawer (labels) when focused,
     // collapses to an icon rail when focus moves into a submenu.
     val SidebarWidthExpanded = 272.dp

@@ -245,13 +245,8 @@ fun TrailerPlayerScreen(videoKey: String, onExit: () -> Unit) {
     }
 }
 
-/**
- * External fallback: YouTube app if installed, else any browser. Never throws.
- *
- * German4K: von `private` auf `internal` gehoben, damit der Trailer im Querbild der Detailseite
- * ([German4kDetailScreen]) denselben Ausweichweg nimmt statt einen zweiten nachzubauen.
- */
-internal fun openInYouTube(context: Context, videoKey: String) {
+/** External fallback: YouTube app if installed, else any browser. Never throws. */
+private fun openInYouTube(context: Context, videoKey: String) {
     val app = Intent(Intent.ACTION_VIEW, Uri.parse("vnd.youtube:$videoKey"))
     val web = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=$videoKey"))
     runCatching { context.startActivity(app) }
