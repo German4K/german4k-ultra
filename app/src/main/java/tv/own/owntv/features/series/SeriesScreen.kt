@@ -712,7 +712,8 @@ private fun SeriesGrid(
                         Spacer(Modifier.height(12.dp))
                     }
                     // Tall portrait poster (like the list / a phone screen), centred in the pane.
-                    Box(modifier = Modifier.fillMaxWidth().height(340.dp), contentAlignment = Alignment.Center) {
+                    // German4K: 220 statt 340 dp — sonst fallen Noten und Handlung unten aus dem Feld (21.09.2026).
+                    Box(modifier = Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
                         Box(
                             modifier = Modifier.fillMaxHeight().aspectRatio(2f / 3f).clip(RoundedCornerShape(12.dp)).background(OwnTVTheme.colors.surfaceContainerLowest),
                             contentAlignment = Alignment.Center,
@@ -730,6 +731,11 @@ private fun SeriesGrid(
                     if (metaBits.isNotEmpty()) {
                         Spacer(Modifier.height(4.dp))
                         Text(metaBits.joinToString(stringResource(R.string.content_metadata_separator)), style = MaterialTheme.typography.bodyMedium, color = OwnTVTheme.colors.onSurfaceVariant)
+                    }
+                    // German4K: Bewertungen je Quelle mit den Zeichen der Seiten.
+                    selectedSeriesMeta?.takeIf { it.seriesId == s.id }?.noten?.let { noten ->
+                        Spacer(Modifier.height(10.dp))
+                        tv.own.owntv.ui.components.German4kNotenZeile(noten)
                     }
                     if (genres.isNotEmpty()) {
                         Spacer(Modifier.height(6.dp))
@@ -832,7 +838,8 @@ private fun SeriesGrid(
     detailsSeries?.let { s ->
         val cache = selectedSeriesMeta?.takeIf { it.seriesId == s.id }?.cache
         tv.own.owntv.features.shell.components.MediaDetailsScreen(
-            details = buildSeriesDetails(s, cache, metadataMode.tmdbWins),
+            details = buildSeriesDetails(s, cache, metadataMode.tmdbWins)
+                .copy(noten = selectedSeriesMeta?.takeIf { it.seriesId == s.id }?.noten),
             onExit = { detailsSeries = null },
         )
     }

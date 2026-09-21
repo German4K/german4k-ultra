@@ -625,6 +625,7 @@ fun MoviesScreen(
                 MovieDetailsPane(
                     movie = selectedMovie,
                     meta = selectedMovieMeta?.takeIf { it.movieId == selectedMovie?.id }?.cache,
+                    noten = selectedMovieMeta?.takeIf { it.movieId == selectedMovie?.id }?.noten,
                     tmdbWins = metadataMode.tmdbWins,
                     resumePositionMs = selectedProgress?.takeIf { !vm.isMovieCompleted(it) }?.positionMs?.takeIf { it > 0 },
                     downloadStrip = selectedMovie?.let { m -> downloadStates[m.id]?.let { tv.own.owntv.core.download.downloadStripFor(listOf(it)) } },
@@ -765,8 +766,9 @@ fun MoviesScreen(
     // Windowed TMDB details popup (§11.1) — read-only, Back exits.
     detailsMovie?.let { m ->
         val cache = selectedMovieMeta?.takeIf { it.movieId == m.id }?.cache
+        val noten = selectedMovieMeta?.takeIf { it.movieId == m.id }?.noten
         MediaDetailsScreen(
-            details = buildMovieDetails(m, cache, metadataMode.tmdbWins),
+            details = buildMovieDetails(m, cache, metadataMode.tmdbWins).copy(noten = noten),
             onExit = { detailsMovie = null },
         )
     }
@@ -970,6 +972,7 @@ private fun MovieContextMenu(
 private fun MovieDetailsPane(
     movie: MovieEntity?,
     meta: tv.own.owntv.core.database.entity.MetadataCacheEntity?,
+    noten: tv.own.owntv.core.german4k.German4kNoten? = null,
     tmdbWins: Boolean,
     resumePositionMs: Long? = null,
     downloadStrip: tv.own.owntv.core.download.DownloadStripState? = null,
@@ -1001,7 +1004,8 @@ private fun MovieDetailsPane(
             Spacer(Modifier.height(12.dp))
         }
         // Tall portrait poster (like the list / a phone screen), centred in the pane.
-        Box(modifier = Modifier.fillMaxWidth().height(340.dp), contentAlignment = Alignment.Center) {
+        // German4K: 220 statt 340 dp — sonst fallen Noten und Handlung unten aus dem Feld (21.09.2026).
+        Box(modifier = Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
             Box(
                 modifier = Modifier.fillMaxHeight().aspectRatio(2f / 3f).clip(RoundedCornerShape(12.dp)).background(colors.surfaceContainerLowest),
                 contentAlignment = Alignment.Center,
@@ -1032,6 +1036,11 @@ private fun MovieDetailsPane(
         Text(movie.name, style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
         Spacer(Modifier.height(6.dp))
         Text(metaLine(movie, meta, tmdbWins), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+        // German4K: Bewertungen je Quelle mit den Zeichen der Seiten (IMDb, TMDB, RT, Metacritic …).
+        if (noten != null && !noten.leer) {
+            Spacer(Modifier.height(10.dp))
+            tv.own.owntv.ui.components.German4kNotenZeile(noten)
+        }
         // Genres & cast are TMDB-only (§7.1) — a whole layer the provider never had.
         val genres = jsonList(meta?.genresJson)
         if (genres.isNotEmpty()) {

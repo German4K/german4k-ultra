@@ -16,6 +16,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -101,6 +102,8 @@ class SeriesViewModel(
     private val externalPlayerLauncher: tv.own.owntv.core.player.ExternalPlayerLauncher,
     private val streamUrlResolver: tv.own.owntv.core.stalker.StreamUrlResolver,
     private val subtitleController: tv.own.owntv.core.subtitles.SubtitleController,
+    // German4K: Bewertungen je Quelle fuer die Detailansicht (IMDb, TMDB, RT, Metacritic …).
+    private val xtream: tv.own.owntv.core.parser.XtreamClient,
 ) : ViewModel() {
 
     data class SeriesMoveState(val items: List<SeriesEntity>, val activeIndex: Int, val contextKey: String)
@@ -294,11 +297,28 @@ class SeriesViewModel(
         .debounce(tv.own.owntv.core.metadata.MetadataRepository.FOCUS_DEBOUNCE_MS)
         .mapLatest { (s, _) ->
             if (s == null) null
-            else SeriesMeta(s.id, runCatching { metadata.resolveSeries(s) }.getOrNull())
+            else kotlinx.coroutines.coroutineScope {
+                // German4K: die Noten parallel zur TMDB-Suche.
+                val noten = async { notenFuer(s) }
+                val cache = runCatching { metadata.resolveSeries(s) }.getOrNull()
+                SeriesMeta(s.id, cache, noten.await())
+            }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    data class SeriesMeta(val seriesId: Long, val cache: tv.own.owntv.core.database.entity.MetadataCacheEntity?)
+    data class SeriesMeta(
+        val seriesId: Long,
+        val cache: tv.own.owntv.core.database.entity.MetadataCacheEntity?,
+        val noten: tv.own.owntv.core.german4k.German4kNoten? = null,
+    )
+
+    /** German4K: Bewertungen vom eigenen Server — nur Xtream-Quellen, still null bei jedem Fehler. */
+    private suspend fun notenFuer(s: SeriesEntity): tv.own.owntv.core.german4k.German4kNoten? {
+        val id = s.remoteId ?: return null
+        val source = sourceDao.getById(s.sourceId) ?: return null
+        if (source.type != tv.own.owntv.core.model.SourceType.XTREAM) return null
+        return runCatching { xtream.getNoten(source, serie = true, id = id) }.getOrNull()
+    }
 
     /**
      * Poster fallback for tiles the provider gave no artwork for — see MovieViewModel.cachedPosters

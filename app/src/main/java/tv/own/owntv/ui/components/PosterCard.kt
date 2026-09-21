@@ -80,19 +80,22 @@ fun PosterCard(
                     }
                 }
 
+                // German4K: IMDb-Note oben rechts, mit dem gelben IMDb-Schild (Kundenwunsch 21.09.2026,
+                // „wie in UHF"). Unser Server liefert in der Liste nur IMDb-Noten (streams.note), das
+                // Schild lügt also nicht. Der Favoriten-Stern ist dafür nach oben links gewandert.
                 if (rating != null && rating > 0) {
                     Row(
                         modifier = Modifier
-                            .align(Alignment.TopStart)
+                            .align(Alignment.TopEnd)
                             .padding(6.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(Color.Black.copy(alpha = 0.55f))
-                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color.Black.copy(alpha = 0.72f))
+                            .padding(start = 3.dp, end = 6.dp, top = 3.dp, bottom = 3.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        OwnTVIcon(OwnTVIcon.STAR, tint = colors.accent, filled = true, modifier = Modifier.size(12.dp))
+                        ImdbZeichen(hoehe = 14.dp)
                         Spacer(Modifier.size(4.dp))
-                        Text(stringResource(R.string.common_rating, rating), style = MaterialTheme.typography.labelMedium, color = Color.White)
+                        Text(german4kNote(rating), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
 
@@ -118,7 +121,7 @@ fun PosterCard(
                         OwnTVIcon.FAVORITE,
                         tint = colors.favorite,
                         filled = true,
-                        modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(18.dp),
+                        modifier = Modifier.align(Alignment.TopStart).padding(6.dp).size(18.dp),
                     )
                 }
 

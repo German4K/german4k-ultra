@@ -69,6 +69,8 @@ data class MediaDetailsUi(
     val genres: List<String> = emptyList(),
     val plot: String? = null,
     val cast: List<tv.own.owntv.core.metadata.CastMember> = emptyList(),
+    /** German4K: Bewertungen je Quelle; null = keine Zeile. */
+    val noten: tv.own.owntv.core.german4k.German4kNoten? = null,
 )
 
 /**
@@ -166,6 +168,10 @@ fun MediaDetailsScreen(details: MediaDetailsUi, onExit: () -> Unit, modifier: Mo
                     if (details.metaLine.isNotBlank()) {
                         Spacer(Modifier.height(8.dp))
                         Text(details.metaLine, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+                    }
+                    if (details.noten != null && !details.noten.leer) {
+                        Spacer(Modifier.height(12.dp))
+                        tv.own.owntv.ui.components.German4kNotenZeile(details.noten, hoehe = 24.dp)
                     }
                     if (details.genres.isNotEmpty()) {
                         Spacer(Modifier.height(6.dp))

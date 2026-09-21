@@ -15,6 +15,7 @@ import androidx.paging.map
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -94,6 +95,8 @@ class MovieViewModel(
     private val externalPlayerLauncher: tv.own.owntv.core.player.ExternalPlayerLauncher,
     private val streamUrlResolver: tv.own.owntv.core.stalker.StreamUrlResolver,
     private val subtitleController: tv.own.owntv.core.subtitles.SubtitleController,
+    // German4K: Bewertungen je Quelle fuer die Detailansicht (IMDb, TMDB, RT, Metacritic …).
+    private val xtream: tv.own.owntv.core.parser.XtreamClient,
 ) : ViewModel() {
 
     data class MovieMoveState(val items: List<MovieEntity>, val activeIndex: Int, val contextKey: String)
@@ -293,13 +296,30 @@ class MovieViewModel(
         .debounce(tv.own.owntv.core.metadata.MetadataRepository.FOCUS_DEBOUNCE_MS)
         .mapLatest { (m, _) ->
             if (m == null) null
-            else MovieMeta(m.id, runCatching { metadata.resolveMovie(m) }.getOrNull())
+            else kotlinx.coroutines.coroutineScope {
+                // German4K: die Noten parallel zur TMDB-Suche, sonst wartet die Detailansicht doppelt.
+                val noten = async { notenFuer(m) }
+                val cache = runCatching { metadata.resolveMovie(m) }.getOrNull()
+                MovieMeta(m.id, cache, noten.await())
+            }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** TMDB metadata tagged with the movie id it was resolved for, so the UI never shows stale meta on a
      *  different card during the debounce window. [cache] is null while resolving or on no match. */
-    data class MovieMeta(val movieId: Long, val cache: tv.own.owntv.core.database.entity.MetadataCacheEntity?)
+    data class MovieMeta(
+        val movieId: Long,
+        val cache: tv.own.owntv.core.database.entity.MetadataCacheEntity?,
+        val noten: tv.own.owntv.core.german4k.German4kNoten? = null,
+    )
+
+    /** German4K: Bewertungen vom eigenen Server — nur Xtream-Quellen, still null bei jedem Fehler. */
+    private suspend fun notenFuer(m: MovieEntity): tv.own.owntv.core.german4k.German4kNoten? {
+        val id = m.remoteId ?: return null
+        val source = sourceDao.getById(m.sourceId) ?: return null
+        if (source.type != tv.own.owntv.core.model.SourceType.XTREAM) return null
+        return runCatching { xtream.getNoten(source, serie = false, id = id) }.getOrNull()
+    }
 
     /**
      * Poster fallback for grid/list tiles the provider gave no artwork for. Those show a placeholder
