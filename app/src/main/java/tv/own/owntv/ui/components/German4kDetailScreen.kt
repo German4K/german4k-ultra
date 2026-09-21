@@ -34,7 +34,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -92,9 +91,6 @@ private const val TRENNER = " · "
 
 /** Eine Zeile Handlung pro Druck, wenn die Seite selbst scrollen muss — wie im TMDB-Fenster. */
 private const val SCROLL_SCHRITT = 260f
-
-/** ~10 Bilder: lange genug, bis die Seite wirklich haengt, kurz genug, um niemandem im Weg zu sein. */
-private const val FOKUS_VERSUCHE = 10
 
 /**
  * Was die Seite zeigt. [details] == null heisst: der Titel ist bekannt, der Server antwortet noch —
@@ -157,12 +153,14 @@ fun German4kDetailScreen(
     BackHandler(enabled = trailerLaeuft) { trailerLaeuft = false }
 
     // Ein einzelner Versuch geht ins Leere, solange die Seite noch aufgeht — dann haette die Seite
-    // gar kein Fokusziel und das D-Pad waere tot. Deshalb Bild fuer Bild nachfassen (wie FocusTrap).
-    LaunchedEffect(ui.schluessel) {
-        repeat(FOKUS_VERSUCHE) {
-            withFrameNanos { }
-            if (runCatching { ersterKnopf.requestFocus() }.isSuccess) return@LaunchedEffect
-        }
+    // gar kein Fokusziel und das D-Pad waere tot. Deshalb Bild fuer Bild nachfassen.
+    LaunchedEffect(ui.schluessel) { fokusMitWiederholung(ersterKnopf) }
+
+    // Scheitert der Trailer, waehrend sein eigener Knopf den Fokus hat, faellt der Knopf aus der
+    // Komposition — und Compose sucht dafuer KEINEN Ersatz: das D-Pad waere tot, bis jemand Zurueck
+    // drueckt. Deshalb den Fokus hier ausdruecklich zurueck auf den ersten Knopf holen.
+    LaunchedEffect(trailerUnmoeglich) {
+        if (trailerUnmoeglich) fokusMitWiederholung(ersterKnopf)
     }
 
     // Ohne Besetzung und ohne Fassungen (Nachtrag, Tafel-Line) sind die Knoepfe das einzige
