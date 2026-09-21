@@ -61,7 +61,7 @@ fun German4kPersonScreen(
 
     LaunchedEffect(titel) {
         if (titel != null && (titel.filme.isNotEmpty() || titel.serien.isNotEmpty())) {
-            runCatching { ersteKachel.requestFocus() }
+            fokusMitWiederholung(ersteKachel)
         }
     }
 
