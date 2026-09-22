@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -33,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -91,6 +93,8 @@ import tv.own.owntv.ui.components.InAppToast
 import tv.own.owntv.ui.components.rememberInAppToast
 import tv.own.owntv.ui.components.OwnTVButton
 import tv.own.owntv.ui.components.OwnTVButtonStyle
+import tv.own.owntv.features.mobil.German4kMobilRahmen
+import tv.own.owntv.ui.LocalFormfaktor
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.core.model.ContentMenu
 import tv.own.owntv.ui.components.MenuAction
@@ -444,6 +448,11 @@ fun MoviesScreen(
     // Manual panel widths (Settings → Panel Width Adjustment). The saved percentages now resolve
     // against the inside of one shared content container; no stored value is rewritten.
     val panelShares = rememberPanelShares(PanelSection.MOVIES, settingsVm)
+    // German4K: Handy/Tablet — Formfaktor und der Drill-down-Zustand des Mobil-Rahmens. Der
+    // Zustand liegt hier statt im Rahmen, damit er eine Drehung ueberlebt und die angepinnten
+    // Ansichten (Favoriten/Verlauf aus "Mehr") ihn erzwingen koennen.
+    val formfaktor = LocalFormfaktor.current
+    var kategorieOffen by rememberSaveable { mutableStateOf(false) }
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
@@ -465,71 +474,28 @@ fun MoviesScreen(
     // sonst reserviert `computePanelWidths` ihn weiter und die Kachelspalte behaelt ihre schmale
     // Breite, waehrend rechts ein Drittel leer bleibt. Ohne eigene Breiten (Standard) bleibt alles
     // wie gehabt: `panels` ist dann null und die Spalte nimmt sich ihr Gewicht.
-    val previewVisible = panelShares?.preview != 0 && !detailseite
+    // German4K: Auf Handy/Tablet gibt es keine dritte Spalte — die Vorschau haette dort keine
+    // Breite mehr; die Angaben zum Film stehen auf der Detailseite.
+    val previewVisible = panelShares?.preview != 0 && !detailseite && !formfaktor.mobil
     val innerGapTotal = browsePanelGapTotal(previewVisible)
     val panels = panelShares?.let {
         computePanelWidths(if (previewVisible) it else it.copy(preview = 0), maxWidth, innerGapTotal)
     }
-    Row(
-        modifier = Modifier
-            .fillMaxSize(),
-    ) {
-        // Plan Z — More → Favourites and More → History pin this pane to one folder and put
-        // their own three tabs above it, so there is no category rail to draw.
-        if (lockedKey == null) {
-        CategoryRail(
-            width = panels?.category ?: Dimens.RailWidthFixed,
-            categories = railItems.map {
-                RailCategory(
-                    it.displayLabel(R.string.content_category_all_movies),
-                    it.icon,
-                    showGenreDot = it.key is LiveKey.Folder,
-                    providerName = it.providerName,
-                )
-            },
-            selectedIndex = selectedIndex,
-            focusRowIndex = railFocusRow,
-            onRowFocused = { railFocusRow = null },
-            onSelect = { idx -> railItems.getOrNull(idx)?.let { vm.select(it.key) } },
-            onLongSelect = { idx ->
-                railItems.getOrNull(idx)?.let { item ->
-                    if (item.key is LiveKey.Folder || item.key is LiveKey.Custom) {
-                        contextCategory = item
-                        contextCategoryKey = item.key
-                    }
-                }
-            },
-            listState = catListState,
-            focusRequester = railFocus,
-            showPanel = false,
-            modifier = Modifier
-                .onFocusChanged { railPaneFocused = it.hasFocus }
-                .chNavPaging(
-                    enabled = chNavEnabled,
-                    upSkip = chNavUpSkip,
-                    downSkip = chNavDownSkip,
-                    isFocused = { railPaneFocused },
-                    lastIndex = { railItems.size - 1 },
-                    currentTargetIndex = { selectedIndex },
-                    onJumpToIndex = { idx -> railItems.getOrNull(idx)?.let { vm.select(it.key) } },
-                ),
-        )
-
-        Spacer(Modifier.width(BrowseColumnGap))
-        Box(
-            Modifier
-                .width(BrowseColumnDividerSpace)
-                .fillMaxHeight()
-                .padding(vertical = 2.dp)
-                .background(OwnTVTheme.colors.outlineVariant.copy(alpha = 0.35f)),
-        )
-
-        Spacer(Modifier.width(BrowseColumnGap))
-        }
-
+    // German4K: Der Listen-/Rasterblock einmal als Lambda — Fernseher- und Mobil-Zweig rufen
+    // denselben Inhalt auf, damit es ihn nicht zweimal gibt. RowScope, weil er im
+    // Fernseher-Zweig `weight(1.8f)` braucht; der Mobil-Zweig setzt ihn in ein eigenes Row.
+    val listeUndRaster: @Composable RowScope.() -> Unit = {
         Column(
             modifier = Modifier
-                .then(if (panels != null) Modifier.width(panels.list) else Modifier.weight(1.8f))
+                // German4K: Auf Handy/Tablet ist das hier die einzige Spalte — kein Gewicht, keine
+                // gespeicherte Breite, sonst bleibt rechts der Platz der Vorschau leer.
+                .then(
+                    when {
+                        formfaktor.mobil -> Modifier
+                        panels != null -> Modifier.width(panels.list)
+                        else -> Modifier.weight(1.8f)
+                    },
+                )
                 .fillMaxSize()
                 .onFocusChanged { gridPaneFocused = it.hasFocus }
                 // CH+- key paging for this movies list/grid. currentTargetIndex falls back to the
@@ -666,7 +632,13 @@ fun MoviesScreen(
             } else {
                 LazyVerticalGrid(
                     state = effectiveGridState,
-                    columns = if (detailseite) GridCells.Fixed(3) else GridCells.Adaptive(minSize = 130.dp),
+                    // German4K: Auf dem Handy sind 130 dp Kacheln so klein, dass der Titel nicht mehr
+                    // lesbar ist — 150 dp ergeben zwei Spalten hoch, drei quer, vier bis sechs auf dem Tablet.
+                    columns = when {
+                        formfaktor.mobil -> GridCells.Adaptive(minSize = 150.dp)
+                        detailseite -> GridCells.Fixed(3)
+                        else -> GridCells.Adaptive(minSize = 130.dp)
+                    },
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -704,6 +676,101 @@ fun MoviesScreen(
                 }
             }
         }
+    }
+
+    // German4K: Auf Handy/Tablet tritt der gemeinsame Mobil-Rahmen an die Stelle der drei
+    // Spalten — Kategorien zum Antippen (Handy hoch) bzw. schmale Rail (quer/Tablet).
+    if (formfaktor.mobil) {
+        German4kMobilRahmen(
+            // Angepinnt (Favoriten/Verlauf aus "Mehr") gibt es keine Kategorien: leere Liste,
+            // dann laesst der Rahmen die Kopfzeile mit dem Zurueck-Pfeil weg.
+            kategorien = if (lockedKey == null) {
+                railItems.map {
+                    RailCategory(
+                        it.displayLabel(R.string.content_category_all_movies),
+                        it.icon,
+                        showGenreDot = it.key is LiveKey.Folder,
+                        providerName = it.providerName,
+                    )
+                }
+            } else {
+                emptyList()
+            },
+            selectedIndex = selectedIndex,
+            onSelect = { idx -> railItems.getOrNull(idx)?.let { vm.select(it.key) } },
+            onLongSelect = { idx ->
+                railItems.getOrNull(idx)?.let { item ->
+                    if (item.key is LiveKey.Folder || item.key is LiveKey.Custom) {
+                        contextCategory = item
+                        contextCategoryKey = item.key
+                    }
+                }
+            },
+            kategorieOffen = kategorieOffen || lockedKey != null,
+            onKategorieOffen = { kategorieOffen = it },
+            titel = selectedLabel,
+        ) {
+            Row(Modifier.fillMaxSize()) { listeUndRaster() }
+        }
+    } else {
+    Row(
+        modifier = Modifier
+            .fillMaxSize(),
+    ) {
+        // Plan Z — More → Favourites and More → History pin this pane to one folder and put
+        // their own three tabs above it, so there is no category rail to draw.
+        if (lockedKey == null) {
+        CategoryRail(
+            width = panels?.category ?: Dimens.RailWidthFixed,
+            categories = railItems.map {
+                RailCategory(
+                    it.displayLabel(R.string.content_category_all_movies),
+                    it.icon,
+                    showGenreDot = it.key is LiveKey.Folder,
+                    providerName = it.providerName,
+                )
+            },
+            selectedIndex = selectedIndex,
+            focusRowIndex = railFocusRow,
+            onRowFocused = { railFocusRow = null },
+            onSelect = { idx -> railItems.getOrNull(idx)?.let { vm.select(it.key) } },
+            onLongSelect = { idx ->
+                railItems.getOrNull(idx)?.let { item ->
+                    if (item.key is LiveKey.Folder || item.key is LiveKey.Custom) {
+                        contextCategory = item
+                        contextCategoryKey = item.key
+                    }
+                }
+            },
+            listState = catListState,
+            focusRequester = railFocus,
+            showPanel = false,
+            modifier = Modifier
+                .onFocusChanged { railPaneFocused = it.hasFocus }
+                .chNavPaging(
+                    enabled = chNavEnabled,
+                    upSkip = chNavUpSkip,
+                    downSkip = chNavDownSkip,
+                    isFocused = { railPaneFocused },
+                    lastIndex = { railItems.size - 1 },
+                    currentTargetIndex = { selectedIndex },
+                    onJumpToIndex = { idx -> railItems.getOrNull(idx)?.let { vm.select(it.key) } },
+                ),
+        )
+
+        Spacer(Modifier.width(BrowseColumnGap))
+        Box(
+            Modifier
+                .width(BrowseColumnDividerSpace)
+                .fillMaxHeight()
+                .padding(vertical = 2.dp)
+                .background(OwnTVTheme.colors.outlineVariant.copy(alpha = 0.35f)),
+        )
+
+        Spacer(Modifier.width(BrowseColumnGap))
+        }
+
+        listeUndRaster()
 
         if (previewVisible) {
             Spacer(Modifier.width(BrowseColumnGap))
@@ -724,6 +791,7 @@ fun MoviesScreen(
                 )
             }
         }
+    }
     }
     }
 
