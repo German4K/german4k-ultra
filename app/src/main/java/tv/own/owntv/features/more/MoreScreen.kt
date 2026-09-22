@@ -73,6 +73,7 @@ import tv.own.owntv.features.shell.components.SheetHeader
 import tv.own.owntv.features.shell.components.SpineItem
 import tv.own.owntv.features.shell.components.TileTone
 import tv.own.owntv.player.PlaybackErrorLog
+import tv.own.owntv.ui.LocalFormfaktor
 import tv.own.owntv.ui.components.ContentPanelFill
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.OwnTVPopup
@@ -197,6 +198,11 @@ fun MoreScreen(
     }
 
     val colors = OwnTVTheme.colors
+    // German4K: Auf Handy und Tablet gibt es nur die Spine, in voller Breite. Auf 360 dp waren die
+    // 34 % Spine-Breite 122 dp — die Zeilen hiessen dort "Downl...", "S...", "F..." (t2/02-handy-mehr.png),
+    // und die Tafel daneben zeigte "OK open Settings", was mit dem Finger niemand drueckt. Die Tafel
+    // ist ohnehin nur eine Vorschau: jede Zeile fuehrt beim Tipp direkt an ihr Ziel.
+    val formfaktor = LocalFormfaktor.current
     val paneShape = SettingsSkin.PaneShape
     val backupAge = lastBackup?.let { relativeShort(it.at) }
     val syncValue = stringResource(if (sync.listening) R.string.common_on else R.string.common_off)
@@ -241,7 +247,7 @@ fun MoreScreen(
         BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f)) {
         // 294 dp is the design width, but at 150% UI Zoom the whole panel is not much wider than
         // that — so it gives way rather than squeezing the pane into a strip. Settings' own rule.
-        val spineWidth = minOf(SettingsSkin.SpineWidth, maxWidth * 0.34f)
+        val spineWidth = if (formfaktor.mobil) maxWidth else minOf(SettingsSkin.SpineWidth, maxWidth * 0.34f)
         Row(
             modifier = Modifier.fillMaxSize(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -363,6 +369,7 @@ fun MoreScreen(
             }
 
             // --- The pane: what is behind the highlighted row. Read-only, and never focusable.
+            if (!formfaktor.mobil) {
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -423,6 +430,7 @@ fun MoreScreen(
                     }
                 }
                 PaneHint(destination)
+            }
             }
         }
         }
