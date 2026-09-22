@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,8 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
@@ -38,9 +35,6 @@ import tv.own.owntv.ui.LocalFormfaktor
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.theme.OwnTVTheme
-
-/** Hoehe einer Kategoriezeile in Ebene 1 — Daumengroesse, nicht Fernbedienungsgroesse. */
-private val ZeilenHoehe = 56.dp
 
 /**
  * German4K: der gemeinsame Rahmen fuer Filme, Serien und Live auf Handy und Tablet (22.09.2026).
@@ -118,7 +112,7 @@ fun German4kMobilRahmen(
                             contentAlignment = Alignment.CenterStart,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(ZeilenHoehe)
+                                .height(German4kMobilZeilenHoehe)
                                 .padding(horizontal = 12.dp, vertical = 2.dp)
                                 .focusRequester(fokus),
                         ) { _ ->
@@ -157,36 +151,7 @@ fun German4kMobilRahmen(
             // Ebene 2: Kopfzeile mit Zurueck-Pfeil + Kategoriename, darunter der Inhalt des Screens.
             Column(modifier.fillMaxSize()) {
                 if (!ohneKategorien) {
-                    val zurueck = stringResource(R.string.g4k_mobil_zurueck)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(ZeilenHoehe)
-                            .padding(horizontal = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        FocusableSurface(
-                            onClick = { onKategorieOffen(false) },
-                            shape = CircleShape,
-                            // OwnTVIcon zeichnet auf Canvas und kennt keine Beschreibung — die
-                            // Vorlesehilfe haengt deshalb an der Flaeche, die man antippt.
-                            modifier = Modifier.size(44.dp).semantics { contentDescription = zurueck },
-                        ) { _ ->
-                            OwnTVIcon(
-                                icon = OwnTVIcon.BACK,
-                                tint = colors.onSurface,
-                                modifier = Modifier.size(22.dp),
-                            )
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = titel,
-                            style = MaterialTheme.typography.titleLarge,
-                            color = colors.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                    German4kMobilKopfzeile(titel = titel, onZurueck = { onKategorieOffen(false) })
                 }
                 Box(Modifier.weight(1f).fillMaxWidth()) { inhalt() }
             }

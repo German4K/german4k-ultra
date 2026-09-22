@@ -99,6 +99,8 @@ import tv.own.owntv.features.settings.ManageSourcesScreen
 import tv.own.owntv.features.settings.SettingsViewModel
 import tv.own.owntv.features.settings.VideoPlayerSettingsScreen
 import tv.own.owntv.core.nav.MainSection
+import tv.own.owntv.features.mobil.German4kMobilKopfzeile
+import tv.own.owntv.ui.LocalFormfaktor
 import tv.own.owntv.ui.components.BrandLockup
 import tv.own.owntv.ui.components.BrowseMode
 import tv.own.owntv.ui.components.FocusableSurface
@@ -279,6 +281,9 @@ fun SettingsScreen(
     // These belong to the two-pane Settings root, but stay remembered while a detail screen replaces
     // it. Otherwise Back briefly rebuilds Quick at row zero before restoring the real group/row.
     var selectedGroup by rememberSaveable { mutableIntStateOf(0) }
+    // German4K: Im Hochformat ist Einstellungen ein Drill-down statt Spine|Blatt — das hier sagt, ob
+    // die zweite Ebene (das Blatt der gewaehlten Gruppe) offen ist. Ueberlebt eine Drehung.
+    var gruppeOffen by rememberSaveable { mutableStateOf(false) }
     var displayedGroup by rememberSaveable { mutableIntStateOf(0) }
     val spineState = rememberLazyListState()
     var savedIndex by remember { mutableIntStateOf(0) }
@@ -901,6 +906,11 @@ fun SettingsScreen(
     BackHandler(enabled = tab == SettingsTab.ROOT && sheetFocused && searchQuery.isBlank()) {
         runCatching { selectedCategoryFocus.requestFocus() }
     }
+    // German4K: Zurueck aus dem Blatt fuehrt im Hochformat auf die Gruppenliste, nicht aus den
+    // Einstellungen heraus. Steht nach den beiden Handlern darueber, damit er sie ueberstimmt.
+    BackHandler(enabled = tab == SettingsTab.ROOT && LocalFormfaktor.current.kompakt && gruppeOffen) {
+        gruppeOffen = false
+    }
     // A genuinely new group starts at its first row. Recreating the root after a sub-screen does not:
     // its group and list position were kept above the sub-screen dispatch, so leave them untouched.
     LaunchedEffect(selectedGroup) {
@@ -1169,14 +1179,19 @@ fun SettingsScreen(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(
-                    text = stringResource(R.string.settings_header_hint),
-                    fontSize = 12.sp,
-                    color = colors.outline,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 3.dp),
-                )
+                // German4K: Der Hinweis beschreibt zwei Spalten ("Links Gruppen, rechts ihre
+                // Einstellungen") — im Hochformat gibt es die nicht, und die Zeile fiele ohnehin in
+                // die Ellipse. Dort faellt sie weg und macht Platz fuer eine Zeile Inhalt.
+                if (!LocalFormfaktor.current.kompakt) {
+                    Text(
+                        text = stringResource(R.string.settings_header_hint),
+                        fontSize = 12.sp,
+                        color = colors.outline,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 3.dp),
+                    )
+                }
             }
             if (searchExpanded || searchQuery.isNotBlank()) {
                 // Sized, not stretched: a field spanning the whole header reads as the subject of the
@@ -1204,10 +1219,14 @@ fun SettingsScreen(
             // gives way with it, for the same reason.
             val spineWidth = minOf(SettingsSkin.SpineWidth, maxWidth * 0.34f)
             val valueColumn = minOf(SettingsSkin.ValueColumn, maxWidth * 0.22f)
-            Row(
-                modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
+            // German4K: Spine und Blatt stehen ab hier als zwei Bausteine da statt fest
+            // nebeneinander. Am Fernseher und auf dem Tablet ruft sie eine Row wie bisher auf; im
+            // Hochformat ist daraus ein Drill-down geworden — 34 % von 360 dp sind 122 dp, in denen
+            // weder die Gruppennamen noch die Einstellungen daneben lesbar sind. Der Inhalt beider
+            // Bausteine ist unveraendert, nur ihr aeusserer Modifier kommt jetzt vom Aufrufer.
+            val kompakt = LocalFormfaktor.current.kompakt
+            val gruppe = categories.getOrNull(selectedGroup)?.first
+            val spineBaustein: @Composable (Modifier) -> Unit = { basis ->
                 // --- The spine: Quick, then the nine groups, each with its icon, its one-line summary
                 // and how many rows it holds. It carries its OWN plate, the same one the sheet has —
                 // the two columns are a pair, and a bare list beside a panelled one reads as
@@ -1218,9 +1237,7 @@ fun SettingsScreen(
                 val searching = searchQuery.isNotBlank()
                 LazyColumn(
                     state = spineState,
-                    modifier = Modifier
-                        .width(spineWidth)
-                        .fillMaxHeight()
+                    modifier = basis
                         .alpha(if (searching) 0.4f else 1f)
                         .clip(paneShape)
                         .glass(surface = GlassSurface.CARDS, baseFill = colors.surfaceContainerLow, shape = paneShape)
@@ -1249,6 +1266,13 @@ fun SettingsScreen(
                             selected = i == selectedGroup,
                             active = rows.any { it.chip != null && it.chipTone != TileTone.SECONDARY },
                             onFocused = { selectedGroup = i },
+                            // German4K: Am Fernseher waehlt OK die Gruppe, deren Zeilen daneben schon
+                            // stehen. Im Hochformat gibt es kein Daneben — dort oeffnet der Tipp sie.
+                            onClick = if (kompakt) {
+                                { selectedGroup = i; gruppeOffen = true }
+                            } else {
+                                null
+                            },
                             modifier = if (i == selectedGroup) {
                                 Modifier.focusRequester(selectedCategoryFocus)
                             } else {
@@ -1258,13 +1282,15 @@ fun SettingsScreen(
                     }
                     item(key = "spine_foot") { SpineFooter() }
                 }
+            }
+            val blattBaustein: @Composable (Modifier) -> Unit = { basis ->
                 // --- The sheet: ONE container holding the selected group's rows — or, while
                 // searching, every match wherever it lives, with the path it came from.
-                val group = categories.getOrNull(selectedGroup)?.first
+                val paneShape = SettingsSkin.PaneShape
+                val searching = searchQuery.isNotBlank()
+                val group = gruppe
                 Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
+                    modifier = basis
                         .clip(paneShape)
                         .glass(surface = GlassSurface.CARDS, baseFill = colors.surfaceContainerLow, shape = paneShape)
                         .border(1.dp, colors.outlineVariant, paneShape),
@@ -1352,6 +1378,36 @@ fun SettingsScreen(
                             }
                         }
                     }
+                }
+            }
+
+            if (kompakt) {
+                // Ebene 1 = Gruppenliste in voller Breite; Ebene 2 = das Blatt der gewaehlten Gruppe
+                // mit der Kopfzeile "< Gruppe". Eine Suche springt sofort auf Ebene 2: was sie
+                // findet, steht im Blatt.
+                val zeigeBlatt = gruppeOffen || searchQuery.isNotBlank()
+                if (zeigeBlatt) {
+                    Column(Modifier.fillMaxSize()) {
+                        German4kMobilKopfzeile(
+                            titel = if (searchQuery.isNotBlank()) {
+                                stringResource(R.string.settings_results_title)
+                            } else {
+                                gruppe?.label.orEmpty()
+                            },
+                            onZurueck = { gruppeOffen = false },
+                        )
+                        blattBaustein(Modifier.fillMaxWidth().weight(1f))
+                    }
+                } else {
+                    spineBaustein(Modifier.fillMaxSize())
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    spineBaustein(Modifier.width(spineWidth).fillMaxHeight())
+                    blattBaustein(Modifier.weight(1f).fillMaxHeight())
                 }
             }
         }
