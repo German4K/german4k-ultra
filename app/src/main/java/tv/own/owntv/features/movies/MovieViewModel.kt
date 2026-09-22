@@ -340,10 +340,23 @@ class MovieViewModel(
     // Serie nennt auch Filme; der Sprung geht dann erst in den Filmbereich, und erst dessen
     // MoviesScreen kann die Detailseite aufmachen. Deshalb legen wir die Kennung hier ab und
     // MoviesScreen holt sie beim naechsten Bild ab (und loescht sie wieder).
+    //
+    // Haltbarkeit: Der Auftrag gilt nur kurz. Kommt der MoviesScreen gar nicht ins Bild (der Wechsel
+    // bricht ab, der Nutzer geht sofort woanders hin), bliebe die Kennung sonst stehen und die
+    // Detailseite spraenge beim naechsten Besuch des Filmbereichs unvermittelt auf. Deshalb ein
+    // Zeitstempel: aeltere Auftraege holt der Bildschirm nicht mehr ab, er wirft sie weg.
     private val _pendingDetailsId = MutableStateFlow<Long?>(null)
     val pendingDetailsId: StateFlow<Long?> = _pendingDetailsId.asStateFlow()
+    private var pendingDetailsGesetztMs = 0L
 
-    fun openDetails(movieId: Long) { _pendingDetailsId.value = movieId }
+    fun openDetails(movieId: Long) {
+        _pendingDetailsId.value = movieId
+        pendingDetailsGesetztMs = System.currentTimeMillis()
+    }
+
+    /** German4K: true, solange der Sprungauftrag jung genug ist, um ihn noch auszufuehren. */
+    fun pendingDetailsFrisch(): Boolean =
+        System.currentTimeMillis() - pendingDetailsGesetztMs <= SPRUNG_FRIST_MS
 
     fun clearPendingDetails() { _pendingDetailsId.value = null }
 
@@ -1049,6 +1062,9 @@ class MovieViewModel(
 
     private companion object {
         const val TAG = "OwnTVHome"
+
+        /** German4K: So lange gilt ein „oeffne diesen Film"-Auftrag aus einem anderen Bereich. */
+        const val SPRUNG_FRIST_MS = 10_000L
         val defaultRail = listOf(
             LiveRailItem(LiveKey.Favorites, icon = OwnTVIcon.FAVORITE),
             LiveRailItem(LiveKey.History, icon = OwnTVIcon.HISTORY),

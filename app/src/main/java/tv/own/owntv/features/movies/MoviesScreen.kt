@@ -212,6 +212,14 @@ fun MoviesScreen(
     val movieProgress by vm.movieProgress.collectAsStateWithLifecycle()
     val downloadStates by vm.downloadStates.collectAsStateWithLifecycle()
     val movies = vm.movies.collectAsLazyPagingItems()
+    // German4K: Wechselt die Detailseite auf einen anderen Titel (andere Fassung, Sprung aus der
+    // Personenseite oder aus dem Serienbereich), wandert das Fokusziel mit: „Zurueck" landet dann auf
+    // der Kachel des zuletzt gezeigten Titels, wenn es sie in dieser Kategorie gibt. Gibt es sie
+    // nicht, steht die Position auf -1 und `fokusZurueck` faellt auf Nachbar bzw. erste Kachel zurueck.
+    val merkeFokusziel: (Long) -> Unit = { id ->
+        contextMovieId = id
+        contextMovieIndex = movies.itemSnapshotList.items.indexOfFirst { it.id == id }
+    }
     val resumeMode by vm.resumeMode.collectAsStateWithLifecycle()
     // Global external-player toggle: never mount the fullscreen in-app player (it spins up mpv)
     // when playback is handed to an external app.
@@ -260,15 +268,17 @@ fun MoviesScreen(
     val pendingDetailsId by vm.pendingDetailsId.collectAsStateWithLifecycle()
     LaunchedEffect(pendingDetailsId) {
         val id = pendingDetailsId ?: return@LaunchedEffect
+        // German4K: Ein Auftrag aus einem anderen Bereich verfaellt, wenn dieser Bildschirm ihn nicht
+        // zeitnah abholt — sonst spraenge er beim naechsten Besuch des Filmbereichs unvermittelt auf.
+        if (!vm.pendingDetailsFrisch()) { vm.clearPendingDetails(); return@LaunchedEffect }
         val m = vm.movieById(id)
         if (m != null) {
             if (detailseite) {
                 // German4K: Auch beim Sprung von aussen Kennung und Position merken, sonst hat
                 // „Zurueck" kein Fokusziel — der Fokus faellt ins Leere und das D-Pad ist tot.
-                // Position -1: der Film muss in dieser Kategorie gar nicht vorkommen, dann nimmt
-                // die Fokusrueckgabe weiter unten die erste Kachel.
-                contextMovieId = m.id
-                contextMovieIndex = -1
+                // Der Film muss in dieser Kategorie gar nicht vorkommen; dann steht die Position auf
+                // -1 und `fokusZurueck` nimmt Nachbar bzw. erste Kachel.
+                merkeFokusziel(m.id)
                 detailsMovie = m
             } else {
                 vm.onMovieFocused(m)
@@ -359,27 +369,16 @@ fun MoviesScreen(
         }
         onRestored()
     }
-    // Closing the long-press context menu must return focus inside this pane, never the CategoryRail.
-    //   - Item still present (Favourite toggle / Download / Cancel): re-focus the same item by id.
-    //   - Item removed (Remove from history, or un-Favourite on the Favorites category): the paged
-    //     list no longer contains it, so focus the NEAREST surviving neighbour by position (the item
-    //     that slid into the removed slot, else the new last item, else first item). Only if the whole
-    //     category is now empty do we let focus leave (there's nothing here to land on).
-    LaunchedEffect(contextMovie, moveItem, creatingCategory, moveState) {
-        if (contextMovie != null) return@LaunchedEffect
-        // Opening the TMDB Details window or the Set TMDB name dialog closes the menu; don't yank focus
-        // back to the grid — they need it (and trap it). The grid is refocused when they close (see below).
-        if (detailsMovie != null) return@LaunchedEffect
-        if (tmdbDetailsMovie != null) return@LaunchedEffect
-        if (setTmdbNameMovie != null) return@LaunchedEffect
-        if (trailerVideoKey != null) return@LaunchedEffect
-        // The context menu closes before MoveToCategoryDialog (and its nested name prompt) opens, and
-        // the reorder overlay owns focus while it is up. Do not focus the grid behind any of them;
-        // this effect re-runs when the whole flow closes and restores the row below.
-        if (moveItem != null || creatingCategory || moveState != null) return@LaunchedEffect
-
+    // German4K: Fokus zurueck in die Kachelspalte — EIN Ort fuer alle Wege zurueck.
+    // Die Kette lautet: Kennung -> Position in der Liste -> hinscrollen -> Nachbar -> erste Kachel.
+    // Bisher stand sie nur im Effekt des Langdruck-Menues; die Detailseite rief blanko
+    // `contextFocus.requestFocus()`. Stand die Kachel gar nicht in der offenen Kategorie (Sprung aus
+    // dem Serienbereich) oder war sie eben verschwunden (Favorit auf der Seite entfernt, waehrend
+    // „Favoriten" offen ist), verpuffte der Aufruf still in `runCatching` — der Fokus blieb in der
+    // geschlossenen Seite haengen und das D-Pad war tot.
+    val fokusZurueck: suspend () -> Unit = fokus@{
         val targetId = contextMovieId
-        if (targetId == null) { contextMovieIndex = -1; return@LaunchedEffect }
+        if (targetId == null) { contextMovieIndex = -1; return@fokus }
         val items = movies.itemSnapshotList.items
         val idx = items.indexOfFirst { it.id == targetId }
         if (idx >= 0) {
@@ -408,10 +407,36 @@ fun MoviesScreen(
                 // neighbour row (now at contextMovieIndex) receives focus.
                 contextMovieId = neighbor.id
                 withFrameNanos { }
-                runCatching { contextFocus.requestFocus() }
+                // German4K: Auch der Nachbar kann noch nicht gebaut sein (kalte Seitenliste) —
+                // dann bleibt die erste Kachel, damit der Fokus diese Spalte sicher erreicht.
+                if (runCatching { contextFocus.requestFocus() }.isFailure) {
+                    runCatching { firstItemFocus.requestFocus() }
+                }
             }
         }
         contextMovieIndex = -1
+    }
+
+    // Closing the long-press context menu must return focus inside this pane, never the CategoryRail.
+    //   - Item still present (Favourite toggle / Download / Cancel): re-focus the same item by id.
+    //   - Item removed (Remove from history, or un-Favourite on the Favorites category): the paged
+    //     list no longer contains it, so focus the NEAREST surviving neighbour by position (the item
+    //     that slid into the removed slot, else the new last item, else first item). Only if the whole
+    //     category is now empty do we let focus leave (there's nothing here to land on).
+    LaunchedEffect(contextMovie, moveItem, creatingCategory, moveState) {
+        if (contextMovie != null) return@LaunchedEffect
+        // Opening the TMDB Details window or the Set TMDB name dialog closes the menu; don't yank focus
+        // back to the grid — they need it (and trap it). The grid is refocused when they close (see below).
+        if (detailsMovie != null) return@LaunchedEffect
+        if (tmdbDetailsMovie != null) return@LaunchedEffect
+        if (setTmdbNameMovie != null) return@LaunchedEffect
+        if (trailerVideoKey != null) return@LaunchedEffect
+        // The context menu closes before MoveToCategoryDialog (and its nested name prompt) opens, and
+        // the reorder overlay owns focus while it is up. Do not focus the grid behind any of them;
+        // this effect re-runs when the whole flow closes and restores the row below.
+        if (moveItem != null || creatingCategory || moveState != null) return@LaunchedEffect
+
+        fokusZurueck()
     }
 
     // Manual panel widths (Settings → Panel Width Adjustment). The saved percentages now resolve
@@ -434,9 +459,15 @@ fun MoviesScreen(
     ) {
     // German4K: Mit Detailseite braucht die Uebersicht keine Vorschauspalte mehr — der Platz geht
     // an groessere Kacheln (drei je Reihe), alles Weitere steht auf der Detailseite.
+    // Wichtig: Ist die Vorschau aus, muss ihr Anteil auch aus der Rechnung raus (`preview = 0`) —
+    // sonst reserviert `computePanelWidths` ihn weiter und die Kachelspalte behaelt ihre schmale
+    // Breite, waehrend rechts ein Drittel leer bleibt. Ohne eigene Breiten (Standard) bleibt alles
+    // wie gehabt: `panels` ist dann null und die Spalte nimmt sich ihr Gewicht.
     val previewVisible = panelShares?.preview != 0 && !detailseite
     val innerGapTotal = browsePanelGapTotal(previewVisible)
-    val panels = panelShares?.let { computePanelWidths(it, maxWidth, innerGapTotal) }
+    val panels = panelShares?.let {
+        computePanelWidths(if (previewVisible) it else it.copy(preview = 0), maxWidth, innerGapTotal)
+    }
     Row(
         modifier = Modifier
             .fillMaxSize(),
@@ -815,10 +846,13 @@ fun MoviesScreen(
 
     // When the details page closes, return focus to the movie it was opened from (the page
     // trapped focus, so without this it would fall to the sidebar).
+    // German4K: ueber `fokusZurueck` — die Kachel muss in der offenen Kategorie gar nicht vorkommen
+    // (Sprung aus dem Serienbereich) oder kann eben verschwunden sein (Favorit auf der Seite
+    // entfernt, waehrend „Favoriten" offen ist); dann uebernimmt Nachbar bzw. erste Kachel.
     LaunchedEffect(detailsMovie, tmdbDetailsMovie) {
         if (detailsMovie == null && tmdbDetailsMovie == null && contextMovieId != null) {
             withFrameNanos { }
-            runCatching { contextFocus.requestFocus() }
+            fokusZurueck()
         }
     }
 
@@ -864,7 +898,8 @@ fun MoviesScreen(
             onFassung = { f ->
                 scope.launch {
                     val ziel = vm.filmZuFassung(m, f)
-                    if (ziel != null) detailsMovie = ziel else toast.show(fassungFehltMessage)
+                    if (ziel != null) { merkeFokusziel(ziel.id); detailsMovie = ziel }
+                    else toast.show(fassungFehltMessage)
                 }
             },
             onExit = { detailsMovie = null },
@@ -882,8 +917,10 @@ fun MoviesScreen(
             name = name,
             titel = personTitel,
             favoritenFilme = favoriteIds,
+            // German4K: Bewusste Grenze zwischen den beiden ViewModels — dieser Bildschirm kennt nur
+            // die Film-Favoriten, Serien bekommen hier deshalb kein Herz.
             favoritenSerien = emptySet(),
-            onFilm = { f -> person = null; detailsMovie = f },
+            onFilm = { f -> person = null; merkeFokusziel(f.id); detailsMovie = f },
             onSerie = { s -> person = null; detailsMovie = null; onOpenSeries(s.id) },
             onExit = { person = null },
         )

@@ -420,29 +420,25 @@ private fun SeriesGrid(
             onRestoredSelected()
         }
     }
-    // Closing the long-press context menu must return focus inside this pane, never the CategoryRail.
-    //   - Item still present (Favourite toggle / Download / Cancel): re-focus the same item by id.
-    //   - Item removed (Remove from history, or un-Favourite on the Favorites category): the paged
-    //     list no longer contains it, so focus the NEAREST surviving neighbour by position (the item
-    //     that slid into the removed slot, else the new last item, else first item). Only if the whole
-    //     category is now empty do we let focus leave (there's nothing here to land on).
-    LaunchedEffect(contextSeries, moveItem, creatingCategory, moveState) {
-        if (contextSeries != null) return@LaunchedEffect
-        // Opening the TMDB Details window closes the menu; let the window keep focus (it traps focus and
-        // refocuses the series on close), don't yank it back to the grid here.
-        if (detailsSeries != null) return@LaunchedEffect
-        if (tmdbDetailsSeries != null) return@LaunchedEffect
-        // Same for the "Set TMDB name" dialog — it refocuses the series itself when it closes.
-        if (setTmdbNameSeries != null) return@LaunchedEffect
-        // Same for the trailer player.
-        if (trailerVideoKey != null) return@LaunchedEffect
-        // The context menu closes before MoveToCategoryDialog (and its nested name prompt) opens, and
-        // the reorder overlay owns focus while it is up. Do not focus the grid behind any of them;
-        // this effect re-runs when the whole flow closes and restores the row below.
-        if (moveItem != null || creatingCategory || moveState != null) return@LaunchedEffect
+    // German4K: Wechselt die Detailseite auf einen anderen Titel (andere Fassung, Sprung aus der
+    // Personenseite), wandert das Fokusziel mit: „Zurueck" landet dann auf der Kachel des zuletzt
+    // gezeigten Titels, wenn es sie in dieser Kategorie gibt. Gibt es sie nicht, steht die Position
+    // auf -1 und die Kette unten faellt auf Nachbar bzw. erste Kachel zurueck.
+    val merkeFokusziel: (Long) -> Unit = { id ->
+        contextSeriesId = id
+        contextSeriesIndex = series.itemSnapshotList.items.indexOfFirst { it.id == id }
+    }
 
+    // German4K: Fokus zurueck in die Kachelspalte — EIN Ort fuer alle Wege zurueck.
+    // Die Kette lautet: Kennung -> Position in der Liste -> hinscrollen -> Nachbar -> erste Kachel.
+    // Bisher stand sie nur im Effekt des Langdruck-Menues; die Detailseite rief blanko
+    // `contextFocus.requestFocus()`. Stand die Kachel gar nicht in der offenen Kategorie (Sprung von
+    // der Personenseite) oder war sie eben verschwunden (Favorit auf der Seite entfernt, waehrend
+    // „Favoriten" offen ist), verpuffte der Aufruf still in `runCatching` — der Fokus blieb in der
+    // geschlossenen Seite haengen und das D-Pad war tot.
+    val fokusZurueck: suspend () -> Unit = fokus@{
         val targetId = contextSeriesId
-        if (targetId == null) { contextSeriesIndex = -1; return@LaunchedEffect }
+        if (targetId == null) { contextSeriesIndex = -1; return@fokus }
         val items = series.itemSnapshotList.items
         val idx = items.indexOfFirst { it.id == targetId }
         if (idx >= 0) {
@@ -466,10 +462,38 @@ private fun SeriesGrid(
                 }
                 contextSeriesId = neighbor.id
                 withFrameNanos { }
-                runCatching { contextFocus.requestFocus() }
+                // German4K: Auch der Nachbar kann noch nicht gebaut sein (kalte Seitenliste) —
+                // dann bleibt die erste Kachel, damit der Fokus diese Spalte sicher erreicht.
+                if (runCatching { contextFocus.requestFocus() }.isFailure) {
+                    runCatching { firstItemFocus.requestFocus() }
+                }
             }
         }
         contextSeriesIndex = -1
+    }
+
+    // Closing the long-press context menu must return focus inside this pane, never the CategoryRail.
+    //   - Item still present (Favourite toggle / Download / Cancel): re-focus the same item by id.
+    //   - Item removed (Remove from history, or un-Favourite on the Favorites category): the paged
+    //     list no longer contains it, so focus the NEAREST surviving neighbour by position (the item
+    //     that slid into the removed slot, else the new last item, else first item). Only if the whole
+    //     category is now empty do we let focus leave (there's nothing here to land on).
+    LaunchedEffect(contextSeries, moveItem, creatingCategory, moveState) {
+        if (contextSeries != null) return@LaunchedEffect
+        // Opening the TMDB Details window closes the menu; let the window keep focus (it traps focus and
+        // refocuses the series on close), don't yank it back to the grid here.
+        if (detailsSeries != null) return@LaunchedEffect
+        if (tmdbDetailsSeries != null) return@LaunchedEffect
+        // Same for the "Set TMDB name" dialog — it refocuses the series itself when it closes.
+        if (setTmdbNameSeries != null) return@LaunchedEffect
+        // Same for the trailer player.
+        if (trailerVideoKey != null) return@LaunchedEffect
+        // The context menu closes before MoveToCategoryDialog (and its nested name prompt) opens, and
+        // the reorder overlay owns focus while it is up. Do not focus the grid behind any of them;
+        // this effect re-runs when the whole flow closes and restores the row below.
+        if (moveItem != null || creatingCategory || moveState != null) return@LaunchedEffect
+
+        fokusZurueck()
     }
 
     // Manual panel widths (Settings → Panel Width Adjustment). The saved percentages now resolve
@@ -492,9 +516,15 @@ private fun SeriesGrid(
     ) {
     // German4K: Mit Detailseite braucht die Uebersicht keine Vorschauspalte mehr — der Platz geht
     // an groessere Kacheln (drei je Reihe), alles Weitere steht auf der Detailseite.
+    // Wichtig: Ist die Vorschau aus, muss ihr Anteil auch aus der Rechnung raus (`preview = 0`) —
+    // sonst reserviert `computePanelWidths` ihn weiter und die Kachelspalte behaelt ihre schmale
+    // Breite, waehrend rechts ein Drittel leer bleibt. Ohne eigene Breiten (Standard) bleibt alles
+    // wie gehabt: `panels` ist dann null und die Spalte nimmt sich ihr Gewicht.
     val previewVisible = panelShares?.preview != 0 && !detailseite
     val innerGapTotal = browsePanelGapTotal(previewVisible)
-    val panels = panelShares?.let { computePanelWidths(it, maxWidth, innerGapTotal) }
+    val panels = panelShares?.let {
+        computePanelWidths(if (previewVisible) it else it.copy(preview = 0), maxWidth, innerGapTotal)
+    }
     Row(
         modifier = Modifier
             .fillMaxSize(),
@@ -867,10 +897,13 @@ private fun SeriesGrid(
 
     // When the details page closes, return focus to the series it was opened from (the page
     // trapped focus, so without this it would fall to the CategoryRail).
+    // German4K: ueber `fokusZurueck` — die Kachel muss in der offenen Kategorie gar nicht vorkommen
+    // (Sprung von der Personenseite) oder kann eben verschwunden sein (Favorit auf der Seite
+    // entfernt, waehrend „Favoriten" offen ist); dann uebernimmt Nachbar bzw. erste Kachel.
     LaunchedEffect(detailsSeries, tmdbDetailsSeries) {
         if (detailsSeries == null && tmdbDetailsSeries == null && contextSeriesId != null) {
             withFrameNanos { }
-            runCatching { contextFocus.requestFocus() }
+            fokusZurueck()
         }
     }
 
@@ -908,7 +941,8 @@ private fun SeriesGrid(
             onFassung = { f ->
                 scope.launch {
                     val ziel = vm.serieZuFassung(s, f)
-                    if (ziel != null) detailsSeries = ziel else toast.show(fassungFehltMessage)
+                    if (ziel != null) { merkeFokusziel(ziel.id); detailsSeries = ziel }
+                    else toast.show(fassungFehltMessage)
                 }
             },
             onExit = { detailsSeries = null },
@@ -925,11 +959,13 @@ private fun SeriesGrid(
         tv.own.owntv.ui.components.German4kPersonScreen(
             name = name,
             titel = personTitel,
+            // German4K: Bewusste Grenze zwischen den beiden ViewModels — dieser Bildschirm kennt nur
+            // die Serien-Favoriten, Filme bekommen hier deshalb kein Herz.
             favoritenFilme = emptySet(),
             favoritenSerien = favoriteIds,
             // German4K: Film aus der Personenseite — Serienseite zu, dann in den Filmbereich.
             onFilm = { f -> person = null; detailsSeries = null; onOpenMovie(f.id) },
-            onSerie = { s -> person = null; detailsSeries = s },
+            onSerie = { s -> person = null; merkeFokusziel(s.id); detailsSeries = s },
             onExit = { person = null },
         )
     }
