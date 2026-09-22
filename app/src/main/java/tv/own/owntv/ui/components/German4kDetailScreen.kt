@@ -86,9 +86,6 @@ private val Ecke = RoundedCornerShape(Dimens.CornerSmall)
 private val PersonBreite = 110.dp
 private val PersonFoto = 72.dp
 
-/** Zwischen den Teilen der Meta-Zeile — ein Zeichen, keine uebersetzbare Wendung. */
-private const val TRENNER = " · "
-
 /** Eine Zeile Handlung pro Druck, wenn die Seite selbst scrollen muss — wie im TMDB-Fenster. */
 private const val SCROLL_SCHRITT = 260f
 
@@ -372,7 +369,10 @@ private fun metaZeile(details: German4kDetails?): String {
     val datum = details.datum.takeIf { it.isNotBlank() }?.let { datumLesbar(it) } ?: details.jahr.takeIf { it.isNotBlank() }
     val genre = details.genre.takeIf { it.isNotBlank() }
     val dauer = (details.dauerSek / 60).takeIf { it > 0 }?.let { stringResource(R.string.g4k_detail_dauer, it) }
-    return listOfNotNull(datum, genre, dauer).joinToString(TRENNER)
+    // German4K: derselbe Trenner wie ueberall sonst in der App (Vorschauspalte, Spielerleiste).
+    // Er sieht mit „  •  " etwas anders aus als das frueher hier fest eingetragene „ · " — die
+    // Einheitlichkeit wiegt schwerer als die alte Optik dieser einen Zeile.
+    return listOfNotNull(datum, genre, dauer).joinToString(stringResource(R.string.content_metadata_separator))
 }
 
 private fun datumLesbar(iso: String): String? = runCatching {

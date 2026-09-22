@@ -191,6 +191,8 @@ fun MoviesScreen(
     // German4K: Personenseite aus der Besetzung — Kennung und Name, der Name steht sofort fest.
     var person by remember { mutableStateOf<Pair<Long, String>?>(null) }
     var personTitel by remember { mutableStateOf<tv.own.owntv.core.german4k.German4kPersonTitel?>(null) }
+    // German4K: Der Abruf ist durch, hat aber nichts geliefert — dritter Zustand neben „laedt" und „da".
+    var personFehler by remember { mutableStateOf(false) }
     // "Set TMDB name" dialog target (§11.2 U5b); null = closed.
     var setTmdbNameMovie by remember { mutableStateOf<MovieEntity?>(null) }
     // In-app trailer playback (§7.3 U4); non-null = fullscreen player open with this YouTube key.
@@ -715,7 +717,7 @@ fun MoviesScreen(
                 MovieDetailsPane(
                     movie = selectedMovie,
                     meta = selectedMovieMeta?.takeIf { it.movieId == selectedMovie?.id }?.cache,
-                    noten = selectedMovieMeta?.takeIf { it.movieId == selectedMovie?.id }?.details?.noten,
+                    noten = selectedMovieMeta?.takeIf { it.movieId == selectedMovie?.id }?.noten,
                     tmdbWins = metadataMode.tmdbWins,
                     resumePositionMs = selectedProgress?.takeIf { !vm.isMovieCompleted(it) }?.positionMs?.takeIf { it > 0 },
                     downloadStrip = selectedMovie?.let { m -> downloadStates[m.id]?.let { tv.own.owntv.core.download.downloadStripFor(listOf(it)) } },
@@ -869,13 +871,19 @@ fun MoviesScreen(
     // aufgebaut — Scrollstand und ein laufender Trailer sind weg. Bewusst in Kauf genommen, ein
     // totes D-Pad waere der groessere Fehler.
     if (person == null) detailsMovie?.let { m ->
-        val meta = selectedMovieMeta?.takeIf { it.movieId == m.id }
         var fortsetzen by remember(m.id) { mutableStateOf<Long?>(null) }
+        // German4K: Die Seite holt ihre Angaben selbst, sobald sie aufgeht — frueher hing das am
+        // Fokus, und jede durchgeblaetterte Kachel kostete einen vollen Detailabruf. Ein Aufruf je
+        // geoeffnetem Titel; bis er da ist, zeigt die Seite ihren Ladezustand (`details == null`).
+        var seitenDetails by remember(m.id) { mutableStateOf<tv.own.owntv.core.german4k.German4kDetails?>(null) }
+        LaunchedEffect(m.id) { seitenDetails = vm.detailsFuer(m) }
         LaunchedEffect(m.id, resumeMode) {
             // German4K: „Nie fortsetzen" heisst auch hier nie — sonst boete die Detailseite einen
             // Fortsetzen-Knopf an, den derselbe Film ueber `startMovie` nie bekaeme.
+            // Und ein fertig gesehener Film bekommt „Abspielen", nicht „Fortsetzen" — genau wie in
+            // der Vorschauspalte, die `isMovieCompleted` schon immer abgezogen hat.
             fortsetzen = if (resumeMode == SettingsRepository.ResumeMode.NEVER) null
-                else vm.savedPositionMs(m).takeIf { it > 0 }
+                else vm.savedPositionMs(m).takeIf { it > 0 && !vm.istFilmFertig(m) }
             vm.onMovieFocused(m)
         }
         tv.own.owntv.ui.components.German4kDetailScreen(
@@ -883,7 +891,7 @@ fun MoviesScreen(
                 schluessel = m.remoteId ?: "false:${m.name}",
                 titel = m.name,
                 plakat = m.posterUrl,
-                details = meta?.details,
+                details = seitenDetails,
                 serie = false,
                 favorit = favoriteIds.contains(m.id),
                 fortsetzenMs = fortsetzen,
@@ -907,15 +915,22 @@ fun MoviesScreen(
     }
 
     // German4K: Personenseite — liegt ueber der Detailseite, deshalb NACH ihr gezeichnet.
+    // `personFehler` unterscheidet „Server antwortet noch" von „Abruf ist durch, aber ohne Antwort".
+    // Ohne das blieb „Laedt…" fuer immer stehen, wenn der Aufruf scheiterte.
     LaunchedEffect(person) {
         personTitel = null
+        personFehler = false
         val id = person?.first ?: return@LaunchedEffect
-        detailsMovie?.let { m -> personTitel = vm.personTitel(m, id) }
+        val m = detailsMovie
+        if (m == null) { personFehler = true; return@LaunchedEffect }
+        val geladen = vm.personTitel(m, id)
+        if (geladen == null) personFehler = true else personTitel = geladen
     }
     person?.let { (_, name) ->
         tv.own.owntv.ui.components.German4kPersonScreen(
             name = name,
             titel = personTitel,
+            fehler = personFehler,
             favoritenFilme = favoriteIds,
             // German4K: Bewusste Grenze zwischen den beiden ViewModels — dieser Bildschirm kennt nur
             // die Film-Favoriten, Serien bekommen hier deshalb kein Herz.
@@ -929,7 +944,7 @@ fun MoviesScreen(
     // Windowed TMDB details popup (§11.1) — read-only, Back exits.
     tmdbDetailsMovie?.let { m ->
         val cache = selectedMovieMeta?.takeIf { it.movieId == m.id }?.cache
-        val noten = selectedMovieMeta?.takeIf { it.movieId == m.id }?.details?.noten
+        val noten = selectedMovieMeta?.takeIf { it.movieId == m.id }?.noten
         MediaDetailsScreen(
             details = buildMovieDetails(m, cache, metadataMode.tmdbWins).copy(noten = noten),
             onExit = { tmdbDetailsMovie = null },

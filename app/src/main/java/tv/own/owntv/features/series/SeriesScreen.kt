@@ -320,6 +320,8 @@ private fun SeriesGrid(
     // German4K: Personenseite aus der Besetzung — Kennung und Name, der Name steht sofort fest.
     var person by remember { mutableStateOf<Pair<Long, String>?>(null) }
     var personTitel by remember { mutableStateOf<tv.own.owntv.core.german4k.German4kPersonTitel?>(null) }
+    // German4K: Der Abruf ist durch, hat aber nichts geliefert — dritter Zustand neben „laedt" und „da".
+    var personFehler by remember { mutableStateOf(false) }
     // Id + list position of the series the context menu was opened on. The id re-focuses the same item
     // when it survives (Favourite/Download/Cancel); when the item is REMOVED (Remove from history, or
     // un-Favourite while on the Favorites category), it's gone from the paged list, so we re-focus the
@@ -800,7 +802,7 @@ private fun SeriesGrid(
                         Text(metaBits.joinToString(stringResource(R.string.content_metadata_separator)), style = MaterialTheme.typography.bodyMedium, color = OwnTVTheme.colors.onSurfaceVariant)
                     }
                     // German4K: Bewertungen je Quelle mit den Zeichen der Seiten.
-                    selectedSeriesMeta?.takeIf { it.seriesId == s.id }?.details?.noten?.let { noten ->
+                    selectedSeriesMeta?.takeIf { it.seriesId == s.id }?.noten?.let { noten ->
                         Spacer(Modifier.height(10.dp))
                         tv.own.owntv.ui.components.German4kNotenZeile(noten)
                     }
@@ -917,14 +919,19 @@ private fun SeriesGrid(
     // nachgemessen, 21.09.2026). Deshalb ist immer nur eine der beiden Seiten da. Der Preis:
     // wer von der Personenseite zurueckkommt, bekommt die Detailseite neu aufgebaut.
     if (person == null) detailsSeries?.let { s ->
-        val meta = selectedSeriesMeta?.takeIf { it.seriesId == s.id }
+        // German4K: Die Seite holt ihre Angaben selbst, sobald sie aufgeht. Frueher hing das am Fokus —
+        // und bei Serien heisst „Detailangaben" `get_series_info` MIT der kompletten Folgenliste, also
+        // ein dicker Abruf je durchgeblaetterter Kachel. Jetzt: ein Abruf je geoeffnetem Titel; bis er
+        // da ist, zeigt die Seite ihren Ladezustand (`details == null`).
+        var seitenDetails by remember(s.id) { mutableStateOf<tv.own.owntv.core.german4k.German4kDetails?>(null) }
+        LaunchedEffect(s.id) { seitenDetails = vm.detailsFuer(s) }
         LaunchedEffect(s.id) { vm.onSeriesFocused(s) }
         tv.own.owntv.ui.components.German4kDetailScreen(
             ui = tv.own.owntv.ui.components.German4kDetailUi(
                 schluessel = s.remoteId ?: "true:${s.name}",
                 titel = s.name,
                 plakat = s.posterUrl,
-                details = meta?.details,
+                details = seitenDetails,
                 serie = true,
                 favorit = favoriteIds.contains(s.id),
                 // German4K: Eine Serie setzt man nicht als Ganzes fort — das macht die Folgenansicht
@@ -950,15 +957,22 @@ private fun SeriesGrid(
     }
 
     // German4K: Personenseite — liegt ueber der Detailseite, deshalb NACH ihr gezeichnet.
+    // `personFehler` unterscheidet „Server antwortet noch" von „Abruf ist durch, aber ohne Antwort".
+    // Ohne das blieb „Laedt…" fuer immer stehen, wenn der Aufruf scheiterte.
     LaunchedEffect(person) {
         personTitel = null
+        personFehler = false
         val id = person?.first ?: return@LaunchedEffect
-        detailsSeries?.let { s -> personTitel = vm.personTitel(s, id) }
+        val s = detailsSeries
+        if (s == null) { personFehler = true; return@LaunchedEffect }
+        val geladen = vm.personTitel(s, id)
+        if (geladen == null) personFehler = true else personTitel = geladen
     }
     person?.let { (_, name) ->
         tv.own.owntv.ui.components.German4kPersonScreen(
             name = name,
             titel = personTitel,
+            fehler = personFehler,
             // German4K: Bewusste Grenze zwischen den beiden ViewModels — dieser Bildschirm kennt nur
             // die Serien-Favoriten, Filme bekommen hier deshalb kein Herz.
             favoritenFilme = emptySet(),
@@ -975,7 +989,7 @@ private fun SeriesGrid(
         val cache = selectedSeriesMeta?.takeIf { it.seriesId == s.id }?.cache
         tv.own.owntv.features.shell.components.MediaDetailsScreen(
             details = buildSeriesDetails(s, cache, metadataMode.tmdbWins)
-                .copy(noten = selectedSeriesMeta?.takeIf { it.seriesId == s.id }?.details?.noten),
+                .copy(noten = selectedSeriesMeta?.takeIf { it.seriesId == s.id }?.noten),
             onExit = { tmdbDetailsSeries = null },
         )
     }

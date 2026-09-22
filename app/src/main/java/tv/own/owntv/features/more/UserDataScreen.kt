@@ -3,6 +3,7 @@ package tv.own.owntv.features.more
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -193,35 +194,47 @@ private fun UserDataScreen(
             }
         }
         Spacer(Modifier.height(10.dp))
+        // German4K: Jeder Reiter bekommt EINE volle Box, nicht nur den Bildschirm selbst.
+        // `MoviesScreen`/`SeriesScreen` zeichnen Detailseite, Personenseite, TMDB-Fenster und die
+        // Hinweisblase als Geschwister NACH ihrem `BoxWithConstraints`. Direkt in dieser Spalte
+        // bekaemen diese Geschwister `maxHeight = 0` — die Spalte hat ihre Hoehe da schon an das
+        // erste Kind vergeben — und die Detailseite waere unsichtbar. In der Huelle (OwnTVShell)
+        // liegen dieselben Bildschirme in einer `Box(weight(1f))`; hier machen wir es genauso.
         when (tab) {
-            UserDataTab.LIVE -> LiveScreen(
-                onFullscreen = onFullscreen,
-                onChildFocused = onChildFocused,
-                lockedKey = key,
-                modifier = Modifier.fillMaxSize(),
-            )
-            UserDataTab.MOVIES -> MoviesScreen(
-                onFullscreen = onFullscreen,
-                onChildFocused = onChildFocused,
-                lockedKey = key,
-                // German4K: Serie aus der Personenseite — hier gibt es keine Huelle, aber dieselben
-                // drei Reiter. Also auf den Serien-Reiter umschalten und sie dort oeffnen; das
-                // SeriesViewModel ist dasselbe, das SeriesScreen gleich holt (ein Exemplar je
-                // Activity), deshalb steht die Serie beim Wechsel schon offen.
-                onOpenSeries = { id -> tab = UserDataTab.SERIES; seriesVm.openSeriesById(id) },
-                modifier = Modifier.fillMaxSize(),
-            )
-            UserDataTab.SERIES -> SeriesScreen(
-                onFullscreen = onFullscreen,
-                onChildFocused = onChildFocused,
-                lockedKey = key,
-                // German4K: Film aus der Personenseite — hier gibt es keine Huelle, aber dieselben
-                // drei Reiter. Also auf den Film-Reiter umschalten und ihn dort oeffnen; das
-                // MovieViewModel ist dasselbe, das MoviesScreen gleich holt (ein Exemplar je
-                // Activity), deshalb steht der Film beim Wechsel schon offen.
-                onOpenMovie = { id -> tab = UserDataTab.MOVIES; movieVm.openDetails(id) },
-                modifier = Modifier.fillMaxSize(),
-            )
+            UserDataTab.LIVE -> Box(Modifier.weight(1f).fillMaxSize()) {
+                LiveScreen(
+                    onFullscreen = onFullscreen,
+                    onChildFocused = onChildFocused,
+                    lockedKey = key,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            UserDataTab.MOVIES -> Box(Modifier.weight(1f).fillMaxSize()) {
+                MoviesScreen(
+                    onFullscreen = onFullscreen,
+                    onChildFocused = onChildFocused,
+                    lockedKey = key,
+                    // German4K: Serie aus der Personenseite — hier gibt es keine Huelle, aber dieselben
+                    // drei Reiter. Also auf den Serien-Reiter umschalten und sie dort oeffnen; das
+                    // SeriesViewModel ist dasselbe, das SeriesScreen gleich holt (ein Exemplar je
+                    // Activity), deshalb steht die Serie beim Wechsel schon offen.
+                    onOpenSeries = { id -> tab = UserDataTab.SERIES; seriesVm.openSeriesById(id) },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            UserDataTab.SERIES -> Box(Modifier.weight(1f).fillMaxSize()) {
+                SeriesScreen(
+                    onFullscreen = onFullscreen,
+                    onChildFocused = onChildFocused,
+                    lockedKey = key,
+                    // German4K: Film aus der Personenseite — hier gibt es keine Huelle, aber dieselben
+                    // drei Reiter. Also auf den Film-Reiter umschalten und ihn dort oeffnen; das
+                    // MovieViewModel ist dasselbe, das MoviesScreen gleich holt (ein Exemplar je
+                    // Activity), deshalb steht der Film beim Wechsel schon offen.
+                    onOpenMovie = { id -> tab = UserDataTab.MOVIES; movieVm.openDetails(id) },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
     }
 

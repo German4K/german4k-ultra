@@ -293,27 +293,42 @@ class SeriesViewModel(
     private val _seriesMetaTick = MutableStateFlow(0L)
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    val selectedSeriesMeta: StateFlow<SeriesMeta?> = combine(_selectedSeries, _seriesMetaTick) { s, tick -> s to tick }
-        .distinctUntilChanged { a, b -> a.first?.id == b.first?.id && a.second == b.second }
-        // See MetadataRepository.FOCUS_DEBOUNCE_MS — 700 ms so scrolling past cards costs nothing.
-        .debounce(tv.own.owntv.core.metadata.MetadataRepository.FOCUS_DEBOUNCE_MS)
-        .mapLatest { (s, _) ->
-            if (s == null) null
-            else kotlinx.coroutines.coroutineScope {
-                // German4K: die Detailangaben parallel zur TMDB-Suche, sonst wartet die Ansicht doppelt.
-                val details = async { detailsFuer(s) }
-                val cache = runCatching { metadata.resolveSeries(s) }.getOrNull()
-                SeriesMeta(s.id, cache, details.await())
+    val selectedSeriesMeta: StateFlow<SeriesMeta?> =
+        combine(_selectedSeries, _seriesMetaTick, settings.g4kDetailseite) { s, tick, seite -> Triple(s, tick, seite) }
+            .distinctUntilChanged { a, b -> a.first?.id == b.first?.id && a.second == b.second && a.third == b.third }
+            // See MetadataRepository.FOCUS_DEBOUNCE_MS — 700 ms so scrolling past cards costs nothing.
+            .debounce(tv.own.owntv.core.metadata.MetadataRepository.FOCUS_DEBOUNCE_MS)
+            .mapLatest { (s, _, seite) ->
+                if (s == null) null
+                else kotlinx.coroutines.coroutineScope {
+                    // German4K: Bei Serien wog der alte Weg am schwersten — `get_series_info` traegt die
+                    // KOMPLETTE Folgenliste, und die wurde bei jedem Fokuswechsel geholt und geparst.
+                    // Steht die Detailseite an (Schalter AN), holt dieser Fluss darum nichts mehr; die
+                    // Detailseite laedt beim Oeffnen selbst. Steht der Schalter AUS, braucht die
+                    // Vorschauspalte nur die Noten — mitlesend, ohne Baum.
+                    val noten = async { if (seite) null else notenFuer(s) }
+                    val cache = runCatching { metadata.resolveSeries(s) }.getOrNull()
+                    SeriesMeta(s.id, cache, noten.await())
+                }
             }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     data class SeriesMeta(
         val seriesId: Long,
         val cache: tv.own.owntv.core.database.entity.MetadataCacheEntity?,
-        // German4K: EIN Aufruf gegen unseren Server liefert Noten, Querbild, Besetzung und Fassungen.
-        val details: tv.own.owntv.core.german4k.German4kDetails? = null,
+        // German4K: Nur die Noten fuer die Vorschauspalte. Alles Uebrige (Querbild, Handlung,
+        // Besetzung, Fassungen) holt die Detailseite selbst — es haengt nicht mehr am Fokus.
+        // null heisst: noch nicht da, keine Noten bekannt, oder die Detailseite ist eingeschaltet.
+        val noten: tv.own.owntv.core.german4k.German4kNoten? = null,
     )
+
+    /** German4K: nur die Noten vom eigenen Server — still null bei jedem Fehler. */
+    suspend fun notenFuer(s: SeriesEntity): tv.own.owntv.core.german4k.German4kNoten? {
+        val id = s.remoteId ?: return null
+        val source = sourceDao.getById(s.sourceId) ?: return null
+        if (source.type != tv.own.owntv.core.model.SourceType.XTREAM) return null
+        return runCatching { xtream.getNoten(source, serie = true, id = id) }.getOrNull()
+    }
 
     /** German4K: Detailangaben vom eigenen Server — nur Xtream-Quellen, still null bei jedem Fehler. */
     suspend fun detailsFuer(s: SeriesEntity): tv.own.owntv.core.german4k.German4kDetails? {

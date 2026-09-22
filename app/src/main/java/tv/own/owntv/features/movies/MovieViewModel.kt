@@ -290,31 +290,47 @@ class MovieViewModel(
     private val _metaRefreshTick = MutableStateFlow(0L)
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    val selectedMovieMeta: StateFlow<MovieMeta?> = combine(_selectedMovie, _metaRefreshTick) { m, tick -> m to tick }
-        .distinctUntilChanged { a, b -> a.first?.id == b.first?.id && a.second == b.second }
-        // 700 ms, not 350: sustained D-pad scrolling was firing a lookup per card it passed over, which
-        // made browsing the single biggest source of metadata traffic. At 700 ms a scroll produces one
-        // lookup when the user actually settles on something.
-        .debounce(tv.own.owntv.core.metadata.MetadataRepository.FOCUS_DEBOUNCE_MS)
-        .mapLatest { (m, _) ->
-            if (m == null) null
-            else kotlinx.coroutines.coroutineScope {
-                // German4K: die Detailangaben parallel zur TMDB-Suche, sonst wartet die Detailansicht doppelt.
-                val details = async { detailsFuer(m) }
-                val cache = runCatching { metadata.resolveMovie(m) }.getOrNull()
-                MovieMeta(m.id, cache, details.await())
+    val selectedMovieMeta: StateFlow<MovieMeta?> =
+        combine(_selectedMovie, _metaRefreshTick, settings.g4kDetailseite) { m, tick, seite -> Triple(m, tick, seite) }
+            .distinctUntilChanged { a, b -> a.first?.id == b.first?.id && a.second == b.second && a.third == b.third }
+            // 700 ms, not 350: sustained D-pad scrolling was firing a lookup per card it passed over, which
+            // made browsing the single biggest source of metadata traffic. At 700 ms a scroll produces one
+            // lookup when the user actually settles on something.
+            .debounce(tv.own.owntv.core.metadata.MetadataRepository.FOCUS_DEBOUNCE_MS)
+            .mapLatest { (m, _, seite) ->
+                if (m == null) null
+                else kotlinx.coroutines.coroutineScope {
+                    // German4K: Steht die Detailseite an (Schalter AN), gibt es rechts gar keine
+                    // Vorschauspalte — dann holt dieser Fluss NICHTS von unserem Server. Frueher lud er
+                    // je Fokuswechsel die vollen Detailangaben; die Detailseite holt sie sich jetzt
+                    // selbst, wenn sie aufgeht (ein Aufruf pro geoeffnetem Titel statt pro Kachel).
+                    // Steht der Schalter AUS, braucht die Vorschauspalte nur die Noten — und die kommen
+                    // ueber den mitlesenden Leser, der die Antwort nicht als Baum aufbaut.
+                    val noten = async { if (seite) null else notenFuer(m) }
+                    val cache = runCatching { metadata.resolveMovie(m) }.getOrNull()
+                    MovieMeta(m.id, cache, noten.await())
+                }
             }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** TMDB metadata tagged with the movie id it was resolved for, so the UI never shows stale meta on a
      *  different card during the debounce window. [cache] is null while resolving or on no match. */
     data class MovieMeta(
         val movieId: Long,
         val cache: tv.own.owntv.core.database.entity.MetadataCacheEntity?,
-        // German4K: EIN Aufruf gegen unseren Server liefert Noten, Querbild, Besetzung und Fassungen.
-        val details: tv.own.owntv.core.german4k.German4kDetails? = null,
+        // German4K: Nur die Noten fuer die Vorschauspalte. Alles Uebrige (Querbild, Handlung,
+        // Besetzung, Fassungen) holt die Detailseite selbst — es haengt nicht mehr am Fokus.
+        // null heisst: noch nicht da, keine Noten bekannt, oder die Detailseite ist eingeschaltet.
+        val noten: tv.own.owntv.core.german4k.German4kNoten? = null,
     )
+
+    /** German4K: nur die Noten vom eigenen Server — still null bei jedem Fehler. */
+    suspend fun notenFuer(m: MovieEntity): tv.own.owntv.core.german4k.German4kNoten? {
+        val id = m.remoteId ?: return null
+        val source = sourceDao.getById(m.sourceId) ?: return null
+        if (source.type != tv.own.owntv.core.model.SourceType.XTREAM) return null
+        return runCatching { xtream.getNoten(source, serie = false, id = id) }.getOrNull()
+    }
 
     /** German4K: Detailangaben vom eigenen Server — nur Xtream-Quellen, still null bei jedem Fehler. */
     suspend fun detailsFuer(m: MovieEntity): tv.own.owntv.core.german4k.German4kDetails? {
@@ -607,6 +623,14 @@ class MovieViewModel(
     /** Saved resume position for [movie] (0 when none) — used by the screen to decide the prompt. */
     suspend fun savedPositionMs(movie: MovieEntity): Long =
         currentProfileId()?.let { progressDao.get(it, MediaType.MOVIE, movie.id)?.positionMs ?: 0 } ?: 0
+
+    /**
+     * German4K: Ist der Film durchgesehen? Dieselbe Regel wie in der Vorschauspalte ([isMovieCompleted]) —
+     * die Detailseite darf bei einem fertigen Film kein „Fortsetzen" anbieten, sonst spraenge er eine
+     * Sekunde vor dem Abspann wieder ein.
+     */
+    suspend fun istFilmFertig(movie: MovieEntity): Boolean =
+        currentProfileId()?.let { pid -> progressDao.get(pid, MediaType.MOVIE, movie.id)?.let { isMovieCompleted(it) } } ?: false
 
     /** Global "External player" toggle — screens must NOT open the fullscreen in-app player when on
      *  (mounting it spins up an mpv instance even though play() branched to the external app). */
