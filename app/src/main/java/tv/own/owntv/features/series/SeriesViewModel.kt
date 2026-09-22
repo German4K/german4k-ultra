@@ -104,6 +104,8 @@ class SeriesViewModel(
     private val subtitleController: tv.own.owntv.core.subtitles.SubtitleController,
     // German4K: Bewertungen je Quelle fuer die Detailansicht (IMDb, TMDB, RT, Metacritic …).
     private val xtream: tv.own.owntv.core.parser.XtreamClient,
+    // German4K: „Weitere Titel mit …" auf der Personenseite der Detailseite.
+    private val personen: tv.own.owntv.core.german4k.German4kPersonRepository,
 ) : ViewModel() {
 
     data class SeriesMoveState(val items: List<SeriesEntity>, val activeIndex: Int, val contextKey: String)
@@ -298,10 +300,10 @@ class SeriesViewModel(
         .mapLatest { (s, _) ->
             if (s == null) null
             else kotlinx.coroutines.coroutineScope {
-                // German4K: die Noten parallel zur TMDB-Suche.
-                val noten = async { notenFuer(s) }
+                // German4K: die Detailangaben parallel zur TMDB-Suche, sonst wartet die Ansicht doppelt.
+                val details = async { detailsFuer(s) }
                 val cache = runCatching { metadata.resolveSeries(s) }.getOrNull()
-                SeriesMeta(s.id, cache, noten.await())
+                SeriesMeta(s.id, cache, details.await())
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -309,16 +311,29 @@ class SeriesViewModel(
     data class SeriesMeta(
         val seriesId: Long,
         val cache: tv.own.owntv.core.database.entity.MetadataCacheEntity?,
-        val noten: tv.own.owntv.core.german4k.German4kNoten? = null,
+        // German4K: EIN Aufruf gegen unseren Server liefert Noten, Querbild, Besetzung und Fassungen.
+        val details: tv.own.owntv.core.german4k.German4kDetails? = null,
     )
 
-    /** German4K: Bewertungen vom eigenen Server — nur Xtream-Quellen, still null bei jedem Fehler. */
-    private suspend fun notenFuer(s: SeriesEntity): tv.own.owntv.core.german4k.German4kNoten? {
+    /** German4K: Detailangaben vom eigenen Server — nur Xtream-Quellen, still null bei jedem Fehler. */
+    suspend fun detailsFuer(s: SeriesEntity): tv.own.owntv.core.german4k.German4kDetails? {
         val id = s.remoteId ?: return null
         val source = sourceDao.getById(s.sourceId) ?: return null
         if (source.type != tv.own.owntv.core.model.SourceType.XTREAM) return null
-        return runCatching { xtream.getNoten(source, serie = true, id = id) }.getOrNull()
+        return runCatching { xtream.getDetails(source, serie = true, id = id) }.getOrNull()
     }
+
+    /** German4K: Schalter „Detailseite vor dem Abspielen" (Einstellungen). */
+    val detailseite: StateFlow<Boolean> = settings.g4kDetailseite
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
+    /** German4K: „Weitere Fassungen" — die lokale Zeile zur gewaehlten Fassung, null wenn sie fehlt. */
+    suspend fun serieZuFassung(s: SeriesEntity, f: tv.own.owntv.core.german4k.German4kFassung): SeriesEntity? =
+        runCatching { seriesDao.findSeriesByRemote(s.sourceId, f.remoteId) }.getOrNull()
+
+    /** German4K: weitere Titel einer Person — dieselbe Quelle wie die Serie, aus der sie aufgerufen wurde. */
+    suspend fun personTitel(s: SeriesEntity, personId: Long): tv.own.owntv.core.german4k.German4kPersonTitel? =
+        runCatching { personen.laden(s.sourceId, personId) }.getOrNull()
 
     /**
      * Poster fallback for tiles the provider gave no artwork for — see MovieViewModel.cachedPosters

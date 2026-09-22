@@ -92,7 +92,36 @@ val appModule = module {
         )
     }
     viewModelOf(::MovieViewModel)
-    viewModelOf(::SeriesViewModel)
+    // German4K: ausgeschrieben wie LiveViewModel oben — mit der Personenseite hat SeriesViewModel
+    // 23 Konstruktorwerte, und `viewModelOf` gibt es nur bis 22. Jedes Argument wird ueber seinen
+    // Typ aufgeloest, die Reihenfolge hier spielt also keine Rolle.
+    viewModel {
+        SeriesViewModel(
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+        )
+    }
     viewModelOf(::SearchViewModel)
     viewModelOf(::ProfilesViewModel)
     // Activity-scoped session state for the profile gate (configuration-only retention, no saved

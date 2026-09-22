@@ -336,6 +336,20 @@ class MovieViewModel(
     suspend fun personTitel(m: MovieEntity, personId: Long): tv.own.owntv.core.german4k.German4kPersonTitel? =
         runCatching { personen.laden(m.sourceId, personId) }.getOrNull()
 
+    // German4K: Auftrag aus einem anderen Bereich — „oeffne diesen Film". Die Personenseite einer
+    // Serie nennt auch Filme; der Sprung geht dann erst in den Filmbereich, und erst dessen
+    // MoviesScreen kann die Detailseite aufmachen. Deshalb legen wir die Kennung hier ab und
+    // MoviesScreen holt sie beim naechsten Bild ab (und loescht sie wieder).
+    private val _pendingDetailsId = MutableStateFlow<Long?>(null)
+    val pendingDetailsId: StateFlow<Long?> = _pendingDetailsId.asStateFlow()
+
+    fun openDetails(movieId: Long) { _pendingDetailsId.value = movieId }
+
+    fun clearPendingDetails() { _pendingDetailsId.value = null }
+
+    /** German4K: Die Zeile zu einer Kennung — fuer den Sprung oben, ohne gleich abzuspielen. */
+    suspend fun movieById(movieId: Long): MovieEntity? = movieDao.getById(movieId)
+
     /**
      * Poster fallback for grid/list tiles the provider gave no artwork for. Those show a placeholder
      * even once the detail pane has resolved and cached a TMDB poster for the same title — most

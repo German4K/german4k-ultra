@@ -133,6 +133,8 @@ fun SeriesScreen(
     onChildFocused: () -> Unit,
     restoreFocus: Boolean = false,
     onRestored: () -> Unit = {},
+    // German4K: Die Personenseite zeigt auch Filme — die Huelle schaltet dafuer in den Filmbereich.
+    onOpenMovie: (movieId: Long) -> Unit = {},
     modifier: Modifier = Modifier,
     /**
      * Pins the grid to one folder and takes the category rail away — how More → Favourites and
@@ -178,6 +180,7 @@ fun SeriesScreen(
             restoreSelected = returnFromShow,
             onRestoredSelected = { returnFromShow = false },
             lockedKey = lockedKey,
+            onOpenMovie = onOpenMovie,
             modifier = modifier,
         )
     }
@@ -263,11 +266,16 @@ private fun SeriesGrid(
     onRestoredSelected: () -> Unit = {},
     /** Non-null while this grid is a More screen's stage — see [SeriesScreen]. */
     lockedKey: LiveKey? = null,
+    // German4K: siehe [SeriesScreen] — Film aus der Personenseite.
+    onOpenMovie: (movieId: Long) -> Unit = {},
     modifier: Modifier,
 ) {
     val alreadyDownloadedMessage = stringResource(R.string.content_already_downloaded)
     val refetchingTmdbMessage = stringResource(R.string.content_refetching_tmdb)
     val researchingTmdbMessage = stringResource(R.string.content_researching_tmdb)
+    // German4K: „Weitere Fassungen" nennt auch Ausgaben, die unser Server kennt, dieses Geraet aber
+    // nicht im Katalog hat — dann muss der Druck eine Rueckmeldung geben statt still zu verpuffen.
+    val fassungFehltMessage = stringResource(R.string.g4k_detail_fassung_fehlt)
     val railItems by vm.railItems.collectAsStateWithLifecycle()
     val providerNames by vm.providerNames.collectAsStateWithLifecycle()
     val selectedKey by vm.selectedKey.collectAsStateWithLifecycle()
@@ -280,6 +288,8 @@ private fun SeriesGrid(
     val selectedSeriesMeta by vm.selectedSeriesMeta.collectAsStateWithLifecycle()
     val selectedSeriesDownloads by vm.selectedSeriesDownloads.collectAsStateWithLifecycle()
     val metadataMode by vm.metadataMode.collectAsStateWithLifecycle()
+    // German4K: Schalter „Detailseite vor dem Abspielen" — er bestimmt Raster, Vorschau und Klick.
+    val detailseite by vm.detailseite.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     val toast = rememberInAppToast()
     val series = vm.series.collectAsLazyPagingItems()
@@ -302,8 +312,14 @@ private fun SeriesGrid(
     var setTmdbNameSeries by remember { mutableStateOf<tv.own.owntv.core.database.entity.SeriesEntity?>(null) }
     // In-app trailer playback (§7.3 U4); non-null = fullscreen player open with this YouTube key.
     var trailerVideoKey by remember { mutableStateOf<String?>(null) }
-    // Fullscreen TMDB details window (§11.1); null = closed.
+    // German4K: Die eigene Detailseite (Querbild, Noten, Besetzung, Fassungen); null = zu.
     var detailsSeries by remember { mutableStateOf<tv.own.owntv.core.database.entity.SeriesEntity?>(null) }
+    // Fullscreen TMDB details window (§11.1); null = closed. German4K: eigener Zustand, seit
+    // `detailsSeries` die neue Seite oeffnet — der Menuepunkt „TMDB Details" bleibt als Lesefenster.
+    var tmdbDetailsSeries by remember { mutableStateOf<tv.own.owntv.core.database.entity.SeriesEntity?>(null) }
+    // German4K: Personenseite aus der Besetzung — Kennung und Name, der Name steht sofort fest.
+    var person by remember { mutableStateOf<Pair<Long, String>?>(null) }
+    var personTitel by remember { mutableStateOf<tv.own.owntv.core.german4k.German4kPersonTitel?>(null) }
     // Id + list position of the series the context menu was opened on. The id re-focuses the same item
     // when it survives (Favourite/Download/Cancel); when the item is REMOVED (Remove from history, or
     // un-Favourite while on the Favorites category), it's gone from the paged list, so we re-focus the
@@ -311,6 +327,22 @@ private fun SeriesGrid(
     var contextSeriesId by remember { mutableStateOf<Long?>(null) }
     var contextSeriesIndex by remember { mutableStateOf(-1) }
     val contextFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+
+    // German4K: Ein Klick auf eine Kachel/Zeile — mit Schalter oeffnet er die Detailseite, ohne
+    // geht er wie bisher direkt in die Folgenansicht. Raster UND Liste gehen denselben Weg.
+    // Kennung und Position merken wir uns auch beim Klick (bisher nur beim Langdruck): nur so
+    // findet der `LaunchedEffect(detailsSeries, tmdbDetailsSeries)` weiter unten nach „Zurueck"
+    // wieder zu GENAU dieser Kachel zurueck. `contextSeries` bleibt dabei null — das Langdruck-
+    // Menue oeffnet also nicht mit.
+    val oeffneSerie: (tv.own.owntv.core.database.entity.SeriesEntity, Int) -> Unit = { s, index ->
+        if (detailseite) {
+            contextSeriesId = s.id
+            contextSeriesIndex = index
+            detailsSeries = s
+        } else {
+            vm.openSeries(s)
+        }
+    }
 
     val selectedIndex = railItems.indexOfFirst { it.key == selectedKey }.coerceAtLeast(0)
     val selectedItem = railItems.getOrNull(selectedIndex)
@@ -399,6 +431,7 @@ private fun SeriesGrid(
         // Opening the TMDB Details window closes the menu; let the window keep focus (it traps focus and
         // refocuses the series on close), don't yank it back to the grid here.
         if (detailsSeries != null) return@LaunchedEffect
+        if (tmdbDetailsSeries != null) return@LaunchedEffect
         // Same for the "Set TMDB name" dialog — it refocuses the series itself when it closes.
         if (setTmdbNameSeries != null) return@LaunchedEffect
         // Same for the trailer player.
@@ -457,7 +490,9 @@ private fun SeriesGrid(
             )
             .onFocusChanged { if (it.hasFocus) onChildFocused() },
     ) {
-    val previewVisible = panelShares?.preview != 0
+    // German4K: Mit Detailseite braucht die Uebersicht keine Vorschauspalte mehr — der Platz geht
+    // an groessere Kacheln (drei je Reihe), alles Weitere steht auf der Detailseite.
+    val previewVisible = panelShares?.preview != 0 && !detailseite
     val innerGapTotal = browsePanelGapTotal(previewVisible)
     val panels = panelShares?.let { computePanelWidths(it, maxWidth, innerGapTotal) }
     Row(
@@ -628,7 +663,8 @@ private fun SeriesGrid(
                                     firstItemFocus = firstItemFocus,
                                 ),
                                 onFocus = { vm.onSeriesFocused(s) },
-                                onClick = { vm.openSeries(s) },
+                                // German4K: gleicher Weg wie im Raster — Schalter an = Detailseite.
+                                onClick = { oeffneSerie(s, index) },
                                 onLongClick = { contextSeries = s; contextSeriesId = s.id; contextSeriesIndex = index },
                             )
                         }
@@ -637,7 +673,7 @@ private fun SeriesGrid(
             } else {
                 LazyVerticalGrid(
                     state = effectiveGridState,
-                    columns = GridCells.Adaptive(minSize = 130.dp),
+                    columns = if (detailseite) GridCells.Fixed(3) else GridCells.Adaptive(minSize = 130.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -661,7 +697,8 @@ private fun SeriesGrid(
                                     firstItemFocus = firstItemFocus,
                                 ),
                                 onFocus = { vm.onSeriesFocused(s) },
-                                onClick = { vm.openSeries(s) },
+                                // German4K: Mit Schalter oeffnet der Klick die Detailseite, ohne die Folgen.
+                                onClick = { oeffneSerie(s, index) },
                                 onLongClick = { contextSeries = s; contextSeriesId = s.id; contextSeriesIndex = index },
                             )
                         }
@@ -733,7 +770,7 @@ private fun SeriesGrid(
                         Text(metaBits.joinToString(stringResource(R.string.content_metadata_separator)), style = MaterialTheme.typography.bodyMedium, color = OwnTVTheme.colors.onSurfaceVariant)
                     }
                     // German4K: Bewertungen je Quelle mit den Zeichen der Seiten.
-                    selectedSeriesMeta?.takeIf { it.seriesId == s.id }?.noten?.let { noten ->
+                    selectedSeriesMeta?.takeIf { it.seriesId == s.id }?.details?.noten?.let { noten ->
                         Spacer(Modifier.height(10.dp))
                         tv.own.owntv.ui.components.German4kNotenZeile(noten)
                     }
@@ -771,7 +808,7 @@ private fun SeriesGrid(
             hasTmdbDetails = metadataMode.enrich && cacheForS != null,
             trailerKey = if (metadataMode.enrich) cacheForS?.trailerKey else null,
             canRefetchTmdb = metadataMode.enrich,
-            onShowDetails = { contextSeries = null; detailsSeries = s },
+            onShowDetails = { contextSeries = null; tmdbDetailsSeries = s },
             onToggleFavorite = { vm.toggleFavorite(s); contextSeries = null },
             onMove = { contextSeries = null; vm.enterMoveMode(s, selectedKey) },
             onMoveToCategory = {
@@ -828,19 +865,82 @@ private fun SeriesGrid(
         }
     }
 
-    // Fullscreen TMDB details window (§11.1) — read-only, Back exits; refocus the series on close.
-    LaunchedEffect(detailsSeries) {
-        if (detailsSeries == null && contextSeriesId != null) {
+    // When the details page closes, return focus to the series it was opened from (the page
+    // trapped focus, so without this it would fall to the CategoryRail).
+    LaunchedEffect(detailsSeries, tmdbDetailsSeries) {
+        if (detailsSeries == null && tmdbDetailsSeries == null && contextSeriesId != null) {
             withFrameNanos { }
             runCatching { contextFocus.requestFocus() }
         }
     }
-    detailsSeries?.let { s ->
+
+    // German4K: Die eigene Detailseite. `vm.onSeriesFocused(s)` muss auch dann laufen, wenn der
+    // Fokus woanders stand (Sprung aus Fassung oder Personenseite), sonst laedt
+    // `selectedSeriesMeta` nie fuer diesen Titel.
+    //
+    // `person == null` ist kein Schoenheitsfehler, sondern Pflicht: beide Seiten tragen
+    // `trapAllFocusExit()`, und dessen `onExit = cancelFocusChange()` verwirft JEDE Fokusuebergabe
+    // aus der Detailseite heraus — auch die der Personenseite (bei den Filmen am Geraet
+    // nachgemessen, 21.09.2026). Deshalb ist immer nur eine der beiden Seiten da. Der Preis:
+    // wer von der Personenseite zurueckkommt, bekommt die Detailseite neu aufgebaut.
+    if (person == null) detailsSeries?.let { s ->
+        val meta = selectedSeriesMeta?.takeIf { it.seriesId == s.id }
+        LaunchedEffect(s.id) { vm.onSeriesFocused(s) }
+        tv.own.owntv.ui.components.German4kDetailScreen(
+            ui = tv.own.owntv.ui.components.German4kDetailUi(
+                schluessel = s.remoteId ?: "true:${s.name}",
+                titel = s.name,
+                plakat = s.posterUrl,
+                details = meta?.details,
+                serie = true,
+                favorit = favoriteIds.contains(s.id),
+                // German4K: Eine Serie setzt man nicht als Ganzes fort — das macht die Folgenansicht
+                // je Folge. Deshalb gibt es hier nur „Folgen".
+                fortsetzenMs = null,
+            ),
+            onAbspielen = { detailsSeries = null; vm.openSeries(s) },
+            onFavorit = { vm.toggleFavorite(s) },
+            onFolgen = { detailsSeries = null; vm.openSeries(s) },
+            onPerson = { d -> person = d.id to d.name },
+            // German4K: Unser Server kennt alle Fassungen, dieses Geraet nur die aus seinem Katalog.
+            // Fehlt die gewaehlte, sagen wir das kurz — stilles Nichtstun sieht am Fernseher wie ein
+            // kaputter Knopf aus.
+            onFassung = { f ->
+                scope.launch {
+                    val ziel = vm.serieZuFassung(s, f)
+                    if (ziel != null) detailsSeries = ziel else toast.show(fassungFehltMessage)
+                }
+            },
+            onExit = { detailsSeries = null },
+        )
+    }
+
+    // German4K: Personenseite — liegt ueber der Detailseite, deshalb NACH ihr gezeichnet.
+    LaunchedEffect(person) {
+        personTitel = null
+        val id = person?.first ?: return@LaunchedEffect
+        detailsSeries?.let { s -> personTitel = vm.personTitel(s, id) }
+    }
+    person?.let { (_, name) ->
+        tv.own.owntv.ui.components.German4kPersonScreen(
+            name = name,
+            titel = personTitel,
+            favoritenFilme = emptySet(),
+            favoritenSerien = favoriteIds,
+            // German4K: Film aus der Personenseite — Serienseite zu, dann in den Filmbereich.
+            onFilm = { f -> person = null; detailsSeries = null; onOpenMovie(f.id) },
+            onSerie = { s -> person = null; detailsSeries = s },
+            onExit = { person = null },
+        )
+    }
+
+    // Fullscreen TMDB details window (§11.1) — read-only, Back exits; refocus the series on close.
+    tmdbDetailsSeries?.let { s ->
         val cache = selectedSeriesMeta?.takeIf { it.seriesId == s.id }?.cache
         tv.own.owntv.features.shell.components.MediaDetailsScreen(
             details = buildSeriesDetails(s, cache, metadataMode.tmdbWins)
-                .copy(noten = selectedSeriesMeta?.takeIf { it.seriesId == s.id }?.noten),
-            onExit = { detailsSeries = null },
+                .copy(noten = selectedSeriesMeta?.takeIf { it.seriesId == s.id }?.details?.noten),
+            onExit = { tmdbDetailsSeries = null },
         )
     }
 

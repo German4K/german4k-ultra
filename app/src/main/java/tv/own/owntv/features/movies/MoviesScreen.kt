@@ -253,6 +253,20 @@ fun MoviesScreen(
         }
     }
 
+    // German4K: Auftrag aus dem Serienbereich — die Personenseite einer Serie nennt auch Filme.
+    // Die Huelle hat dafuer schon auf „Filme" umgeschaltet; hier machen wir die Detailseite auf.
+    // Steht der Schalter aus, gibt es gar keine Personenseite — dann bleibt nur, den Film
+    // auszuwaehlen, damit die Vorschauspalte ihn zeigt statt einen beliebigen anderen.
+    val pendingDetailsId by vm.pendingDetailsId.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingDetailsId) {
+        val id = pendingDetailsId ?: return@LaunchedEffect
+        val m = vm.movieById(id)
+        if (m != null) {
+            if (detailseite) detailsMovie = m else vm.onMovieFocused(m)
+        }
+        vm.clearPendingDetails()
+    }
+
     val gridState = rememberLazyGridState()
     val listState = rememberLazyListState()
     val selFocus = remember { FocusRequester() }

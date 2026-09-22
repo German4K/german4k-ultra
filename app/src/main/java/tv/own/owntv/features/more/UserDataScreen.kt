@@ -31,6 +31,7 @@ import androidx.tv.material3.Text
 import tv.own.owntv.R
 import tv.own.owntv.core.live.LiveKey
 import tv.own.owntv.features.live.LiveScreen
+import tv.own.owntv.features.movies.MovieViewModel
 import tv.own.owntv.features.movies.MoviesScreen
 import tv.own.owntv.features.series.SeriesScreen
 import tv.own.owntv.features.series.SeriesViewModel
@@ -116,6 +117,8 @@ private fun UserDataScreen(
     // German4K: nur fuer den Sprung „Serie aus der Personenseite" — dasselbe Exemplar, das
     // SeriesScreen im Serien-Reiter benutzt.
     seriesVm: SeriesViewModel = koinViewModel(),
+    // German4K: dasselbe umgekehrt — „Film aus der Personenseite" einer Serie.
+    movieVm: MovieViewModel = koinViewModel(),
 ) {
     val history = key == LiveKey.History
     var tab by rememberSaveable { mutableStateOf(UserDataTab.LIVE) }
@@ -212,6 +215,11 @@ private fun UserDataScreen(
                 onFullscreen = onFullscreen,
                 onChildFocused = onChildFocused,
                 lockedKey = key,
+                // German4K: Film aus der Personenseite — hier gibt es keine Huelle, aber dieselben
+                // drei Reiter. Also auf den Film-Reiter umschalten und ihn dort oeffnen; das
+                // MovieViewModel ist dasselbe, das MoviesScreen gleich holt (ein Exemplar je
+                // Activity), deshalb steht der Film beim Wechsel schon offen.
+                onOpenMovie = { id -> tab = UserDataTab.MOVIES; movieVm.openDetails(id) },
                 modifier = Modifier.fillMaxSize(),
             )
         }

@@ -1094,6 +1094,9 @@ fun OwnTVShell(
                             onChildFocused = { focusedLayer = ShellLayer.CONTENT },
                             restoreFocus = restoreFocus,
                             onRestored = { restoreFocus = false },
+                            // German4K: Film aus der Personenseite — in den Filmbereich wechseln und
+                            // ihn dort oeffnen; der Filmbereich teilt sich dieses MovieViewModel.
+                            onOpenMovie = { id -> onSelectSection(MainSection.MOVIES); movieVm.openDetails(id) },
                             modifier = Modifier.fillMaxSize(),
                         )
 

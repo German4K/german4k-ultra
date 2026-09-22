@@ -227,6 +227,7 @@
 2	technical	app/src/main/java/tv/own/owntv/features/series/SeriesScreen.kt	series
 1	preference-key	app/src/main/java/tv/own/owntv/features/series/SeriesScreen.kt	set_tmdb_name
 2	preference-key	app/src/main/java/tv/own/owntv/features/series/SeriesScreen.kt	tmdb_details
+1	technical	app/src/main/java/tv/own/owntv/features/series/SeriesScreen.kt	true:${s.name}
 1	technical	app/src/main/java/tv/own/owntv/features/series/SeriesScreen.kt	w300
 2	technical	app/src/main/java/tv/own/owntv/features/series/SeriesScreen.kt	✓
 2	empty	app/src/main/java/tv/own/owntv/features/series/SeriesViewModel.kt	\0
