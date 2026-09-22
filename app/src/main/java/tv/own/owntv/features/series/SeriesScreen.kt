@@ -620,10 +620,10 @@ private fun SeriesGrid(
                 .then(if (lockedKey == null) Modifier.trapVerticalFocusExit() else Modifier)
                 .focusGroup()
         ) {
-            // German4K: Im Hochformat traegt schon die Kopfzeile des Mobil-Rahmens den
+            // German4K: Auf Handy und Tablet traegt schon die Kopfzeile des Mobil-Rahmens den
             // Kategorienamen — diese Brotkrume wuerde ihn ein zweites Mal zeigen und frisst
             // ein Siebtel des Bildschirms. Die Zaehlerzeile darunter bleibt, sie sagt etwas Neues.
-            if (!formfaktor.kompakt) {
+            if (!formfaktor.mobil) {
                 Text(stringResource(R.string.content_section_category, stringResource(R.string.common_nav_series), selectedLabel), style = MaterialTheme.typography.headlineLarge, color = OwnTVTheme.colors.onSurface)
                 Spacer(Modifier.height(4.dp))
             }
@@ -1221,6 +1221,18 @@ private fun buildSeriesDetails(
     )
 }
 
+/**
+ * German4K: schneidet den vorangestellten Serientitel aus dem Folgennamen.
+ *
+ * Nur fuer die schmale Anzeige gedacht; wenn nach dem Schnitt nichts Brauchbares uebrig bleibt,
+ * bleibt der Name unveraendert — lieber abgeschnitten als leer.
+ */
+private fun EpisodeEntity.ohneSerienPraefix(serienName: String): EpisodeEntity {
+    if (serienName.isBlank() || !name.startsWith(serienName, ignoreCase = true)) return this
+    val rest = name.drop(serienName.length).dropWhile { it.isWhitespace() || it == '-' || it == '\u2013' }
+    return if (rest.isBlank()) this else copy(name = rest)
+}
+
 /** A provider may omit an episode title. Keep the fallback in Compose so it follows the active locale. */
 @Composable
 private fun episodeDisplayTitle(episode: EpisodeEntity): String =
@@ -1547,7 +1559,10 @@ private fun EpisodeView(
         // Sortierung dann gar nicht mehr zu sehen. Den Zurueck-Knopf und den Schalterblock gibt es
         // dafuer nur einmal, beide Bauarten rufen dieselben Lambdas auf.
         val zurueckKnopf: @Composable () -> Unit = {
-            OwnTVButton(label = stringResource(R.string.common_back), onClick = { vm.closeSeries() }, style = OwnTVButtonStyle.SECONDARY, icon = OwnTVIcon.CHEVRON)
+            // German4K: CHEVRON zeigt nach rechts — am Fernseher liest man das als "weiter", auf dem
+            // Handy steht daneben aber das Wort "Zurueck". Mobil deshalb derselbe Links-Pfeil, den
+            // die Kopfzeile des Mobil-Rahmens traegt. TV unveraendert.
+            OwnTVButton(label = stringResource(R.string.common_back), onClick = { vm.closeSeries() }, style = OwnTVButtonStyle.SECONDARY, icon = if (formfaktor.mobil) OwnTVIcon.BACK else OwnTVIcon.CHEVRON)
         }
         val kopfSchalter: @Composable RowScope.() -> Unit = {
             OwnTVButton(
@@ -1722,7 +1737,12 @@ private fun EpisodeView(
                                     val prog = episodeProgress[ep.id]
                                     val completed = ep.id in completedIds
                                     EpisodeRow(
-                                        episode = ep,
+                                        // German4K: Anbieter stellen dem Folgennamen oft den ganzen
+                                        // Serientitel voran ("DE - Stilles Wasser (2020) (US) - S01E01 - ...").
+                                        // Auf 360 dp bleibt davon nur die Ellipse. Im Hochformat
+                                        // deshalb das Praefix abschneiden — die Serie steht schon in
+                                        // der Kopfzeile. TV und Tablet quer sehen den Namen wie bisher.
+                                        episode = if (formfaktor.kompakt) ep.ohneSerienPraefix(series.name) else ep,
                                         meta = seasonMeta[ep.id],
                                         lastWatched = ep.id == lastPlayedId,
                                         completed = completed,

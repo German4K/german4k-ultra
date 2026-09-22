@@ -18,8 +18,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -104,8 +107,11 @@ fun German4kMobilRahmen(
                 }
                 LazyColumn(state = listenZustand, modifier = Modifier.fillMaxSize()) {
                     itemsIndexed(kategorien) { i, k ->
+                        // German4K: wie in der unteren Leiste — ein Tipp bewegt den Fokus nicht von
+                        // selbst, der Rahmen bliebe auf der zuletzt fokussierten Zeile stehen.
+                        val fokus = remember { FocusRequester() }
                         FocusableSurface(
-                            onClick = { onSelect(i); onKategorieOffen(true) },
+                            onClick = { runCatching { fokus.requestFocus() }; onSelect(i); onKategorieOffen(true) },
                             onLongClick = onLongSelect?.let { { it(i) } },
                             selected = i == selectedIndex,
                             shape = RoundedCornerShape(12.dp),
@@ -113,7 +119,8 @@ fun German4kMobilRahmen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(ZeilenHoehe)
-                                .padding(horizontal = 12.dp, vertical = 2.dp),
+                                .padding(horizontal = 12.dp, vertical = 2.dp)
+                                .focusRequester(fokus),
                         ) { _ ->
                             Row(
                                 modifier = Modifier

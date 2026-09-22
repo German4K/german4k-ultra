@@ -46,6 +46,7 @@ import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
 import tv.own.owntv.R
 import tv.own.owntv.core.weather.WeatherInfo
+import tv.own.owntv.ui.LocalFormfaktor
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.core.theme.GlassSurface
@@ -130,7 +131,10 @@ fun TopBar(
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             audioBar?.invoke()
-            if (weatherInfo != null) WeatherChip(info = weatherInfo, fahrenheit = weatherFahrenheit)
+            // German4K: Im Hochformat sind vier Chips eine Reihe zu lang — Uhr und Profil liefen
+            // rechts aus dem Bild (t2/02-handy-home.png). Das Wetter ist davon das Entbehrlichste:
+            // ein Handy hat es ohnehin in der Statusleiste. TV und Tablet bleiben unveraendert.
+            if (weatherInfo != null && !LocalFormfaktor.current.kompakt) WeatherChip(info = weatherInfo, fahrenheit = weatherFahrenheit)
             German4kExpiryChip()
             ClockChip()
             if (playlistName.isNotBlank()) {

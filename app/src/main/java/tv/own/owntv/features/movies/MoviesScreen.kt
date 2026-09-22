@@ -560,10 +560,10 @@ fun MoviesScreen(
                 .then(if (lockedKey == null) Modifier.trapVerticalFocusExit() else Modifier)
                 .focusGroup()
         ) {
-            // German4K: Im Hochformat traegt schon die Kopfzeile des Mobil-Rahmens den
+            // German4K: Auf Handy und Tablet traegt schon die Kopfzeile des Mobil-Rahmens den
             // Kategorienamen — diese Brotkrume wuerde ihn ein zweites Mal zeigen und frisst
             // ein Siebtel des Bildschirms. Die Zaehlerzeile darunter bleibt, sie sagt etwas Neues.
-            if (!formfaktor.kompakt) {
+            if (!formfaktor.mobil) {
                 Text(stringResource(R.string.content_section_category, stringResource(R.string.common_nav_movies), selectedLabel), style = MaterialTheme.typography.headlineLarge, color = OwnTVTheme.colors.onSurface)
                 Spacer(Modifier.height(4.dp))
             }

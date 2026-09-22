@@ -16,6 +16,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -96,11 +98,16 @@ fun German4kBottomBar(
                 val aktiv = section == selected ||
                     (section == MainSection.MORE && selected == MainSection.SETTINGS)
                 val ton = if (aktiv) colors.primary else colors.onSurfaceVariant
+                // German4K: Ein Tipp bewegt den Fokus nicht — der Steuerkreuz-Rahmen blieb auf dem
+                // zuletzt fokussierten Feld stehen (z. B. "Home" umrandet, waehrend "Filme" laeuft).
+                // Beim Tipp holen wir ihn deshalb selbst auf das getippte Feld. runCatching, weil
+                // requestFocus wirft, solange der Knoten noch nicht haengt.
+                val fokus = remember(section) { FocusRequester() }
                 FocusableSurface(
-                    onClick = { onSelect(section) },
+                    onClick = { runCatching { fokus.requestFocus() }; onSelect(section) },
                     selected = aktiv,
                     shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    modifier = Modifier.weight(1f).fillMaxHeight().focusRequester(fokus),
                 ) { _ ->
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
