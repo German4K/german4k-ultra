@@ -128,6 +128,8 @@ fun MoviesScreen(
     restoreFocus: Boolean = false,
     onRestored: () -> Unit = {},
     onContentScrolled: (Boolean) -> Unit = {},
+    // German4K: Die Personenseite zeigt auch Serien — die Huelle schaltet dafuer in den Serienbereich.
+    onOpenSeries: (seriesId: Long) -> Unit = {},
     modifier: Modifier = Modifier,
     /**
      * Pins the grid to one folder and takes the category rail away — how More → Favourites and
@@ -161,6 +163,8 @@ fun MoviesScreen(
     val selectedMovie by vm.selectedMovie.collectAsStateWithLifecycle()
     val selectedMovieMeta by vm.selectedMovieMeta.collectAsStateWithLifecycle()
     val metadataMode by vm.metadataMode.collectAsStateWithLifecycle()
+    // German4K: Schalter „Detailseite vor dem Abspielen" — er bestimmt Raster, Vorschau und Klick.
+    val detailseite by vm.detailseite.collectAsStateWithLifecycle()
     val moveState by vm.moveState.collectAsStateWithLifecycle()
     val categoryMoveState by vm.categoryMoveState.collectAsStateWithLifecycle()
     var contextMovie by remember { mutableStateOf<MovieEntity?>(null) }
@@ -176,8 +180,14 @@ fun MoviesScreen(
     var moveOriginKey by remember { mutableStateOf<String?>(null) }
     var moveOriginName by remember { mutableStateOf<String?>(null) }
     var creatingCategory by remember { mutableStateOf(false) }
-    // Fullscreen TMDB details window (§11.1); null = closed.
+    // German4K: Die eigene Detailseite (Querbild, Noten, Besetzung, Fassungen); null = zu.
     var detailsMovie by remember { mutableStateOf<MovieEntity?>(null) }
+    // Fullscreen TMDB details window (§11.1); null = closed. German4K: eigener Zustand, seit
+    // `detailsMovie` die neue Seite oeffnet — der Menuepunkt „TMDB Details" bleibt als Lesefenster.
+    var tmdbDetailsMovie by remember { mutableStateOf<MovieEntity?>(null) }
+    // German4K: Personenseite aus der Besetzung — Kennung und Name, der Name steht sofort fest.
+    var person by remember { mutableStateOf<Pair<Long, String>?>(null) }
+    var personTitel by remember { mutableStateOf<tv.own.owntv.core.german4k.German4kPersonTitel?>(null) }
     // "Set TMDB name" dialog target (§11.2 U5b); null = closed.
     var setTmdbNameMovie by remember { mutableStateOf<MovieEntity?>(null) }
     // In-app trailer playback (§7.3 U4); non-null = fullscreen player open with this YouTube key.
@@ -316,6 +326,7 @@ fun MoviesScreen(
         // Opening the TMDB Details window or the Set TMDB name dialog closes the menu; don't yank focus
         // back to the grid — they need it (and trap it). The grid is refocused when they close (see below).
         if (detailsMovie != null) return@LaunchedEffect
+        if (tmdbDetailsMovie != null) return@LaunchedEffect
         if (setTmdbNameMovie != null) return@LaunchedEffect
         if (trailerVideoKey != null) return@LaunchedEffect
         // The context menu closes before MoveToCategoryDialog (and its nested name prompt) opens, and
@@ -377,7 +388,9 @@ fun MoviesScreen(
             )
             .onFocusChanged { if (it.hasFocus) onChildFocused() },
     ) {
-    val previewVisible = panelShares?.preview != 0
+    // German4K: Mit Detailseite braucht die Uebersicht keine Vorschauspalte mehr — der Platz geht
+    // an groessere Kacheln (drei je Reihe), alles Weitere steht auf der Detailseite.
+    val previewVisible = panelShares?.preview != 0 && !detailseite
     val innerGapTotal = browsePanelGapTotal(previewVisible)
     val panels = panelShares?.let { computePanelWidths(it, maxWidth, innerGapTotal) }
     Row(
@@ -575,7 +588,7 @@ fun MoviesScreen(
             } else {
                 LazyVerticalGrid(
                     state = effectiveGridState,
-                    columns = GridCells.Adaptive(minSize = 130.dp),
+                    columns = if (detailseite) GridCells.Fixed(3) else GridCells.Adaptive(minSize = 130.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -604,7 +617,8 @@ fun MoviesScreen(
                                     firstItemFocus = firstItemFocus,
                                 ),
                                 onFocus = { vm.onMovieFocused(movie) },
-                                onClick = { startMovie(movie) },
+                                // German4K: Mit Schalter oeffnet der Klick die Detailseite, ohne spielt er sofort ab.
+                                onClick = { if (detailseite) detailsMovie = movie else startMovie(movie) },
                                 onLongClick = { contextMovie = movie; contextMovieId = movie.id; contextMovieIndex = index },
                             )
                         }
@@ -625,7 +639,7 @@ fun MoviesScreen(
                 MovieDetailsPane(
                     movie = selectedMovie,
                     meta = selectedMovieMeta?.takeIf { it.movieId == selectedMovie?.id }?.cache,
-                    noten = selectedMovieMeta?.takeIf { it.movieId == selectedMovie?.id }?.noten,
+                    noten = selectedMovieMeta?.takeIf { it.movieId == selectedMovie?.id }?.details?.noten,
                     tmdbWins = metadataMode.tmdbWins,
                     resumePositionMs = selectedProgress?.takeIf { !vm.isMovieCompleted(it) }?.positionMs?.takeIf { it > 0 },
                     downloadStrip = selectedMovie?.let { m -> downloadStates[m.id]?.let { tv.own.owntv.core.download.downloadStripFor(listOf(it)) } },
@@ -664,7 +678,7 @@ fun MoviesScreen(
             hasTmdbDetails = metadataMode.enrich && cacheForM != null,
             trailerKey = if (metadataMode.enrich) cacheForM?.trailerKey else null,
             canRefetchTmdb = metadataMode.enrich,
-            onShowDetails = { contextMovie = null; detailsMovie = m },
+            onShowDetails = { contextMovie = null; tmdbDetailsMovie = m },
             onToggleFavorite = { vm.toggleFavorite(m); contextMovie = null },
             onToggleWatched = {
                 if (watched) vm.markMovieUnwatched(m) else vm.markMovieWatched(m)
@@ -754,22 +768,75 @@ fun MoviesScreen(
         }
     }
 
-    // When the TMDB Details window closes, return focus to the movie it was opened from (the window
+    // When the details page closes, return focus to the movie it was opened from (the page
     // trapped focus, so without this it would fall to the sidebar).
-    LaunchedEffect(detailsMovie) {
-        if (detailsMovie == null && contextMovieId != null) {
+    LaunchedEffect(detailsMovie, tmdbDetailsMovie) {
+        if (detailsMovie == null && tmdbDetailsMovie == null && contextMovieId != null) {
             withFrameNanos { }
             runCatching { contextFocus.requestFocus() }
         }
     }
 
+    // German4K: Die eigene Detailseite. `vm.select(m)` heisst hier `onMovieFocused` — sie muss auch
+    // dann laufen, wenn der Fokus woanders stand (Sprung aus Fassung oder Personenseite), sonst
+    // laedt `selectedMovieMeta` nie fuer diesen Titel.
+    //
+    // `person == null` ist kein Schoenheitsfehler, sondern Pflicht: beide Seiten tragen
+    // `trapAllFocusExit()`, und dessen `onExit = cancelFocusChange()` verwirft JEDE Fokusuebergabe
+    // aus der Detailseite heraus — auch die der Personenseite. Blieb die Detailseite unter der
+    // Personenseite stehen, bekam die Personenseite den Fokus nie und das D-Pad war dort tot
+    // (am Geraet nachgemessen, 21.09.2026). Deshalb ist immer nur eine der beiden Seiten da.
+    if (person == null) detailsMovie?.let { m ->
+        val meta = selectedMovieMeta?.takeIf { it.movieId == m.id }
+        var fortsetzen by remember(m.id) { mutableStateOf<Long?>(null) }
+        LaunchedEffect(m.id) {
+            fortsetzen = vm.savedPositionMs(m).takeIf { it > 0 }
+            vm.onMovieFocused(m)
+        }
+        tv.own.owntv.ui.components.German4kDetailScreen(
+            ui = tv.own.owntv.ui.components.German4kDetailUi(
+                schluessel = m.remoteId ?: "false:${m.name}",
+                titel = m.name,
+                plakat = m.posterUrl,
+                details = meta?.details,
+                serie = false,
+                favorit = favoriteIds.contains(m.id),
+                fortsetzenMs = fortsetzen,
+            ),
+            onAbspielen = { start -> detailsMovie = null; vm.play(m, start); goFullscreen() },
+            onFavorit = { vm.toggleFavorite(m) },
+            onFolgen = {},
+            onPerson = { d -> person = d.id to d.name },
+            onFassung = { f -> scope.launch { vm.filmZuFassung(m, f)?.let { detailsMovie = it } } },
+            onExit = { detailsMovie = null },
+        )
+    }
+
+    // German4K: Personenseite — liegt ueber der Detailseite, deshalb NACH ihr gezeichnet.
+    LaunchedEffect(person) {
+        personTitel = null
+        val id = person?.first ?: return@LaunchedEffect
+        detailsMovie?.let { m -> personTitel = vm.personTitel(m, id) }
+    }
+    person?.let { (_, name) ->
+        tv.own.owntv.ui.components.German4kPersonScreen(
+            name = name,
+            titel = personTitel,
+            favoritenFilme = favoriteIds,
+            favoritenSerien = emptySet(),
+            onFilm = { f -> person = null; detailsMovie = f },
+            onSerie = { s -> person = null; detailsMovie = null; onOpenSeries(s.id) },
+            onExit = { person = null },
+        )
+    }
+
     // Windowed TMDB details popup (§11.1) — read-only, Back exits.
-    detailsMovie?.let { m ->
+    tmdbDetailsMovie?.let { m ->
         val cache = selectedMovieMeta?.takeIf { it.movieId == m.id }?.cache
-        val noten = selectedMovieMeta?.takeIf { it.movieId == m.id }?.noten
+        val noten = selectedMovieMeta?.takeIf { it.movieId == m.id }?.details?.noten
         MediaDetailsScreen(
             details = buildMovieDetails(m, cache, metadataMode.tmdbWins).copy(noten = noten),
-            onExit = { detailsMovie = null },
+            onExit = { tmdbDetailsMovie = null },
         )
     }
 

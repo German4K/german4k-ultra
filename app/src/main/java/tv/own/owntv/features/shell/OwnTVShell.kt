@@ -1083,6 +1083,9 @@ fun OwnTVShell(
                             restoreFocus = restoreFocus,
                             onRestored = { restoreFocus = false },
                             onContentScrolled = { contentScrolled = it },
+                            // German4K: Serie aus der Personenseite — in den Serienbereich wechseln und
+                            // sie dort oeffnen; der Serienbereich teilt sich dieses SeriesViewModel.
+                            onOpenSeries = { id -> onSelectSection(MainSection.SERIES); seriesVm.openSeriesById(id) },
                             modifier = Modifier.fillMaxSize(),
                         )
 

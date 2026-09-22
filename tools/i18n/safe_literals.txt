@@ -184,6 +184,7 @@
 1	technical	app/src/main/java/tv/own/owntv/features/movies/MoviesScreen.kt	,
 1	preference-key	app/src/main/java/tv/own/owntv/features/movies/MoviesScreen.kt	delete_subtitles
 1	preference-key	app/src/main/java/tv/own/owntv/features/movies/MoviesScreen.kt	download
+1	technical	app/src/main/java/tv/own/owntv/features/movies/MoviesScreen.kt	false:${m.name}
 1	preference-key	app/src/main/java/tv/own/owntv/features/movies/MoviesScreen.kt	favourite
 1	preference-key	app/src/main/java/tv/own/owntv/features/movies/MoviesScreen.kt	hide
 1	preference-key	app/src/main/java/tv/own/owntv/features/movies/MoviesScreen.kt	mark_watched
