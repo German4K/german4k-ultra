@@ -107,7 +107,17 @@ internal fun TopBar(
                     }
                     parts.forEachIndexed { i, label ->
                         if (i > 0) Box(Modifier.size(3.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.3f)))
-                        Text(label, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.5f))
+                        // German4K: softWrap = false. Wird die Reihe eng (Hochformat), brach eine
+                        // Plakette sonst buchstabenweise um — "EXO" stand als E/X/O untereinander.
+                        // Lieber am Rand abgeschnitten als in eine Buchstabensaeule zerlegt.
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color.White.copy(alpha = 0.5f),
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                     // The LIVE badge has left the top bar: live status belongs beside the timeline that
                     // describes it, so it is now the stateful badge at the right end of the dock's band A.
@@ -150,8 +160,17 @@ internal fun TopBar(
           Spacer(Modifier.width(20.dp))
       }
       // Right half, pushed to the far edge. Same weight as the left, hence the true centring above.
-      Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.Top) {
-          if (trailing != null) trailing()
+      //
+      // German4K: Das Gegengewicht ist nur noetig, solange die Uhr in der Mitte steht — sie soll auf
+      // dem echten Bildschirmmittelpunkt sitzen. Ohne Uhr (im Hochformat, und hinter einer
+      // Fehlermeldung) nahm die leere rechte Haelfte trotzdem die halbe Breite, und vom Sendernamen
+      // links blieb die Ellipse. Dann bekommt die rechte Seite nur noch, was ihr Inhalt braucht.
+      if (centre != null) {
+          Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.Top) {
+              if (trailing != null) trailing()
+          }
+      } else if (trailing != null) {
+          Row(horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.Top) { trailing() }
       }
     }
 }

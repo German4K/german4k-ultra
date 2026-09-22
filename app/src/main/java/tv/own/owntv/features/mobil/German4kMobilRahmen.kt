@@ -17,11 +17,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -101,11 +98,11 @@ fun German4kMobilRahmen(
                 }
                 LazyColumn(state = listenZustand, modifier = Modifier.fillMaxSize()) {
                     itemsIndexed(kategorien) { i, k ->
-                        // German4K: wie in der unteren Leiste — ein Tipp bewegt den Fokus nicht von
-                        // selbst, der Rahmen bliebe auf der zuletzt fokussierten Zeile stehen.
-                        val fokus = remember { FocusRequester() }
+                        // German4K: Hier bewusst KEIN requestFocus wie in der unteren Leiste — der
+                        // Tipp ersetzt die Liste im selben Zug durch Ebene 2, die angeforderte Zeile
+                        // ist also schon weg, bevor der Fokus ankaeme.
                         FocusableSurface(
-                            onClick = { runCatching { fokus.requestFocus() }; onSelect(i); onKategorieOffen(true) },
+                            onClick = { onSelect(i); onKategorieOffen(true) },
                             onLongClick = onLongSelect?.let { { it(i) } },
                             selected = i == selectedIndex,
                             shape = RoundedCornerShape(12.dp),
@@ -113,8 +110,7 @@ fun German4kMobilRahmen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(German4kMobilZeilenHoehe)
-                                .padding(horizontal = 12.dp, vertical = 2.dp)
-                                .focusRequester(fokus),
+                                .padding(horizontal = 12.dp, vertical = 2.dp),
                         ) { _ ->
                             Row(
                                 modifier = Modifier

@@ -256,7 +256,8 @@ fun PlayerHud(
     val nextCountdown = ((msToAdvance + 999L) / 1000L).toInt().coerceIn(0, 30)
 
     // German4K: Auf Touch-Geraeten gibt es keine Fernbedienung — ein Tipp aufs Bild zeigt/versteckt die Steuerung.
-    val mobil = LocalFormfaktor.current.mobil
+    val formfaktor = LocalFormfaktor.current
+    val mobil = formfaktor.mobil
     var controlsVisible by remember { mutableStateOf(true) }
     var showInfo by remember { mutableStateOf(false) } // stream technical-info overlay
     // Used only by "Report this stream", which writes the current readout into the playback log (F18).
@@ -619,13 +620,29 @@ fun PlayerHud(
             // One unified strip: back · logo · chips-over-channel-name · Now/Next guide. The channel name
             // used to be drawn twice (here and in a floating card below), with the guide stranded on the
             // right edge — that space belongs to the history list now.
+            // German4K: Im Hochformat traegt die Kopfzeile nur noch Zurueck, Logo und Sendername.
+            // Die Reihe teilt sich sonst in linke Haelfte | Uhr | rechte Haelfte, beide Haelften mit
+            // gleichem Gewicht — auf 360 dp bleiben der linken nach Zurueck (40 dp) und Logo (46 dp)
+            // keine 20 dp fuer den Namen. Die Plakette "EXO" wurde darin buchstabenweise umbrochen,
+            // vom Sendernamen blieb die Ellipse (t7/07-handy-player-hoch.png, Stand vor dem Fix).
+            //
+            // Was wegfaellt, geht nicht verloren: die Uhr steht zwei Zentimeter darueber in der
+            // Statusleiste des Handys, der laufende Motor unten in der Leiste ("EXO", dort auch
+            // umschaltbar), Aufloesung und Codec im Stream-Fenster. Das Programmfeld ist eine
+            // Fernseher-Kachel — auf dem Handy waere es breiter als der halbe Bildschirm.
+            // Quer und am Fernseher bleibt die Reihe, wie sie war.
+            val kompaktKopf = formfaktor.kompakt
             TopBar(
-                player, isLive, listOfNotNull(engineChip) + streamChips.ifEmpty { listOfNotNull(videoRes) }, duration, onBack,
+                player,
+                isLive,
+                if (kompaktKopf) emptyList() else listOfNotNull(engineChip) + streamChips.ifEmpty { listOfNotNull(videoRes) },
+                duration,
+                onBack,
                 modifier = Modifier.align(Alignment.TopStart),
-                trailing = if (error == null) liveEpgCard else null,
+                trailing = if (error == null && !kompaktKopf) liveEpgCard else null,
                 // Hidden behind an error overlay along with the rest of the chrome: a clock ticking
                 // over a failure message just draws the eye to the wrong thing.
-                centre = if (error == null) {
+                centre = if (error == null && !kompaktKopf) {
                     { PlayerClock(watchingMs = watchingWall) }
                 } else null,
             )

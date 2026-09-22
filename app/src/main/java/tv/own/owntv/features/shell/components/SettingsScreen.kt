@@ -907,10 +907,24 @@ fun SettingsScreen(
         runCatching { selectedCategoryFocus.requestFocus() }
     }
     // German4K: Zurueck aus dem Blatt fuehrt im Hochformat auf die Gruppenliste, nicht aus den
-    // Einstellungen heraus. Steht nach den beiden Handlern darueber, damit er sie ueberstimmt.
-    BackHandler(enabled = tab == SettingsTab.ROOT && LocalFormfaktor.current.kompakt && gruppeOffen) {
+    // Einstellungen heraus. Steht nach den Handlern darueber, damit er sie ueberstimmt — auch den
+    // ganz oben, der sonst nur die Suche leeren wuerde und die Ebene 2 stehen liesse.
+    //
+    // Eine Suche ist ebenfalls Ebene 2 (die Treffer stehen im Blatt), also muss der Weg zurueck sie
+    // schliessen: erst die Suche leeren, dann die Gruppe zuklappen. Dasselbe tut der Pfeil in der
+    // Kopfzeile — beide rufen `zurueckZurSpine`.
+    val zurueckZurSpine = {
+        if (searchQuery.isNotBlank()) {
+            searchQuery = ""
+            searchExpanded = false
+        }
         gruppeOffen = false
     }
+    BackHandler(
+        enabled = tab == SettingsTab.ROOT && LocalFormfaktor.current.kompakt &&
+            (gruppeOffen || searchQuery.isNotBlank()),
+        onBack = zurueckZurSpine,
+    )
     // A genuinely new group starts at its first row. Recreating the root after a sub-screen does not:
     // its group and list position were kept above the sub-screen dispatch, so leave them untouched.
     LaunchedEffect(selectedGroup) {
@@ -1394,7 +1408,7 @@ fun SettingsScreen(
                             } else {
                                 gruppe?.label.orEmpty()
                             },
-                            onZurueck = { gruppeOffen = false },
+                            onZurueck = zurueckZurSpine,
                         )
                         blattBaustein(Modifier.fillMaxWidth().weight(1f))
                     }
