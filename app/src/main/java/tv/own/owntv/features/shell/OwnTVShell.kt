@@ -22,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.produceState
@@ -178,6 +179,11 @@ fun OwnTVShell(
     var restoreFocus by remember { mutableStateOf(false) }
     var restoreTrendingSearchFocus by remember { mutableStateOf(false) }
     var trendingSearchActive by remember { mutableStateOf(false) }
+    // German4K: Handy/Tablet — steht im Live-Bereich die Senderliste einer Kategorie offen? Der
+    // Zustand liegt hier und nicht in LiveScreen, weil ein Tipp auf einen Sender ins Vollbild geht
+    // und diese Huelle den Bildschirm dafuer aus der Komposition nimmt; ein rememberSaveable dort
+    // faengt danach wieder bei der Kategorieliste an. Am Fernseher ohne Wirkung.
+    var liveKategorieOffen by rememberSaveable { mutableStateOf(false) }
     val player = koinInject<OwnTVPlayer>()
     // Docked mini-player size (% of screen width) + position, configurable in Settings and from the
     // mini-player's own controls. Read straight from settings so both entry points stay in sync.
@@ -1073,6 +1079,8 @@ fun OwnTVShell(
                             restoreFocus = restoreFocus,
                             onRestored = { restoreFocus = false },
                             onContentScrolled = { contentScrolled = it },
+                            kategorieOffen = liveKategorieOffen,
+                            onKategorieOffen = { liveKategorieOffen = it },
                             modifier = Modifier.fillMaxSize(),
                         )
 

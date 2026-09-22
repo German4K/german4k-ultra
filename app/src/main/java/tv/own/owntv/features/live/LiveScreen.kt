@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -64,6 +65,7 @@ import tv.own.owntv.core.customize.CustomizeKeys
 import tv.own.owntv.core.database.entity.ChannelEntity
 import tv.own.owntv.core.database.entity.ContentOrderEntity
 import tv.own.owntv.features.customize.MoveToCategoryDialog
+import tv.own.owntv.features.mobil.German4kMobilRahmen
 import tv.own.owntv.features.settings.SettingsViewModel
 import tv.own.owntv.features.settings.data.BrowseColumnGap
 import tv.own.owntv.features.settings.data.BrowseColumnDividerSpace
@@ -74,6 +76,7 @@ import tv.own.owntv.features.settings.data.computePanelWidths
 import tv.own.owntv.features.settings.rememberPanelShares
 import tv.own.owntv.features.shell.components.CategoryContextMenu
 import tv.own.owntv.features.shell.components.CategoryRail
+import tv.own.owntv.ui.LocalFormfaktor
 import tv.own.owntv.ui.components.MoveOrderOverlay
 import tv.own.owntv.features.shell.components.PreviewPane
 import tv.own.owntv.features.shell.components.RailCategory
@@ -120,6 +123,16 @@ fun LiveScreen(
     restoreFocus: Boolean = false,
     onRestored: () -> Unit = {},
     onContentScrolled: (Boolean) -> Unit = {},
+    /**
+     * German4K: Handy/Tablet — steht die Senderliste einer Kategorie offen (Ebene 2 des
+     * Mobil-Rahmens)? Der Zustand liegt in der Huelle, nicht hier: ein Tipp auf einen Sender geht
+     * ins Vollbild, und die Huelle nimmt dafuer diesen Bildschirm aus der Komposition — ein
+     * `rememberSaveable` hier faengt danach wieder bei der Kategorieliste an. Gemessen: Zurueck aus
+     * dem Vollbild landete so in den Kategorien statt in der Senderliste.
+     * Am Fernseher und in den angepinnten Ansichten (lockedKey) ohne Wirkung.
+     */
+    kategorieOffen: Boolean = false,
+    onKategorieOffen: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     /**
      * Pins the list to one folder and takes the category rail away — how More → Favourites and
@@ -128,6 +141,9 @@ fun LiveScreen(
     lockedKey: LiveKey? = null,
 ) {
     val vm: LiveViewModel = koinViewModel()
+    // German4K: Handy/Tablet — der Formfaktor entscheidet, ob der Mobil-Rahmen an die Stelle der
+    // drei Spalten tritt. Der Drill-down-Zustand kommt von aussen (siehe Parameter).
+    val formfaktor = LocalFormfaktor.current
     // Locking and unlocking are one pair: the pin belongs to this screen's lifetime, not to the view
     // model's. On the television that view model is a single instance shared with the browse section,
     // so a pin left behind froze its category rail. `DisposableEffect` (not `LaunchedEffect`) also
@@ -179,7 +195,14 @@ fun LiveScreen(
         }
     }
     // Preview runs only when the player isn't busy (previewEnabled) AND the user hasn't turned it off.
-    val effectivePreview = previewEnabled && livePreviewSetting
+    // German4K: Auf Handy/Tablet gibt es keine Vorschauspalte — dort darf auch keine zweite
+    // Wiedergabe-Engine mitlaufen, sie kostet Akku und Bandbreite fuer ein Bild, das niemand sieht.
+    val previewWirksam = previewEnabled && !formfaktor.mobil
+    val effectivePreview = previewWirksam && livePreviewSetting
+
+    // German4K: Wer aus dem Vollbild auf ein Handy zurueckkommt (oder dreht), hat vielleicht noch
+    // eine laufende Vorschau — beim Betreten in Mobil abschalten.
+    LaunchedEffect(formfaktor.mobil) { if (formfaktor.mobil) vm.stopPreview() }
 
     // NOTE: do NOT stop the player when LiveScreen leaves composition — going fullscreen disposes
     // this screen, and stopping here would abort the stream that was just started. Playback is
@@ -436,76 +459,27 @@ fun LiveScreen(
             )
             .onFocusChanged { if (it.hasFocus) onChildFocused() },
     ) {
-    val previewVisible = panelShares?.preview != 0
+    // German4K: Auf Handy/Tablet gibt es keine dritte Spalte — die Vorschau haette dort keine
+    // Breite mehr; was laeuft, steht in der Zeile des Senders und danach im Vollbild.
+    val previewVisible = panelShares?.preview != 0 && !formfaktor.mobil
     val innerGapTotal = browsePanelGapTotal(previewVisible)
     val panels = panelShares?.let { computePanelWidths(it, maxWidth, innerGapTotal) }
-    Row(
-        modifier = Modifier
-            .fillMaxSize(),
-    ) {
-        // Plan Z — More → Favourites and More → History pin this pane to one folder and put
-        // their own three tabs above it, so there is no category rail to draw.
-        if (lockedKey == null) {
-        CategoryRail(
-            width = panels?.category ?: Dimens.RailWidthFixed,
-            categories = railItems.map {
-                RailCategory(
-                    it.displayLabel(),
-                    it.icon,
-                    showGenreDot = it.key is LiveKey.Folder,
-                    providerName = it.providerName,
-                )
-            },
-            selectedIndex = selectedIndex,
-            focusRowIndex = railFocusRow,
-            onRowFocused = { railFocusRow = null },
-            onSelect = { idx -> railItems.getOrNull(idx)?.let { vm.select(it.key) } },
-            onLongSelect = { idx -> 
-                railItems.getOrNull(idx)?.let { item ->
-                    if (item.key is LiveKey.Folder || item.key is LiveKey.Custom) {
-                        contextCategory = item
-                        contextCategoryKey = item.key
-                    }
-                }
-            },
-            // Focusing a folder stops the in-pane preview — but only when a preview is actually running.
-            // When the player is docked (live PiP) or fullscreen, previewEnabled is false and stopPreview
-            // would kill that stream (e.g. while navigating left to leave Live), so we skip it.
-            onFocused = { if (previewEnabled) vm.stopPreview() },
-            listState = catListState,
-            focusRequester = railFocus,
-            showPanel = false,
-            modifier = Modifier
-                .onFocusChanged { railPaneFocused = it.hasFocus }
-                .chNavPaging(
-                    enabled = chNavEnabled,
-                    upSkip = chNavUpSkip,
-                    downSkip = chNavDownSkip,
-                    isFocused = { railPaneFocused },
-                    lastIndex = { railItems.size - 1 },
-                    currentTargetIndex = { selectedIndex },
-                    // Selecting a category loads only its first paged page (~50 items), not all channels
-                    // at once, so this is fast. The rail's LaunchedEffect scrolls + focuses the pill.
-                    onJumpToIndex = { idx -> railItems.getOrNull(idx)?.let { vm.select(it.key) } },
-                ),
-        )
-
-        Spacer(Modifier.width(BrowseColumnGap))
-        Box(
-            Modifier
-                .width(BrowseColumnDividerSpace)
-                .fillMaxHeight()
-                .padding(vertical = 2.dp)
-                .background(OwnTVTheme.colors.outlineVariant.copy(alpha = 0.35f)),
-        )
-
-        Spacer(Modifier.width(BrowseColumnGap))
-        }
-
+    // German4K: Die Senderspalte einmal als Lambda — Fernseher- und Mobil-Zweig rufen denselben
+    // Inhalt auf, damit es ihn nicht zweimal gibt. RowScope, weil sie im Fernseher-Zweig neben der
+    // Rail und der Vorschau steht; der Mobil-Zweig setzt sie in ein eigenes Row.
+    val kanalliste: @Composable RowScope.() -> Unit = {
         // Layer 3 — header + channel list (fixed-width column; the preview pane fills the rest)
         Column(
             modifier = Modifier
-                .width(panels?.list ?: Dimens.ChannelListWidth)
+                // German4K: Auf Handy/Tablet ist das hier die einzige Spalte — keine gespeicherte
+                // Breite, sonst bleibt rechts der Platz der Vorschau leer.
+                .then(
+                    if (formfaktor.mobil) {
+                        Modifier.fillMaxWidth()
+                    } else {
+                        Modifier.width(panels?.list ?: Dimens.ChannelListWidth)
+                    },
+                )
                 .fillMaxHeight()
                 // Track whether this pane holds focus so chNavPaging only consumes CH keys when it does.
                 .onFocusChanged { channelPaneFocused = it.hasFocus }
@@ -569,14 +543,19 @@ fun LiveScreen(
                 .then(if (lockedKey == null) Modifier.trapVerticalFocusExit() else Modifier)
                 .focusGroup()
         ) {
-            Text(
-                stringResource(R.string.content_section_category, stringResource(R.string.common_nav_live_tv), selectedLabel),
-                style = MaterialTheme.typography.headlineMedium,
-                color = OwnTVTheme.colors.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(4.dp))
+            // German4K: Im Hochformat traegt schon die Kopfzeile des Mobil-Rahmens den
+            // Kategorienamen — diese Brotkrume wuerde ihn ein zweites Mal zeigen und frisst auf
+            // einem Handy ein Siebtel des Bildschirms. Die Zaehlerzeile darunter bleibt.
+            if (!formfaktor.kompakt) {
+                Text(
+                    stringResource(R.string.content_section_category, stringResource(R.string.common_nav_live_tv), selectedLabel),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = OwnTVTheme.colors.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(4.dp))
+            }
             Text(
                 pluralStringResource(R.plurals.content_count_channels, count, selectedLabel, count),
                 style = MaterialTheme.typography.titleMedium,
@@ -648,6 +627,108 @@ fun LiveScreen(
                 }
             }
         }
+    }
+
+    // German4K: Auf Handy/Tablet tritt der gemeinsame Mobil-Rahmen an die Stelle der drei Spalten —
+    // Kategorien zum Antippen (Handy hoch) bzw. schmale Rail (quer/Tablet). Ein Tipp auf einen
+    // Sender fuehrt wie am Fernseher direkt ins Vollbild.
+    if (formfaktor.mobil) {
+        German4kMobilRahmen(
+            // Angepinnt (Favoriten/Verlauf aus "Mehr") gibt es keine Kategorien: leere Liste,
+            // dann laesst der Rahmen die Kopfzeile mit dem Zurueck-Pfeil weg.
+            kategorien = if (lockedKey == null) {
+                railItems.map {
+                    RailCategory(
+                        it.displayLabel(),
+                        it.icon,
+                        showGenreDot = it.key is LiveKey.Folder,
+                        providerName = it.providerName,
+                    )
+                }
+            } else {
+                emptyList()
+            },
+            selectedIndex = selectedIndex,
+            onSelect = { idx -> railItems.getOrNull(idx)?.let { vm.select(it.key) } },
+            onLongSelect = { idx ->
+                railItems.getOrNull(idx)?.let { item ->
+                    if (item.key is LiveKey.Folder || item.key is LiveKey.Custom) {
+                        contextCategory = item
+                        contextCategoryKey = item.key
+                    }
+                }
+            },
+            kategorieOffen = kategorieOffen || lockedKey != null,
+            onKategorieOffen = onKategorieOffen,
+            titel = selectedLabel,
+        ) {
+            Row(Modifier.fillMaxSize()) { kanalliste() }
+        }
+    } else {
+    Row(
+        modifier = Modifier
+            .fillMaxSize(),
+    ) {
+        // Plan Z — More → Favourites and More → History pin this pane to one folder and put
+        // their own three tabs above it, so there is no category rail to draw.
+        if (lockedKey == null) {
+        CategoryRail(
+            width = panels?.category ?: Dimens.RailWidthFixed,
+            categories = railItems.map {
+                RailCategory(
+                    it.displayLabel(),
+                    it.icon,
+                    showGenreDot = it.key is LiveKey.Folder,
+                    providerName = it.providerName,
+                )
+            },
+            selectedIndex = selectedIndex,
+            focusRowIndex = railFocusRow,
+            onRowFocused = { railFocusRow = null },
+            onSelect = { idx -> railItems.getOrNull(idx)?.let { vm.select(it.key) } },
+            onLongSelect = { idx -> 
+                railItems.getOrNull(idx)?.let { item ->
+                    if (item.key is LiveKey.Folder || item.key is LiveKey.Custom) {
+                        contextCategory = item
+                        contextCategoryKey = item.key
+                    }
+                }
+            },
+            // Focusing a folder stops the in-pane preview — but only when a preview is actually running.
+            // When the player is docked (live PiP) or fullscreen, previewEnabled is false and stopPreview
+            // would kill that stream (e.g. while navigating left to leave Live), so we skip it.
+            onFocused = { if (previewEnabled) vm.stopPreview() },
+            listState = catListState,
+            focusRequester = railFocus,
+            showPanel = false,
+            modifier = Modifier
+                .onFocusChanged { railPaneFocused = it.hasFocus }
+                .chNavPaging(
+                    enabled = chNavEnabled,
+                    upSkip = chNavUpSkip,
+                    downSkip = chNavDownSkip,
+                    isFocused = { railPaneFocused },
+                    lastIndex = { railItems.size - 1 },
+                    currentTargetIndex = { selectedIndex },
+                    // Selecting a category loads only its first paged page (~50 items), not all channels
+                    // at once, so this is fast. The rail's LaunchedEffect scrolls + focuses the pill.
+                    onJumpToIndex = { idx -> railItems.getOrNull(idx)?.let { vm.select(it.key) } },
+                ),
+        )
+
+        Spacer(Modifier.width(BrowseColumnGap))
+        Box(
+            Modifier
+                .width(BrowseColumnDividerSpace)
+                .fillMaxHeight()
+                .padding(vertical = 2.dp)
+                .background(OwnTVTheme.colors.outlineVariant.copy(alpha = 0.35f)),
+        )
+
+        Spacer(Modifier.width(BrowseColumnGap))
+        }
+
+        kanalliste()
 
         // Layer 4 — preview pane (informational only — no focusable actions; management lives in long-press)
         if (previewVisible) {
@@ -669,6 +750,7 @@ fun LiveScreen(
                 )
             }
         }
+    }
     }
     }
 
