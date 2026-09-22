@@ -262,7 +262,17 @@ fun MoviesScreen(
         val id = pendingDetailsId ?: return@LaunchedEffect
         val m = vm.movieById(id)
         if (m != null) {
-            if (detailseite) detailsMovie = m else vm.onMovieFocused(m)
+            if (detailseite) {
+                // German4K: Auch beim Sprung von aussen Kennung und Position merken, sonst hat
+                // „Zurueck" kein Fokusziel — der Fokus faellt ins Leere und das D-Pad ist tot.
+                // Position -1: der Film muss in dieser Kategorie gar nicht vorkommen, dann nimmt
+                // die Fokusrueckgabe weiter unten die erste Kachel.
+                contextMovieId = m.id
+                contextMovieIndex = -1
+                detailsMovie = m
+            } else {
+                vm.onMovieFocused(m)
+            }
         }
         vm.clearPendingDetails()
     }
