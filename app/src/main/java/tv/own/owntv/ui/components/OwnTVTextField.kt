@@ -49,6 +49,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.R
 import tv.own.owntv.core.theme.GlassSurface
+import tv.own.owntv.ui.LocalFormfaktor
 import tv.own.owntv.ui.theme.LocalGlass
 import tv.own.owntv.ui.theme.OwnTVTheme
 import tv.own.owntv.ui.theme.glass
@@ -84,6 +85,7 @@ fun OwnTVTextField(
     corner: androidx.compose.ui.unit.Dp = 12.dp,
 ) {
     val colors = OwnTVTheme.colors
+    val formfaktor = LocalFormfaktor.current
     val interaction = remember { MutableInteractionSource() }
     val fieldFocused by interaction.collectIsFocusedAsState()
     var editing by remember { mutableStateOf(false) }
@@ -169,8 +171,15 @@ fun OwnTVTextField(
                     .padding(horizontal = 16.dp, vertical = 14.dp)
                     .bringIntoViewRequester(bringIntoView)
                     .focusRequester(innerFocus)
-                        .focusProperties { canFocus = editing }
-                        .onFocusChanged { if (editing && !it.isFocused) editing = false }
+                        // German4K: wie im SearchBar — am Fernseher ist das Feld erst nach OK
+                        // fokussierbar, damit der Fokus ohne Tastatur-Popup durchlaufen kann. Auf
+                        // Handy/Tablet verschluckt BasicTextField dabei den Tipp, bevor er die
+                        // umgebende Flaeche erreicht: kein Tastaturfeld, keine Eingabe. Dort ist das
+                        // Feld deshalb von Anfang an tippbar.
+                        .focusProperties { canFocus = editing || formfaktor.mobil }
+                        .onFocusChanged {
+                            if (it.isFocused) editing = true else if (editing) editing = false
+                        }
                         .onPreviewKeyEvent {
                             if (it.key == Key.Back) {
                                 if (it.type == KeyEventType.KeyUp) {
