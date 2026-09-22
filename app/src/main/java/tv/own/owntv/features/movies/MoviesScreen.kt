@@ -560,8 +560,13 @@ fun MoviesScreen(
                 .then(if (lockedKey == null) Modifier.trapVerticalFocusExit() else Modifier)
                 .focusGroup()
         ) {
-            Text(stringResource(R.string.content_section_category, stringResource(R.string.common_nav_movies), selectedLabel), style = MaterialTheme.typography.headlineLarge, color = OwnTVTheme.colors.onSurface)
-            Spacer(Modifier.height(4.dp))
+            // German4K: Im Hochformat traegt schon die Kopfzeile des Mobil-Rahmens den
+            // Kategorienamen — diese Brotkrume wuerde ihn ein zweites Mal zeigen und frisst
+            // ein Siebtel des Bildschirms. Die Zaehlerzeile darunter bleibt, sie sagt etwas Neues.
+            if (!formfaktor.kompakt) {
+                Text(stringResource(R.string.content_section_category, stringResource(R.string.common_nav_movies), selectedLabel), style = MaterialTheme.typography.headlineLarge, color = OwnTVTheme.colors.onSurface)
+                Spacer(Modifier.height(4.dp))
+            }
             Text(
                 pluralStringResource(R.plurals.content_count_movies, count, selectedLabel, count),
                 style = MaterialTheme.typography.titleMedium,
@@ -632,10 +637,12 @@ fun MoviesScreen(
             } else {
                 LazyVerticalGrid(
                     state = effectiveGridState,
-                    // German4K: Auf dem Handy sind 130 dp Kacheln so klein, dass der Titel nicht mehr
-                    // lesbar ist — 150 dp ergeben zwei Spalten hoch, drei quer, vier bis sechs auf dem Tablet.
+                    // German4K: Kachelbreite je Breitenklasse. Auf einem Handy im Hochformat waeren
+                    // 130 dp so schmal, dass der Titel nicht mehr zu lesen ist — dort 150 dp (zwei
+                    // Spalten). Quer und auf dem Tablet ist Platz genug, da bleibt es beim
+                    // Fernseher-Mass 130 dp, sonst stehen auf einem Tablet nur drei Kacheln nebeneinander.
                     columns = when {
-                        formfaktor.mobil -> GridCells.Adaptive(minSize = 150.dp)
+                        formfaktor.mobil -> GridCells.Adaptive(minSize = if (formfaktor.kompakt) 150.dp else 130.dp)
                         detailseite -> GridCells.Fixed(3)
                         else -> GridCells.Adaptive(minSize = 130.dp)
                     },

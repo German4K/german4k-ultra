@@ -80,6 +80,9 @@ fun German4kMobilRahmen(
         // Zurueck schliesst erst die Kategorie, dann erst verlaesst es den Bereich. Overlays
         // (Detailseite, Personenseite) melden ihren BackHandler spaeter in der Komposition an und
         // gewinnen deshalb — ihr Zurueck fuehrt wie gewohnt ins Raster, nicht in die Kategorieliste.
+        // Das haengt daran, dass die Screens `German4kDetailScreen` NACH dem Rahmen aufrufen: wer
+        // das Overlay einmal vor den Rahmen zieht, bekommt Zurueck aus der Detailseite in die
+        // Kategorieliste statt ins Raster.
         BackHandler(enabled = kategorieOffen && !ohneKategorien) { onKategorieOffen(false) }
 
         if (!kategorieOffen && !ohneKategorien) {
