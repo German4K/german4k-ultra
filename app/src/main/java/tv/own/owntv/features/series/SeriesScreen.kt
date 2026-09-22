@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -36,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -83,6 +86,8 @@ import tv.own.owntv.features.settings.data.browsePanelGapTotal
 import tv.own.owntv.features.settings.data.computePanelWidths
 import tv.own.owntv.core.settings.SettingsRepository
 import tv.own.owntv.features.settings.rememberPanelShares
+import tv.own.owntv.features.mobil.German4kMobilRahmen
+import tv.own.owntv.ui.LocalFormfaktor
 import tv.own.owntv.features.shell.components.CategoryContextMenu
 import tv.own.owntv.features.shell.components.CategoryRail
 import tv.own.owntv.features.shell.components.PreviewPane
@@ -155,6 +160,11 @@ fun SeriesScreen(
         }
     }
     val openedSeries by vm.openedSeries.collectAsStateWithLifecycle()
+    // German4K: Der Drill-down-Zustand des Mobil-Rahmens lebt hier und nicht in [SeriesGrid]:
+    // beim Oeffnen einer Serie verlaesst das Raster die Komposition, ein rememberSaveable darin
+    // faenge danach wieder bei der Kategorieliste an — Zurueck aus den Folgen soll aber im
+    // Raster landen.
+    var kategorieOffen by rememberSaveable { mutableStateOf(false) }
 
     // Track leaving a show so the grid can put focus back on the poster you came from (the episode
     // view that held focus is unmounted on Back — focus would otherwise die and land on the sidebar).
@@ -181,6 +191,8 @@ fun SeriesScreen(
             onRestoredSelected = { returnFromShow = false },
             lockedKey = lockedKey,
             onOpenMovie = onOpenMovie,
+            kategorieOffen = kategorieOffen,
+            onKategorieOffen = { kategorieOffen = it },
             modifier = modifier,
         )
     }
@@ -268,6 +280,9 @@ private fun SeriesGrid(
     lockedKey: LiveKey? = null,
     // German4K: siehe [SeriesScreen] — Film aus der Personenseite.
     onOpenMovie: (movieId: Long) -> Unit = {},
+    // German4K: Drill-down-Zustand des Mobil-Rahmens, gehalten von [SeriesScreen].
+    kategorieOffen: Boolean = false,
+    onKategorieOffen: (Boolean) -> Unit = {},
     modifier: Modifier,
 ) {
     val alreadyDownloadedMessage = stringResource(R.string.content_already_downloaded)
@@ -501,6 +516,8 @@ private fun SeriesGrid(
     // Manual panel widths (Settings → Panel Width Adjustment). The saved percentages now resolve
     // against the inside of one shared content container; no stored value is rewritten.
     val panelShares = rememberPanelShares(PanelSection.SERIES, settingsVm)
+    // German4K: Handy/Tablet — der Formfaktor entscheidet ueber Rahmen, Spalten und Vorschau.
+    val formfaktor = LocalFormfaktor.current
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
@@ -522,71 +539,28 @@ private fun SeriesGrid(
     // sonst reserviert `computePanelWidths` ihn weiter und die Kachelspalte behaelt ihre schmale
     // Breite, waehrend rechts ein Drittel leer bleibt. Ohne eigene Breiten (Standard) bleibt alles
     // wie gehabt: `panels` ist dann null und die Spalte nimmt sich ihr Gewicht.
-    val previewVisible = panelShares?.preview != 0 && !detailseite
+    // German4K: Auf Handy/Tablet gibt es keine dritte Spalte — die Vorschau haette dort keine
+    // Breite mehr; die Angaben zur Serie stehen auf der Detailseite.
+    val previewVisible = panelShares?.preview != 0 && !detailseite && !formfaktor.mobil
     val innerGapTotal = browsePanelGapTotal(previewVisible)
     val panels = panelShares?.let {
         computePanelWidths(if (previewVisible) it else it.copy(preview = 0), maxWidth, innerGapTotal)
     }
-    Row(
-        modifier = Modifier
-            .fillMaxSize(),
-    ) {
-        // Plan Z — More → Favourites and More → History pin this pane to one folder and put
-        // their own three tabs above it, so there is no category rail to draw.
-        if (lockedKey == null) {
-        CategoryRail(
-            width = panels?.category ?: Dimens.RailWidthFixed,
-            categories = railItems.map {
-                RailCategory(
-                    it.displayLabel(R.string.content_category_all_series),
-                    it.icon,
-                    showGenreDot = it.key is LiveKey.Folder,
-                    providerName = it.providerName,
-                )
-            },
-            selectedIndex = selectedIndex,
-            focusRowIndex = railFocusRow,
-            onRowFocused = { railFocusRow = null },
-            onSelect = { idx -> railItems.getOrNull(idx)?.let { vm.select(it.key) } },
-            onLongSelect = { idx ->
-                railItems.getOrNull(idx)?.let { item ->
-                    if (item.key is LiveKey.Folder || item.key is LiveKey.Custom) {
-                        contextCategory = item
-                        contextCategoryKey = item.key
-                    }
-                }
-            },
-            listState = catListState,
-            focusRequester = railFocus,
-            showPanel = false,
-            modifier = Modifier
-                .onFocusChanged { railPaneFocused = it.hasFocus }
-                .chNavPaging(
-                    enabled = chNavEnabled,
-                    upSkip = chNavUpSkip,
-                    downSkip = chNavDownSkip,
-                    isFocused = { railPaneFocused },
-                    lastIndex = { railItems.size - 1 },
-                    currentTargetIndex = { selectedIndex },
-                    onJumpToIndex = { idx -> railItems.getOrNull(idx)?.let { vm.select(it.key) } },
-                ),
-        )
-
-        Spacer(Modifier.width(BrowseColumnGap))
-        Box(
-            Modifier
-                .width(BrowseColumnDividerSpace)
-                .fillMaxHeight()
-                .padding(vertical = 2.dp)
-                .background(OwnTVTheme.colors.outlineVariant.copy(alpha = 0.35f)),
-        )
-
-        Spacer(Modifier.width(BrowseColumnGap))
-        }
-
+    // German4K: Der Listen-/Rasterblock einmal als Lambda — Fernseher- und Mobil-Zweig rufen
+    // denselben Inhalt auf, damit es ihn nicht zweimal gibt. RowScope, weil er im
+    // Fernseher-Zweig `weight(1.8f)` braucht; der Mobil-Zweig setzt ihn in ein eigenes Row.
+    val listeUndRaster: @Composable RowScope.() -> Unit = {
         Column(
             modifier = Modifier
-                .then(if (panels != null) Modifier.width(panels.list) else Modifier.weight(1.8f))
+                // German4K: Auf Handy/Tablet ist das hier die einzige Spalte — kein Gewicht, keine
+                // gespeicherte Breite, sonst bleibt rechts der Platz der Vorschau leer.
+                .then(
+                    when {
+                        formfaktor.mobil -> Modifier
+                        panels != null -> Modifier.width(panels.list)
+                        else -> Modifier.weight(1.8f)
+                    },
+                )
                 .fillMaxSize()
                 .onFocusChanged { gridPaneFocused = it.hasFocus }
                 .chNavPaging(
@@ -646,8 +620,13 @@ private fun SeriesGrid(
                 .then(if (lockedKey == null) Modifier.trapVerticalFocusExit() else Modifier)
                 .focusGroup()
         ) {
-            Text(stringResource(R.string.content_section_category, stringResource(R.string.common_nav_series), selectedLabel), style = MaterialTheme.typography.headlineLarge, color = OwnTVTheme.colors.onSurface)
-            Spacer(Modifier.height(4.dp))
+            // German4K: Im Hochformat traegt schon die Kopfzeile des Mobil-Rahmens den
+            // Kategorienamen — diese Brotkrume wuerde ihn ein zweites Mal zeigen und frisst
+            // ein Siebtel des Bildschirms. Die Zaehlerzeile darunter bleibt, sie sagt etwas Neues.
+            if (!formfaktor.kompakt) {
+                Text(stringResource(R.string.content_section_category, stringResource(R.string.common_nav_series), selectedLabel), style = MaterialTheme.typography.headlineLarge, color = OwnTVTheme.colors.onSurface)
+                Spacer(Modifier.height(4.dp))
+            }
             Text(pluralStringResource(R.plurals.content_count_series, count, selectedLabel, count), style = MaterialTheme.typography.titleMedium, color = OwnTVTheme.colors.primary, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(14.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -705,7 +684,14 @@ private fun SeriesGrid(
             } else {
                 LazyVerticalGrid(
                     state = effectiveGridState,
-                    columns = if (detailseite) GridCells.Fixed(3) else GridCells.Adaptive(minSize = 130.dp),
+                    // German4K: Kachelbreite je Breitenklasse. Auf einem Handy im Hochformat waeren
+                    // 130 dp so schmal, dass der Titel nicht mehr zu lesen ist — dort 150 dp (zwei
+                    // Spalten). Quer und auf dem Tablet bleibt es beim Fernseher-Mass 130 dp.
+                    columns = when {
+                        formfaktor.mobil -> GridCells.Adaptive(minSize = if (formfaktor.kompakt) 150.dp else 130.dp)
+                        detailseite -> GridCells.Fixed(3)
+                        else -> GridCells.Adaptive(minSize = 130.dp)
+                    },
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -738,6 +724,101 @@ private fun SeriesGrid(
                 }
             }
         }
+    }
+
+    // German4K: Auf Handy/Tablet tritt der gemeinsame Mobil-Rahmen an die Stelle der drei
+    // Spalten — Kategorien zum Antippen (Handy hoch) bzw. schmale Rail (quer/Tablet).
+    if (formfaktor.mobil) {
+        German4kMobilRahmen(
+            // Angepinnt (Favoriten/Verlauf aus "Mehr") gibt es keine Kategorien: leere Liste,
+            // dann laesst der Rahmen die Kopfzeile mit dem Zurueck-Pfeil weg.
+            kategorien = if (lockedKey == null) {
+                railItems.map {
+                    RailCategory(
+                        it.displayLabel(R.string.content_category_all_series),
+                        it.icon,
+                        showGenreDot = it.key is LiveKey.Folder,
+                        providerName = it.providerName,
+                    )
+                }
+            } else {
+                emptyList()
+            },
+            selectedIndex = selectedIndex,
+            onSelect = { idx -> railItems.getOrNull(idx)?.let { vm.select(it.key) } },
+            onLongSelect = { idx ->
+                railItems.getOrNull(idx)?.let { item ->
+                    if (item.key is LiveKey.Folder || item.key is LiveKey.Custom) {
+                        contextCategory = item
+                        contextCategoryKey = item.key
+                    }
+                }
+            },
+            kategorieOffen = kategorieOffen || lockedKey != null,
+            onKategorieOffen = onKategorieOffen,
+            titel = selectedLabel,
+        ) {
+            Row(Modifier.fillMaxSize()) { listeUndRaster() }
+        }
+    } else {
+    Row(
+        modifier = Modifier
+            .fillMaxSize(),
+    ) {
+        // Plan Z — More → Favourites and More → History pin this pane to one folder and put
+        // their own three tabs above it, so there is no category rail to draw.
+        if (lockedKey == null) {
+        CategoryRail(
+            width = panels?.category ?: Dimens.RailWidthFixed,
+            categories = railItems.map {
+                RailCategory(
+                    it.displayLabel(R.string.content_category_all_series),
+                    it.icon,
+                    showGenreDot = it.key is LiveKey.Folder,
+                    providerName = it.providerName,
+                )
+            },
+            selectedIndex = selectedIndex,
+            focusRowIndex = railFocusRow,
+            onRowFocused = { railFocusRow = null },
+            onSelect = { idx -> railItems.getOrNull(idx)?.let { vm.select(it.key) } },
+            onLongSelect = { idx ->
+                railItems.getOrNull(idx)?.let { item ->
+                    if (item.key is LiveKey.Folder || item.key is LiveKey.Custom) {
+                        contextCategory = item
+                        contextCategoryKey = item.key
+                    }
+                }
+            },
+            listState = catListState,
+            focusRequester = railFocus,
+            showPanel = false,
+            modifier = Modifier
+                .onFocusChanged { railPaneFocused = it.hasFocus }
+                .chNavPaging(
+                    enabled = chNavEnabled,
+                    upSkip = chNavUpSkip,
+                    downSkip = chNavDownSkip,
+                    isFocused = { railPaneFocused },
+                    lastIndex = { railItems.size - 1 },
+                    currentTargetIndex = { selectedIndex },
+                    onJumpToIndex = { idx -> railItems.getOrNull(idx)?.let { vm.select(it.key) } },
+                ),
+        )
+
+        Spacer(Modifier.width(BrowseColumnGap))
+        Box(
+            Modifier
+                .width(BrowseColumnDividerSpace)
+                .fillMaxHeight()
+                .padding(vertical = 2.dp)
+                .background(OwnTVTheme.colors.outlineVariant.copy(alpha = 0.35f)),
+        )
+
+        Spacer(Modifier.width(BrowseColumnGap))
+        }
+
+        listeUndRaster()
 
         if (previewVisible) {
             Spacer(Modifier.width(BrowseColumnGap))
@@ -826,6 +907,7 @@ private fun SeriesGrid(
                 }
             }
         }
+    }
     }
     }
 
@@ -1330,6 +1412,8 @@ private fun EpisodeView(
     val seriesOrder by vm.seriesOrder.collectAsStateWithLifecycle()
     val nextUpId by vm.nextUpEpisodeId.collectAsStateWithLifecycle()
     val epListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    // German4K: Handy/Tablet — Kopfzeile, Innenabstand und die rechte Spalte haengen daran.
+    val formfaktor = LocalFormfaktor.current
     val episodeViewMode by vm.episodeViewMode.collectAsStateWithLifecycle()
     val isEpisodeGrid = episodeViewMode == SettingsRepository.VodViewMode.GRID
     // Grid mode has its own scroll state; every scroll/focus path below goes through `scrollEpisodes`
@@ -1450,12 +1534,22 @@ private fun EpisodeView(
         // without a panel background.
         modifier = modifier.fillMaxSize().onFocusChanged { if (it.hasFocus) onChildFocused() }
             .roundedPanel(fillColor = ContentPanelFill)
-            .padding(horizontal = Dimens.ScreenPaddingH, vertical = Dimens.ScreenPaddingV),
+            // German4K: Im Hochformat sind 32 dp Rand ein Zehntel der Breite — dort 12 dp.
+            .padding(
+                horizontal = if (formfaktor.kompakt) 12.dp else Dimens.ScreenPaddingH,
+                vertical = if (formfaktor.kompakt) 12.dp else Dimens.ScreenPaddingV,
+            ),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        // German4K: Am Fernseher steht die Kopfzeile in einer Reihe: Zurueck, Titel, vier Schalter.
+        // Auf Handy und Tablet steht der Titel oben und die Schalter darunter. Grund ist nicht nur
+        // der Platz im Hochformat: der Titel in der Fernseher-Reihe hat kein Gewicht, ein langer
+        // Serienname nimmt sich die ganze Breite — quer auf dem Handy waren Favorit, Liste und
+        // Sortierung dann gar nicht mehr zu sehen. Den Zurueck-Knopf und den Schalterblock gibt es
+        // dafuer nur einmal, beide Bauarten rufen dieselben Lambdas auf.
+        val zurueckKnopf: @Composable () -> Unit = {
             OwnTVButton(label = stringResource(R.string.common_back), onClick = { vm.closeSeries() }, style = OwnTVButtonStyle.SECONDARY, icon = OwnTVIcon.CHEVRON)
-            Text(series.name, style = MaterialTheme.typography.headlineLarge, color = OwnTVTheme.colors.onSurface)
-            Spacer(Modifier.weight(1f))
+        }
+        val kopfSchalter: @Composable RowScope.() -> Unit = {
             OwnTVButton(
                 label = if (favoriteIds.contains(series.id)) stringResource(R.string.content_favorited) else stringResource(R.string.content_favorite),
                 onClick = { vm.toggleFavorite(series) },
@@ -1496,6 +1590,36 @@ private fun EpisodeView(
                 icon = OwnTVIcon.SORT,
             )
         }
+        if (formfaktor.mobil) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                zurueckKnopf()
+                Text(
+                    series.name,
+                    style = if (formfaktor.kompakt) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineLarge,
+                    color = OwnTVTheme.colors.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            // FlowRow, nicht eine schiebbare Reihe: in einer waagerecht scrollenden Reihe ist die
+            // Breite unendlich, und OwnTVButton misst seine Beschriftung mit `weight(1f)` — die
+            // waere dann null breit, die Knoepfe traegen nur noch ihr Zeichen. So bricht die
+            // Reihe stattdessen um und die Beschriftung bleibt lesbar.
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) { kopfSchalter() }
+        } else {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            zurueckKnopf()
+            Text(series.name, style = MaterialTheme.typography.headlineLarge, color = OwnTVTheme.colors.onSurface)
+            Spacer(Modifier.weight(1f))
+            kopfSchalter()
+        }
+        }
         Spacer(Modifier.height(16.dp))
 
         when {
@@ -1510,7 +1634,8 @@ private fun EpisodeView(
                 // In grid mode the pane is gone and the episodes take the full width.
                 Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     Column(modifier = Modifier
-                        .weight(if (isEpisodeGrid) 1f else 1.4f)
+                        // German4K: Ohne die rechte Spalte gehoert die ganze Breite der Liste.
+                        .weight(if (isEpisodeGrid || formfaktor.mobil) 1f else 1.4f)
                         .fillMaxHeight()
                         .onFocusChanged { epPaneFocused = it.hasFocus }
                         .chNavPaging(
@@ -1614,7 +1739,10 @@ private fun EpisodeView(
                     }
                     // Grid mode drops the preview pane on purpose: the tiles already show the still,
                     // which is the whole point of the layout, and a full-width grid fits far more.
-                    if (!isEpisodeGrid) Box(modifier = Modifier.weight(1f).fillMaxHeight().roundedPanel(fillColor = PreviewPanelFill)) {
+                    // German4K: Auf Handy/Tablet faellt sie ebenfalls weg — auf 360 dp bliebe fuer
+                    // die Folgenliste kaum mehr als die Nummer uebrig. Was drin stand, steht auf
+                    // der Detailseite; ein Tipp auf die Folge spielt sie.
+                    if (!isEpisodeGrid && !formfaktor.mobil) Box(modifier = Modifier.weight(1f).fillMaxHeight().roundedPanel(fillColor = PreviewPanelFill)) {
                         val ep = selectedEpisode
                         val meta = selectedEpisodeMeta?.takeIf { it.episodeId == ep?.id }?.cache
                         val nextUpEp = nextUpId?.let { id -> episodes.firstOrNull { it.id == id } }
