@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -71,6 +72,7 @@ import tv.own.owntv.R
 import tv.own.owntv.core.german4k.German4kDarsteller
 import tv.own.owntv.core.german4k.German4kDetails
 import tv.own.owntv.core.german4k.German4kFassung
+import tv.own.owntv.ui.LocalFormfaktor
 import tv.own.owntv.ui.theme.Dimens
 import tv.own.owntv.ui.theme.OwnTVTheme
 
@@ -176,6 +178,8 @@ fun German4kDetailScreen(
         }
     }
 
+    val formfaktor = LocalFormfaktor.current
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -197,14 +201,17 @@ fun German4kDetailScreen(
                 onTrailerUnmoeglich = { trailerUnmoeglich = true; trailerLaeuft = false },
             )
 
+            // German4K: 48 dp Rand sind auf 360 dp Breite ein Viertel des Bildes. Im Hochformat
+            // deshalb 16 dp — der Fernseher behaelt seinen Rand fuer den Sitzabstand.
+            val seitenRand = if (formfaktor.kompakt) 16.dp else Dimens.DetailSeitenRand
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = Dimens.DetailSeitenRand, end = Dimens.DetailSeitenRand, top = 20.dp, bottom = 40.dp),
+                    .padding(start = seitenRand, end = seitenRand, top = 20.dp, bottom = 40.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
                 // Zeigt nichts, wenn es keine Noten gibt — dann faellt auch der Abstand weg.
-                German4kNotenZeile(details?.noten, hoehe = 24.dp)
+                German4kNotenZeile(details?.noten, hoehe = if (formfaktor.kompakt) 20.dp else 24.dp)
 
                 Knopfzeile(
                     ui = ui,
@@ -252,6 +259,7 @@ private fun Hero(
     onTrailerUnmoeglich: () -> Unit,
 ) {
     val colors = OwnTVTheme.colors
+    val formfaktor = LocalFormfaktor.current
     val details = ui.details
     val trailer = details?.trailer
     Box(
@@ -259,7 +267,9 @@ private fun Hero(
             .fillMaxWidth()
             // 16:6 statt 16:9 — auf 960x540 dp bleibt das Querbild damit 360 dp hoch, und die ersten
             // Zeilen der Handlung stehen beim Oeffnen schon im Bild statt unter der Falz.
-            .aspectRatio(16f / 6f)
+            // German4K: Im Hochformat ist das Bild nur 360 dp breit, 16:6 ergaebe einen 135 dp hohen
+            // Streifen, in dem Titel und Meta-Zeile keinen Platz mehr haben. Dort wieder 16:9.
+            .aspectRatio(if (formfaktor.kompakt) 16f / 9f else 16f / 6f)
             .background(colors.surfaceContainerLowest),
     ) {
         if (trailerLaeuft && trailer != null) {
@@ -285,11 +295,16 @@ private fun Hero(
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = Dimens.DetailSeitenRand, end = Dimens.DetailSeitenRand, bottom = 12.dp),
+                .padding(
+                    start = if (formfaktor.kompakt) 16.dp else Dimens.DetailSeitenRand,
+                    end = if (formfaktor.kompakt) 16.dp else Dimens.DetailSeitenRand,
+                    bottom = 12.dp,
+                ),
         ) {
             Text(
                 ui.titel,
-                style = MaterialTheme.typography.displaySmall,
+                // displaySmall (36 sp) fuellt im Hochformat mit zwei Zeilen das halbe Querbild.
+                style = if (formfaktor.kompakt) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.displaySmall,
                 fontWeight = FontWeight.Bold,
                 color = colors.onSurface,
                 maxLines = 2,
@@ -395,11 +410,10 @@ private fun Knopfzeile(
     onFolgen: () -> Unit,
     onTrailer: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    // German4K: Abspielen + Von vorn + Favorit + Trailer sind vier Knoepfe — auf 360 dp Breite
+    // schiebt eine Row den letzten aus dem Bild. Mobil deshalb umbrechend, TV in einer Reihe.
+    // Beide Bauarten zeigen denselben Inhalt; er steht einmal in `knoepfe`.
+    val knoepfe: @Composable () -> Unit = {
         if (ui.serie) {
             OwnTVButton(
                 stringResource(R.string.g4k_detail_folgen),
@@ -438,6 +452,19 @@ private fun Knopfzeile(
                 style = OwnTVButtonStyle.SECONDARY,
             )
         }
+    }
+    if (LocalFormfaktor.current.mobil) {
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) { knoepfe() }
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) { knoepfe() }
     }
 }
 

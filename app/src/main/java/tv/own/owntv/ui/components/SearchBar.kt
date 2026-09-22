@@ -48,6 +48,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.R
 import tv.own.owntv.core.theme.GlassSurface
+import tv.own.owntv.ui.LocalFormfaktor
 import tv.own.owntv.ui.theme.LocalGlass
 import tv.own.owntv.ui.theme.OwnTVTheme
 import tv.own.owntv.ui.theme.glass
@@ -73,6 +74,7 @@ fun SearchBar(
     surface: GlassSurface? = GlassSurface.CARDS,
 ) {
     val colors = OwnTVTheme.colors
+    val formfaktor = LocalFormfaktor.current
     val resolvedPlaceholder = placeholder ?: stringResource(R.string.common_search_hint)
     val interaction = remember { MutableInteractionSource() }
     val pillFocused by interaction.collectIsFocusedAsState()
@@ -156,8 +158,15 @@ fun SearchBar(
                         .fillMaxWidth()
                         .bringIntoViewRequester(bringIntoView)
                         .focusRequester(fieldFocus)
-                        .focusProperties { canFocus = editing }
-                        .onFocusChanged { if (editing && !it.isFocused) editing = false }
+                        // German4K: Am Fernseher ist das Feld erst nach OK auf der Pille fokussierbar,
+                        // damit der Fokus ohne Tastatur-Popup durchlaufen kann. Auf Handy/Tablet ist
+                        // das ein Blocker: BasicTextField verschluckt den Tipp, bevor er die Pille
+                        // erreicht, und der Kunde tippt ins Leere — die Suche war per Finger nicht
+                        // zu bedienen. Dort ist das Feld deshalb von Anfang an tippbar.
+                        .focusProperties { canFocus = editing || formfaktor.mobil }
+                        .onFocusChanged {
+                            if (it.isFocused) editing = true else if (editing) editing = false
+                        }
                         .onPreviewKeyEvent {
                             // After the IME closed itself, Back hands focus back to the pill
                             // instead of bubbling to the screen's BackHandler.

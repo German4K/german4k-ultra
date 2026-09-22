@@ -51,6 +51,7 @@ import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.SearchBar
 import tv.own.owntv.ui.components.ContentPanelFill
 import tv.own.owntv.ui.components.roundedPanel
+import tv.own.owntv.ui.LocalFormfaktor
 import tv.own.owntv.ui.theme.Dimens
 import tv.own.owntv.core.theme.GlassSurface
 import tv.own.owntv.ui.theme.OwnTVTheme
@@ -117,14 +118,24 @@ fun SearchScreen(
     val searching = query.trim().length >= 2
     val shown = if (searching) results else curated
 
+    // German4K: 32 dp Rand und eine displaygrosse Ueberschrift kosten im Hochformat die halbe
+    // Trefferliste — dort schmaler und eine Stufe kleiner. TV unveraendert.
+    val formfaktor = LocalFormfaktor.current
     Column(
         modifier = modifier
             .fillMaxSize()
             .roundedPanel(fillColor = ContentPanelFill)
             .onFocusChanged { if (it.hasFocus) onChildFocused() }
-            .padding(horizontal = Dimens.ScreenPaddingH, vertical = Dimens.ScreenPaddingV),
+            .padding(
+                horizontal = if (formfaktor.kompakt) 12.dp else Dimens.ScreenPaddingH,
+                vertical = if (formfaktor.kompakt) 12.dp else Dimens.ScreenPaddingV,
+            ),
     ) {
-        Text(stringResource(R.string.search_title), style = MaterialTheme.typography.headlineLarge, color = colors.onSurface)
+        Text(
+            stringResource(R.string.search_title),
+            style = if (formfaktor.kompakt) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineLarge,
+            color = colors.onSurface,
+        )
         Spacer(Modifier.height(14.dp))
         SearchBar(
             query = query,
@@ -297,13 +308,18 @@ private fun ResultsWithDetail(
             }
         }
 
-        DetailPane(
-            item = active,
-            onPlayChannel = onPlayChannel,
-            onPlayMovie = onPlayMovie,
-            onOpenSeries = onOpenSeries,
-            modifier = Modifier.width(340.dp).fillMaxHeight(),
-        )
+        // German4K: die Vorschauplatte ist 340 dp breit — auf einem 360 dp breiten Handy bliebe fuer
+        // die Trefferliste daneben nichts uebrig. Mobil faellt sie deshalb weg; ein Tipp auf den
+        // Treffer spielt ihn ohnehin direkt, so wie in Filme, Serien und Live.
+        if (!LocalFormfaktor.current.mobil) {
+            DetailPane(
+                item = active,
+                onPlayChannel = onPlayChannel,
+                onPlayMovie = onPlayMovie,
+                onOpenSeries = onOpenSeries,
+                modifier = Modifier.width(340.dp).fillMaxHeight(),
+            )
+        }
     }
 }
 

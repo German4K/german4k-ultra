@@ -29,6 +29,7 @@ import tv.own.owntv.R
 import tv.own.owntv.core.database.entity.MovieEntity
 import tv.own.owntv.core.database.entity.SeriesEntity
 import tv.own.owntv.core.german4k.German4kPersonTitel
+import tv.own.owntv.ui.LocalFormfaktor
 import tv.own.owntv.ui.theme.Dimens
 import tv.own.owntv.ui.theme.OwnTVTheme
 
@@ -76,6 +77,8 @@ fun German4kPersonScreen(
         fokusMitWiederholung(if (kacheln != null) ersteKachel else hinweisFokus)
     }
 
+    val formfaktor = LocalFormfaktor.current
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -87,7 +90,12 @@ fun German4kPersonScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(colors.background)
-                .padding(horizontal = Dimens.DetailSeitenRand, vertical = 32.dp),
+                // German4K: derselbe schmale Rand wie auf der Detailseite — 48 dp waeren auf einem
+                // Handy ein Viertel der Breite.
+                .padding(
+                    horizontal = if (formfaktor.kompakt) 16.dp else Dimens.DetailSeitenRand,
+                    vertical = if (formfaktor.kompakt) 16.dp else 32.dp,
+                ),
         ) {
             Text(name, style = MaterialTheme.typography.headlineMedium, color = colors.onSurface)
             Spacer(Modifier.height(24.dp))
@@ -105,7 +113,9 @@ fun German4kPersonScreen(
                 )
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(SPALTEN),
+                    // German4K: sechs feste Spalten ergeben auf 360 dp Briefmarken von 50 dp. Mobil
+                    // rechnet das Raster die Spaltenzahl deshalb aus der Breite aus.
+                    columns = if (formfaktor.mobil) GridCells.Adaptive(minSize = 150.dp) else GridCells.Fixed(SPALTEN),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
