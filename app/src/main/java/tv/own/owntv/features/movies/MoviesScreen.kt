@@ -152,6 +152,9 @@ fun MoviesScreen(
     val alreadyDownloadedMessage = stringResource(R.string.content_already_downloaded)
     val refetchingTmdbMessage = stringResource(R.string.content_refetching_tmdb)
     val researchingTmdbMessage = stringResource(R.string.content_researching_tmdb)
+    // German4K: „Weitere Fassungen" nennt auch Ausgaben, die unser Server kennt, dieses Geraet aber
+    // nicht im Katalog hat — dann muss der Druck eine Rueckmeldung geben statt still zu verpuffen.
+    val fassungFehltMessage = stringResource(R.string.g4k_detail_fassung_fehlt)
     val railItems by vm.railItems.collectAsStateWithLifecycle()
     val providerNames by vm.providerNames.collectAsStateWithLifecycle()
     val selectedKey by vm.selectedKey.collectAsStateWithLifecycle()
@@ -230,6 +233,23 @@ fun MoviesScreen(
                 resumeMode == SettingsRepository.ResumeMode.AUTO && pos > 0 -> { vm.play(m, pos); goFullscreen() }
                 else -> { vm.play(m, 0); goFullscreen() }
             }
+        }
+    }
+
+    // German4K: Ein Klick auf eine Kachel/Zeile — mit Schalter oeffnet er die Detailseite, ohne
+    // spielt er sofort ab. Raster UND Liste gehen denselben Weg, sonst haette die Listenansicht
+    // die Detailseite nie gesehen.
+    // Kennung und Position merken wir uns auch beim Klick (bisher nur beim Langdruck): nur so
+    // findet der `LaunchedEffect(detailsMovie, tmdbDetailsMovie)` weiter unten nach „Zurueck"
+    // wieder zu GENAU dieser Kachel zurueck. `contextMovie` bleibt dabei null — das Langdruck-
+    // Menue oeffnet also nicht mit, und beim Schliessen der Seite oeffnet es auch nicht nach.
+    val oeffneFilm: (MovieEntity, Int) -> Unit = { m, index ->
+        if (detailseite) {
+            contextMovieId = m.id
+            contextMovieIndex = index
+            detailsMovie = m
+        } else {
+            startMovie(m)
         }
     }
 
@@ -579,7 +599,8 @@ fun MoviesScreen(
                                     firstItemFocus = firstItemFocus,
                                 ),
                                 onFocus = { vm.onMovieFocused(movie) },
-                                onClick = { startMovie(movie) },
+                                // German4K: gleicher Weg wie im Raster — Schalter an = Detailseite.
+                                onClick = { oeffneFilm(movie, index) },
                                 onLongClick = { contextMovie = movie; contextMovieId = movie.id; contextMovieIndex = index },
                             )
                         }
@@ -618,7 +639,7 @@ fun MoviesScreen(
                                 ),
                                 onFocus = { vm.onMovieFocused(movie) },
                                 // German4K: Mit Schalter oeffnet der Klick die Detailseite, ohne spielt er sofort ab.
-                                onClick = { if (detailseite) detailsMovie = movie else startMovie(movie) },
+                                onClick = { oeffneFilm(movie, index) },
                                 onLongClick = { contextMovie = movie; contextMovieId = movie.id; contextMovieIndex = index },
                             )
                         }
@@ -786,11 +807,17 @@ fun MoviesScreen(
     // aus der Detailseite heraus — auch die der Personenseite. Blieb die Detailseite unter der
     // Personenseite stehen, bekam die Personenseite den Fokus nie und das D-Pad war dort tot
     // (am Geraet nachgemessen, 21.09.2026). Deshalb ist immer nur eine der beiden Seiten da.
+    // Der Preis dafuer: Wer von der Personenseite zurueckkommt, bekommt die Detailseite neu
+    // aufgebaut — Scrollstand und ein laufender Trailer sind weg. Bewusst in Kauf genommen, ein
+    // totes D-Pad waere der groessere Fehler.
     if (person == null) detailsMovie?.let { m ->
         val meta = selectedMovieMeta?.takeIf { it.movieId == m.id }
         var fortsetzen by remember(m.id) { mutableStateOf<Long?>(null) }
-        LaunchedEffect(m.id) {
-            fortsetzen = vm.savedPositionMs(m).takeIf { it > 0 }
+        LaunchedEffect(m.id, resumeMode) {
+            // German4K: „Nie fortsetzen" heisst auch hier nie — sonst boete die Detailseite einen
+            // Fortsetzen-Knopf an, den derselbe Film ueber `startMovie` nie bekaeme.
+            fortsetzen = if (resumeMode == SettingsRepository.ResumeMode.NEVER) null
+                else vm.savedPositionMs(m).takeIf { it > 0 }
             vm.onMovieFocused(m)
         }
         tv.own.owntv.ui.components.German4kDetailScreen(
@@ -807,7 +834,15 @@ fun MoviesScreen(
             onFavorit = { vm.toggleFavorite(m) },
             onFolgen = {},
             onPerson = { d -> person = d.id to d.name },
-            onFassung = { f -> scope.launch { vm.filmZuFassung(m, f)?.let { detailsMovie = it } } },
+            // German4K: Unser Server kennt alle Fassungen eines Films, dieses Geraet nur die aus
+            // seinem Katalog. Fehlt die gewaehlte, sagen wir das kurz — stilles Nichtstun sieht
+            // am Fernseher wie ein kaputter Knopf aus.
+            onFassung = { f ->
+                scope.launch {
+                    val ziel = vm.filmZuFassung(m, f)
+                    if (ziel != null) detailsMovie = ziel else toast.show(fassungFehltMessage)
+                }
+            },
             onExit = { detailsMovie = null },
         )
     }

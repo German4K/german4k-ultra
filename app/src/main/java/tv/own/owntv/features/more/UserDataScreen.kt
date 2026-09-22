@@ -33,6 +33,7 @@ import tv.own.owntv.core.live.LiveKey
 import tv.own.owntv.features.live.LiveScreen
 import tv.own.owntv.features.movies.MoviesScreen
 import tv.own.owntv.features.series.SeriesScreen
+import tv.own.owntv.features.series.SeriesViewModel
 import tv.own.owntv.features.settings.SettingsViewModel
 import tv.own.owntv.features.shell.components.ClearHistoryDialog
 import tv.own.owntv.features.settings.data.BrowseContainerPadding
@@ -112,6 +113,9 @@ private fun UserDataScreen(
     modifier: Modifier = Modifier,
     counts: MoreCountsViewModel = koinViewModel(),
     settingsVm: SettingsViewModel = koinViewModel(),
+    // German4K: nur fuer den Sprung „Serie aus der Personenseite" — dasselbe Exemplar, das
+    // SeriesScreen im Serien-Reiter benutzt.
+    seriesVm: SeriesViewModel = koinViewModel(),
 ) {
     val history = key == LiveKey.History
     var tab by rememberSaveable { mutableStateOf(UserDataTab.LIVE) }
@@ -197,6 +201,11 @@ private fun UserDataScreen(
                 onFullscreen = onFullscreen,
                 onChildFocused = onChildFocused,
                 lockedKey = key,
+                // German4K: Serie aus der Personenseite — hier gibt es keine Huelle, aber dieselben
+                // drei Reiter. Also auf den Serien-Reiter umschalten und sie dort oeffnen; das
+                // SeriesViewModel ist dasselbe, das SeriesScreen gleich holt (ein Exemplar je
+                // Activity), deshalb steht die Serie beim Wechsel schon offen.
+                onOpenSeries = { id -> tab = UserDataTab.SERIES; seriesVm.openSeriesById(id) },
                 modifier = Modifier.fillMaxSize(),
             )
             UserDataTab.SERIES -> SeriesScreen(
