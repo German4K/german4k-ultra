@@ -372,7 +372,9 @@ private fun metaZeile(details: German4kDetails?): String {
     // German4K: derselbe Trenner wie ueberall sonst in der App (Vorschauspalte, Spielerleiste).
     // Er sieht mit „  •  " etwas anders aus als das frueher hier fest eingetragene „ · " — die
     // Einheitlichkeit wiegt schwerer als die alte Optik dieser einen Zeile.
-    return listOfNotNull(datum, genre, dauer).joinToString(stringResource(R.string.content_metadata_separator))
+    // German4K: die Ressource verliert beim Bauen ihre Leerzeichen (unquotiert) — deshalb hier selbst einrahmen.
+    val trenner = " " + stringResource(R.string.content_metadata_separator).trim() + " "
+    return listOfNotNull(datum, genre, dauer).joinToString(trenner)
 }
 
 private fun datumLesbar(iso: String): String? = runCatching {
