@@ -87,6 +87,7 @@ import tv.own.owntv.features.settings.data.computePanelWidths
 import tv.own.owntv.core.settings.SettingsRepository
 import tv.own.owntv.features.settings.rememberPanelShares
 import tv.own.owntv.features.mobil.German4kMobilRahmen
+import tv.own.owntv.features.mobil.ohneSerienPraefix
 import tv.own.owntv.ui.LocalFormfaktor
 import tv.own.owntv.features.shell.components.CategoryContextMenu
 import tv.own.owntv.features.shell.components.CategoryRail
@@ -1225,33 +1226,6 @@ private fun buildSeriesDetails(
     )
 }
 
-/** Trennzeichen, mit denen Anbieter ihre Praefixe an den Folgennamen kleben. */
-private fun Char.istTrenner(): Boolean = isWhitespace() || this == '-' || this == '\u2013' || this == '\u2014'
-
-/** "S01E01", "s1e1" und Verwandte am Anfang eines Folgennamens. */
-private val StaffelFolgePraefix = Regex("^[Ss]\\d{1,3}[Ee]\\d{1,4}")
-
-/**
- * German4K: raeumt den Folgennamen fuer die schmale Anzeige auf.
- *
- * Anbieter stellen dem Namen dreierlei voran: den ganzen Serientitel, ein blankes Trennzeichen und
- * die Staffel-Folge-Kennung. Auf 360 dp bleibt davon nur die Ellipse — und alle drei stehen auf dem
- * Bildschirm schon woanders: die Serie in der Kopfzeile, die Staffel auf dem Reiter, die Nummer in
- * der Plakette links neben der Zeile.
- *
- * Bleibt nach einem Schnitt nichts Brauchbares uebrig, bleibt der Name so, wie er war — lieber
- * abgeschnitten als leer.
- */
-private fun EpisodeEntity.ohneSerienPraefix(serienName: String): EpisodeEntity {
-    var rest = name
-    if (serienName.isNotBlank() && rest.startsWith(serienName, ignoreCase = true)) {
-        rest = rest.drop(serienName.length)
-    }
-    rest = rest.dropWhile { it.istTrenner() }
-    rest = StaffelFolgePraefix.find(rest)?.let { rest.drop(it.value.length).dropWhile { c -> c.istTrenner() } } ?: rest
-    return if (rest.isBlank()) this else copy(name = rest)
-}
-
 /** A provider may omit an episode title. Keep the fallback in Compose so it follows the active locale. */
 @Composable
 private fun episodeDisplayTitle(episode: EpisodeEntity): String =
@@ -1755,13 +1729,21 @@ private fun EpisodeView(
                                 itemsIndexed(visibleEpisodes, key = { _, ep -> ep.id }) { index, ep ->
                                     val prog = episodeProgress[ep.id]
                                     val completed = ep.id in completedIds
+                                    // German4K: Anbieter stellen dem Folgennamen oft den ganzen
+                                    // Serientitel voran ("DE - Stilles Wasser (2020) (US) - S01E01 - ...").
+                                    // Auf 360 dp bleibt davon nur die Ellipse. Im Hochformat
+                                    // deshalb das Praefix abschneiden — die Serie steht schon in
+                                    // der Kopfzeile. TV und Tablet quer sehen den Namen wie bisher.
+                                    //
+                                    // German4K: gemerkt statt bei jeder Neuzeichnung berechnet — ohne
+                                    // das entstand je Zeile und Frame eine neue EpisodeEntity-Kopie,
+                                    // und eine neue Instanz laesst Compose die Zeile fuer geaendert
+                                    // halten, obwohl sich nichts geaendert hat.
+                                    val anzeige = remember(ep.id, series.name, formfaktor.kompakt) {
+                                        if (formfaktor.kompakt) ep.ohneSerienPraefix(series.name) else ep
+                                    }
                                     EpisodeRow(
-                                        // German4K: Anbieter stellen dem Folgennamen oft den ganzen
-                                        // Serientitel voran ("DE - Stilles Wasser (2020) (US) - S01E01 - ...").
-                                        // Auf 360 dp bleibt davon nur die Ellipse. Im Hochformat
-                                        // deshalb das Praefix abschneiden — die Serie steht schon in
-                                        // der Kopfzeile. TV und Tablet quer sehen den Namen wie bisher.
-                                        episode = if (formfaktor.kompakt) ep.ohneSerienPraefix(series.name) else ep,
+                                        episode = anzeige,
                                         meta = seasonMeta[ep.id],
                                         lastWatched = ep.id == lastPlayedId,
                                         completed = completed,

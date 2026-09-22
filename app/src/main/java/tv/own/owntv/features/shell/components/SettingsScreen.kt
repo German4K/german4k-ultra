@@ -1318,6 +1318,9 @@ fun SettingsScreen(
                             else -> pluralStringResource(R.plurals.settings_setting_count, selectedRows.size, selectedRows.size)
                         },
                         tagHot = sheetFocused,
+                        // German4K: Im Hochformat ist das Blatt immer Ebene 2 unter der Kopfzeile
+                        // "< Gruppe" (siehe unten, `if (kompakt)`) — der Name stand dort doppelt.
+                        titelZeigen = !kompakt,
                     )
                     if (searching && searchResults.isEmpty()) {
                         Text(
@@ -4535,7 +4538,19 @@ private fun SpineHeader() {
  * which of the two columns has the cursor.
  */
 @Composable
-internal fun SheetHeader(title: String, summary: String, tag: String, tagHot: Boolean) {
+internal fun SheetHeader(
+    title: String,
+    summary: String,
+    tag: String,
+    tagHot: Boolean,
+    /**
+     * German4K: Im Hochformat steht der Gruppenname schon in der Kopfzeile "< Gruppe" darueber —
+     * zweimal derselbe Name untereinander liest sich wie ein Fehler und kostet eine Zeile Inhalt.
+     * Dort wird nur der Titel ausgeblendet; die Beschreibung und die Zaehlplakette bleiben, die
+     * traegt die Kopfzeile naemlich nicht. Am Fernseher und auf dem Tablet unveraendert.
+     */
+    titelZeigen: Boolean = true,
+) {
     val colors = OwnTVTheme.colors
     Row(
         modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 10.dp),
@@ -4543,7 +4558,9 @@ internal fun SheetHeader(title: String, summary: String, tag: String, tagHot: Bo
         verticalAlignment = Alignment.Top,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = colors.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (titelZeigen) {
+                Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = colors.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
             Text(
                 summary,
                 fontSize = 12.5.sp,
@@ -4551,7 +4568,7 @@ internal fun SheetHeader(title: String, summary: String, tag: String, tagHot: Bo
                 color = colors.onSurfaceVariant,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier.padding(top = if (titelZeigen) 4.dp else 0.dp),
             )
         }
         Box(

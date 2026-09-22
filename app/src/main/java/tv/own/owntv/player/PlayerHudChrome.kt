@@ -165,12 +165,15 @@ internal fun TopBar(
       // dem echten Bildschirmmittelpunkt sitzen. Ohne Uhr (im Hochformat, und hinter einer
       // Fehlermeldung) nahm die leere rechte Haelfte trotzdem die halbe Breite, und vom Sendernamen
       // links blieb die Ellipse. Dann bekommt die rechte Seite nur noch, was ihr Inhalt braucht.
+      //
+      // German4K: Ohne Uhr gibt es auch nichts Rechtes — beide Seiten setzt derselbe Aufrufer
+      // gemeinsam (PlayerHud: `centre` und `trailing` haengen beide an `error == null &&
+      // !kompaktKopf`). Der frueher hier stehende Zweig "keine Uhr, aber trailing" konnte deshalb
+      // nie laufen und ist raus.
       if (centre != null) {
           Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.Top) {
               if (trailing != null) trailing()
           }
-      } else if (trailing != null) {
-          Row(horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.Top) { trailing() }
       }
     }
 }
