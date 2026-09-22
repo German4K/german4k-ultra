@@ -146,17 +146,19 @@ private fun UncoupledView(answer: German4kPanelAnswer, loginFailed: Boolean, onL
         Text(answer.noteContent, style = MaterialTheme.typography.bodyMedium, color = colors.primary, textAlign = TextAlign.Center, modifier = Modifier.widthIn(max = 720.dp))
     }
     Spacer(Modifier.height(24.dp))
-    // German4K: Auf dem Handy passen zwei Spalten nicht nebeneinander — dort steht alles untereinander,
-    // der QR-Code zuerst und groesser (er wird mit dem zweiten Geraet abfotografiert). Fernseher und
-    // Tablet im Querformat behalten die bisherigen zwei Spalten.
+    // German4K: Auf dem Handy passen zwei Spalten nicht nebeneinander — dort steht alles
+    // untereinander, und zwar in derselben Reihenfolge wie auf dem Fernseher: erst das Anmelden
+    // (1), dann der QR-Code (2), nur groesser. Ein Handy kann seinen eigenen QR-Code nicht
+    // abfotografieren — der gehoert nach unten, und die Ziffern in den Texten lesen sich wieder
+    // 1 → 2 → 3. Fernseher und Tablet im Querformat behalten die bisherigen zwei Spalten.
     if (kompakt) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            RechteSpalte(answer, qr, qrGroesse = 240.dp)
-            Spacer(Modifier.height(24.dp))
             LinkeSpalte(onLogin = onLogin, fr = fr)
+            Spacer(Modifier.height(24.dp))
+            RechteSpalte(answer, qr, qrGroesse = 240.dp)
         }
     } else {
         Row(horizontalArrangement = Arrangement.spacedBy(28.dp), verticalAlignment = Alignment.Top) {
@@ -164,17 +166,19 @@ private fun UncoupledView(answer: German4kPanelAnswer, loginFailed: Boolean, onL
             RechteSpalte(answer, qr, Modifier.width(300.dp), qrGroesse = 172.dp)
         }
     }
+    val knoepfe: @Composable () -> Unit = {
+        OwnTVButton(stringResource(R.string.g4k_retry_button), onClick = onRetry, style = OwnTVButtonStyle.SECONDARY)
+        OwnTVButton(stringResource(R.string.g4k_manual_button), onClick = onManual, style = OwnTVButtonStyle.SECONDARY)
+    }
     Spacer(Modifier.height(28.dp))
     if (kompakt) {
-        // Untereinander: zwei Knoepfe nebeneinander werden auf dem Handy sonst abgeschnitten.
+        // German4K: Untereinander — zwei Knoepfe nebeneinander werden auf dem Handy sonst abgeschnitten.
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            OwnTVButton(stringResource(R.string.g4k_retry_button), onClick = onRetry, style = OwnTVButtonStyle.SECONDARY)
-            OwnTVButton(stringResource(R.string.g4k_manual_button), onClick = onManual, style = OwnTVButtonStyle.SECONDARY)
+            knoepfe()
         }
     } else {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OwnTVButton(stringResource(R.string.g4k_retry_button), onClick = onRetry, style = OwnTVButtonStyle.SECONDARY)
-            OwnTVButton(stringResource(R.string.g4k_manual_button), onClick = onManual, style = OwnTVButtonStyle.SECONDARY)
+            knoepfe()
         }
     }
 }
