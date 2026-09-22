@@ -187,6 +187,12 @@ fun OwnTVShell(
     // und diese Huelle den Bildschirm dafuer aus der Komposition nimmt; ein rememberSaveable dort
     // faengt danach wieder bei der Kategorieliste an. Am Fernseher ohne Wirkung.
     var liveKategorieOffen by rememberSaveable { mutableStateOf(false) }
+    // German4K: dasselbe fuer Filme und Serien. Gemessen: Kategorie antippen, Film starten,
+    // Zurueck — und man stand wieder in der Kategorieliste statt im Raster, weil diese Huelle den
+    // Bildschirm fuers Vollbild aus der Komposition nimmt und das `rememberSaveable` im Bildschirm
+    // damit verschwindet. Am Fernseher ohne Wirkung (die Vorgabewerte bleiben unbenutzt).
+    var moviesKategorieOffen by rememberSaveable { mutableStateOf(false) }
+    var seriesKategorieOffen by rememberSaveable { mutableStateOf(false) }
     val player = koinInject<OwnTVPlayer>()
     // Docked mini-player size (% of screen width) + position, configurable in Settings and from the
     // mini-player's own controls. Read straight from settings so both entry points stay in sync.
@@ -1101,6 +1107,8 @@ fun OwnTVShell(
                             // German4K: Serie aus der Personenseite — in den Serienbereich wechseln und
                             // sie dort oeffnen; der Serienbereich teilt sich dieses SeriesViewModel.
                             onOpenSeries = { id -> onSelectSection(MainSection.SERIES); seriesVm.openSeriesById(id) },
+                            kategorieOffen = moviesKategorieOffen,
+                            onKategorieOffen = { moviesKategorieOffen = it },
                             modifier = Modifier.fillMaxSize(),
                         )
 
@@ -1112,6 +1120,8 @@ fun OwnTVShell(
                             // German4K: Film aus der Personenseite — in den Filmbereich wechseln und
                             // ihn dort oeffnen; der Filmbereich teilt sich dieses MovieViewModel.
                             onOpenMovie = { id -> onSelectSection(MainSection.MOVIES); movieVm.openDetails(id) },
+                            kategorieOffen = seriesKategorieOffen,
+                            onKategorieOffen = { seriesKategorieOffen = it },
                             modifier = Modifier.fillMaxSize(),
                         )
 

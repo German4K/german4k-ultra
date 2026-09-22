@@ -140,6 +140,15 @@ fun SeriesScreen(
     onRestored: () -> Unit = {},
     // German4K: Die Personenseite zeigt auch Filme — die Huelle schaltet dafuer in den Filmbereich.
     onOpenMovie: (movieId: Long) -> Unit = {},
+    /**
+     * German4K: Handy/Tablet — steht das Raster einer Kategorie offen (Ebene 2 des Mobil-Rahmens)?
+     * Der Zustand liegt in der Huelle, nicht hier: ein Tipp auf eine Folge geht ins Vollbild, und
+     * die Huelle nimmt dafuer diesen Bildschirm aus der Komposition — ein `rememberSaveable` hier
+     * faengt danach wieder bei der Kategorieliste an. Genau wie bei Live-TV (siehe LiveScreen).
+     * Am Fernseher und in den angepinnten Ansichten (lockedKey) ohne Wirkung.
+     */
+    kategorieOffen: Boolean = false,
+    onKategorieOffen: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     /**
      * Pins the grid to one folder and takes the category rail away — how More → Favourites and
@@ -160,11 +169,6 @@ fun SeriesScreen(
         }
     }
     val openedSeries by vm.openedSeries.collectAsStateWithLifecycle()
-    // German4K: Der Drill-down-Zustand des Mobil-Rahmens lebt hier und nicht in [SeriesGrid]:
-    // beim Oeffnen einer Serie verlaesst das Raster die Komposition, ein rememberSaveable darin
-    // faenge danach wieder bei der Kategorieliste an — Zurueck aus den Folgen soll aber im
-    // Raster landen.
-    var kategorieOffen by rememberSaveable { mutableStateOf(false) }
 
     // Track leaving a show so the grid can put focus back on the poster you came from (the episode
     // view that held focus is unmounted on Back — focus would otherwise die and land on the sidebar).
@@ -192,7 +196,7 @@ fun SeriesScreen(
             lockedKey = lockedKey,
             onOpenMovie = onOpenMovie,
             kategorieOffen = kategorieOffen,
-            onKategorieOffen = { kategorieOffen = it },
+            onKategorieOffen = onKategorieOffen,
             modifier = modifier,
         )
     }

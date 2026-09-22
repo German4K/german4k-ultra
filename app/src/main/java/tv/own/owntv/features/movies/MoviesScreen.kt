@@ -134,6 +134,15 @@ fun MoviesScreen(
     onContentScrolled: (Boolean) -> Unit = {},
     // German4K: Die Personenseite zeigt auch Serien — die Huelle schaltet dafuer in den Serienbereich.
     onOpenSeries: (seriesId: Long) -> Unit = {},
+    /**
+     * German4K: Handy/Tablet — steht das Raster einer Kategorie offen (Ebene 2 des Mobil-Rahmens)?
+     * Der Zustand liegt in der Huelle, nicht hier: ein Tipp auf einen Film geht ins Vollbild, und
+     * die Huelle nimmt dafuer diesen Bildschirm aus der Komposition — ein `rememberSaveable` hier
+     * faengt danach wieder bei der Kategorieliste an. Genau wie bei Live-TV (siehe LiveScreen).
+     * Am Fernseher und in den angepinnten Ansichten (lockedKey) ohne Wirkung.
+     */
+    kategorieOffen: Boolean = false,
+    onKategorieOffen: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     /**
      * Pins the grid to one folder and takes the category rail away — how More → Favourites and
@@ -448,11 +457,10 @@ fun MoviesScreen(
     // Manual panel widths (Settings → Panel Width Adjustment). The saved percentages now resolve
     // against the inside of one shared content container; no stored value is rewritten.
     val panelShares = rememberPanelShares(PanelSection.MOVIES, settingsVm)
-    // German4K: Handy/Tablet — Formfaktor und der Drill-down-Zustand des Mobil-Rahmens. Der
-    // Zustand liegt hier statt im Rahmen, damit er eine Drehung ueberlebt und die angepinnten
-    // Ansichten (Favoriten/Verlauf aus "Mehr") ihn erzwingen koennen.
+    // German4K: Handy/Tablet — Formfaktor fuer den Mobil-Rahmen. Der Drill-down-Zustand kommt von
+    // aussen (Parameter `kategorieOffen`): er muss eine Drehung UND das Vollbild ueberleben, und
+    // die angepinnten Ansichten (Favoriten/Verlauf aus "Mehr") erzwingen ihn ueber `lockedKey`.
     val formfaktor = LocalFormfaktor.current
-    var kategorieOffen by rememberSaveable { mutableStateOf(false) }
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
@@ -714,7 +722,7 @@ fun MoviesScreen(
                 }
             },
             kategorieOffen = kategorieOffen || lockedKey != null,
-            onKategorieOffen = { kategorieOffen = it },
+            onKategorieOffen = onKategorieOffen,
             titel = selectedLabel,
         ) {
             Row(Modifier.fillMaxSize()) { listeUndRaster() }
