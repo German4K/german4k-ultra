@@ -7,6 +7,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -78,7 +81,19 @@ fun German4kBottomBar(
         listOf(MainSection.HOME, MainSection.LIVE_TV, MainSection.MOVIES, MainSection.SERIES)
             .filter { it in visibleSections } + MainSection.MORE
     }
-    Column(modifier = modifier.fillMaxWidth().height(German4kBottomBarHoehe)) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            // German4K: Ab Android 15 zeichnet das System randlos — ohne diesen Abstand liegt die
+            // Leiste unter der Navigationsleiste bzw. dem Wischbalken, und die untere Haelfte der
+            // fuenf Felder ist nicht mehr zu treffen. Der Fuellton steht bewusst VOR dem Abstand,
+            // damit der Streifen unter dem Wischbalken mitgefaerbt wird statt durchzuscheinen.
+            // Die Leiste bleibt 72 dp hoch, der Abstand kommt darunter dazu; auf Android 14 und
+            // aelter ist er 0.
+            .background(colors.surfaceContainerLow)
+            .windowInsetsPadding(WindowInsets.navigationBars)
+            .height(German4kBottomBarHoehe),
+    ) {
         // Trennlinie nach oben: ohne sie verschwimmt die Leiste mit dem Inhalt darueber.
         Box(
             modifier = Modifier

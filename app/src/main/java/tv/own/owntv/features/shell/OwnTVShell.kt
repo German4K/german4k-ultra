@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -854,6 +857,11 @@ fun OwnTVShell(
       if (playerMode != PlayerMode.FULLSCREEN) {
         Column(
             modifier = Modifier.fillMaxSize()
+                // German4K: Ab Android 15 zeichnet das System randlos — ohne diesen Abstand liegt
+                // die Kopfzeile unter der Statusleiste (Uhrzeit und Akku ueber dem Bereichsnamen).
+                // Nur auf Handy/Tablet: am Fernseher gibt es keine Systemleisten, und auf Android
+                // 14 und aelter ist der Abstand 0, dort aendert die Zeile also nichts.
+                .then(if (formfaktor.mobil) Modifier.windowInsetsPadding(WindowInsets.statusBars) else Modifier)
                 // One group with a restorer: leaving for the mini player and coming back lands on the
                 // exact control that was focused, without every screen having to remember its own.
                 .focusRequester(shellContentFocus)

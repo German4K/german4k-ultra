@@ -9,6 +9,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -638,7 +642,12 @@ fun PlayerHud(
                 if (kompaktKopf) emptyList() else listOfNotNull(engineChip) + streamChips.ifEmpty { listOfNotNull(videoRes) },
                 duration,
                 onBack,
-                modifier = Modifier.align(Alignment.TopStart),
+                // German4K: Ab Android 15 zeichnet das System randlos. Das Bild selbst soll bis an
+                // den Rand gehen — die Bedienung nicht: ohne den Abstand liegt "Zurueck" unter der
+                // Statusleiste. Nur auf Handy/Tablet, am Fernseher ist der Abstand ohnehin 0.
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .then(if (mobil) Modifier.windowInsetsPadding(WindowInsets.statusBars) else Modifier),
                 trailing = if (error == null && !kompaktKopf) liveEpgCard else null,
                 // Hidden behind an error overlay along with the rest of the chrome: a clock ticking
                 // over a failure message just draws the eye to the wrong thing.
@@ -690,7 +699,13 @@ fun PlayerHud(
                     favorite = favorite, onToggleFavorite = onToggleFavorite,
                     onOpenDialog = { dialog = it }, onPip = onPip, onAudioMode = onAudioMode,
                     onMultiview = onMultiview, onRecordThis = onRecordThis, recordingThis = recordingThis, onBack = onBack,
-                    modifier = Modifier.align(Alignment.BottomStart),
+                    // German4K: dasselbe unten — der Fortschrittsbalken und die Knopfreihe lagen
+                    // ab Android 15 unter der Navigationsleiste bzw. dem Wischbalken und waren dort
+                    // nicht zu treffen. Der Schleier darunter bleibt randlos, nur die Bedienung
+                    // rutscht hoch. Nur auf Handy/Tablet.
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .then(if (mobil) Modifier.windowInsetsPadding(WindowInsets.navigationBars) else Modifier),
                 )
             }
         }
