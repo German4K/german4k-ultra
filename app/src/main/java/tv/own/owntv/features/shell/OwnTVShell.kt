@@ -981,10 +981,16 @@ fun OwnTVShell(
                             // Downloads und TV-Programm haengen deshalb auf Handy/Tablet hier mit
                             // drin. Auf dem Fernseher bleibt die Liste leer, dort hat jedes dieser
                             // Ziele seinen eigenen Platz in der Seitenleiste.
+                            //
+                            // German4K: Das TV-Programm faellt im Hochformat weg. Es ist ein
+                            // Fernseher-Raster — Senderspalte plus Stunden nebeneinander —, und auf
+                            // 360 dp ist davon nichts zu bedienen. Eine Tuer, die ins Leere fuehrt,
+                            // ist schlimmer als keine. Quer und auf dem Tablet bleibt sie.
                             onOpenSection = onSelectSection,
                             zusatzSections = if (formfaktor.mobil) {
                                 listOf(MainSection.SEARCH, MainSection.DOWNLOADS, MainSection.EPG)
                                     .filter { it == MainSection.SEARCH || it in visibleSections }
+                                    .filter { !(formfaktor.kompakt && it == MainSection.EPG) }
                             } else emptyList(),
                             onChildFocused = { focusedLayer = ShellLayer.CONTENT },
                             modifier = Modifier

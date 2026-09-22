@@ -108,9 +108,12 @@ private enum class MoreRow { SETTINGS, FAVORITES, HISTORY, BACKUP, LOCAL_SYNC, E
  * **Focus lands on Settings**, so the most-used destination is rail → More → OK: one extra press
  * over what it used to be, and never a hunt.
  *
- * There is deliberately no Downloads row and no Profiles row. Both already have a rail slot —
- * Downloads in `browseOrder`, the profile card at the rail's foot — and one door each is the rule
- * this screen exists to enforce.
+ * **Eine Tuer je Ziel — aber je Formfaktor gezaehlt.** Am Fernseher hat jedes Ziel schon einen
+ * Platz in der Seitenleiste (Downloads in `browseOrder`, das Profil am Fuss der Leiste), also gibt
+ * es hier keine Zeile dafuer. Auf Handy und Tablet tritt die untere Leiste an die Stelle der
+ * Seitenleiste, und dort ist nur fuer fuenf Ziele Platz — Suche, Downloads und TV-Programm bekommen
+ * ihre Tuer deshalb hier (`zusatzSections`, gefuellt von `OwnTVShell`). Beide Male fuehrt genau ein
+ * Weg zu jedem Ziel; es ist nur nicht ueberall derselbe. Eine Profilzeile gibt es in keinem Fall.
  */
 @Composable
 fun MoreScreen(
@@ -247,7 +250,11 @@ fun MoreScreen(
         BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f)) {
         // 294 dp is the design width, but at 150% UI Zoom the whole panel is not much wider than
         // that — so it gives way rather than squeezing the pane into a strip. Settings' own rule.
-        val spineWidth = if (formfaktor.mobil) maxWidth else minOf(SettingsSkin.SpineWidth, maxWidth * 0.34f)
+        //
+        // German4K: Einspaltig nur im Hochformat (kompakt), nicht auf jedem Handy/Tablet. 34 % von
+        // 360 dp sind 122 dp — dort ist neben der Liste nichts mehr lesbar. Ein Tablet und ein Handy
+        // quer haben die Breite sehr wohl und behalten Spine|Tafel, genau wie die Einstellungen.
+        val spineWidth = if (formfaktor.kompakt) maxWidth else minOf(SettingsSkin.SpineWidth, maxWidth * 0.34f)
         Row(
             modifier = Modifier.fillMaxSize(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -369,7 +376,9 @@ fun MoreScreen(
             }
 
             // --- The pane: what is behind the highlighted row. Read-only, and never focusable.
-            if (!formfaktor.mobil) {
+            // German4K: faellt nur im Hochformat weg (siehe spineWidth oben) — quer und auf dem
+            // Tablet steht sie wie am Fernseher neben der Liste.
+            if (!formfaktor.kompakt) {
                 Column(
                     modifier = Modifier
                         .weight(1f)
