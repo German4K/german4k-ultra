@@ -3,6 +3,7 @@ package tv.own.owntv.player
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Box
@@ -38,6 +39,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -53,6 +55,7 @@ import tv.own.owntv.core.i18n.HorizontalDirection
 import tv.own.owntv.core.i18n.horizontalDirection
 import tv.own.owntv.core.settings.RemoteShortcutAction
 import tv.own.owntv.core.settings.RemoteShortcutPress
+import tv.own.owntv.ui.LocalFormfaktor
 import tv.own.owntv.ui.components.LocalRemoteShortcuts
 import tv.own.owntv.ui.components.OwnTVButton
 import tv.own.owntv.ui.components.OwnTVButtonStyle
@@ -252,6 +255,8 @@ fun PlayerHud(
         msToAdvance in 0L..30_000L && !autoNextDismissed
     val nextCountdown = ((msToAdvance + 999L) / 1000L).toInt().coerceIn(0, 30)
 
+    // German4K: Auf Touch-Geraeten gibt es keine Fernbedienung — ein Tipp aufs Bild zeigt/versteckt die Steuerung.
+    val mobil = LocalFormfaktor.current.mobil
     var controlsVisible by remember { mutableStateOf(true) }
     var showInfo by remember { mutableStateOf(false) } // stream technical-info overlay
     // Used only by "Report this stream", which writes the current readout into the playback log (F18).
@@ -532,7 +537,15 @@ fun PlayerHud(
                 controlsVisible -> { wakeTick++; false }
                 else -> false
             }
-        },
+        }
+            // German4K: Tipp auf die freie Flaeche schaltet die Steuerung um. Die Geste sitzt aussen um
+            // die Knoepfe — Compose liefert Zeiger-Ereignisse zuerst an die Kinder, ein Klick auf
+            // Play/Pause bleibt also beim Knopf. Auf dem Fernseher wird sie gar nicht erst registriert.
+            .then(
+                if (mobil) Modifier.pointerInput(inert) {
+                    detectTapGestures(onTap = { if (!inert) controlsVisible = !controlsVisible })
+                } else Modifier,
+            ),
     ) {
         if (!controlsVisible && !showNextCard) {
             Box(

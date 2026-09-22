@@ -45,6 +45,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -56,6 +57,7 @@ import tv.own.owntv.core.companion.CompanionLink
 import tv.own.owntv.core.german4k.German4kPanelAnswer
 import tv.own.owntv.core.german4k.German4kProvisioner
 import tv.own.owntv.core.sync.importProgressDisplay
+import tv.own.owntv.ui.LocalFormfaktor
 import tv.own.owntv.ui.components.OwnTVButton
 import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.OwnTVIcon
@@ -131,6 +133,7 @@ private fun ImportingView(s: German4kProvisioner.State.Importing) {
 @Composable
 private fun UncoupledView(answer: German4kPanelAnswer, loginFailed: Boolean, onLogin: () -> Unit, onRetry: () -> Unit, onManual: () -> Unit) {
     val colors = OwnTVTheme.colors
+    val kompakt = LocalFormfaktor.current.kompakt
     val fr = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
     val qr = remember(answer.einrichtenUrl) { answer.einrichtenUrl.takeIf { it.isNotBlank() }?.let { CompanionLink.renderQr(it, 400) } }
@@ -143,41 +146,82 @@ private fun UncoupledView(answer: German4kPanelAnswer, loginFailed: Boolean, onL
         Text(answer.noteContent, style = MaterialTheme.typography.bodyMedium, color = colors.primary, textAlign = TextAlign.Center, modifier = Modifier.widthIn(max = 720.dp))
     }
     Spacer(Modifier.height(24.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(28.dp), verticalAlignment = Alignment.Top) {
-        Column(Modifier.width(300.dp)) {
-            Way(stringResource(R.string.g4k_way_login_title), stringResource(R.string.g4k_way_login_body))
-            Spacer(Modifier.height(10.dp))
-            OwnTVButton(stringResource(R.string.g4k_login_button), onClick = onLogin, icon = OwnTVIcon.PLAY, modifier = Modifier.focusRequester(fr))
-            Spacer(Modifier.height(22.dp))
-            Way(stringResource(R.string.g4k_way_photo_title), stringResource(R.string.g4k_way_photo_body))
-            Spacer(Modifier.height(6.dp))
-            Text(stringResource(R.string.g4k_contact), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+    // German4K: Auf dem Handy passen zwei Spalten nicht nebeneinander — dort steht alles untereinander,
+    // der QR-Code zuerst und groesser (er wird mit dem zweiten Geraet abfotografiert). Fernseher und
+    // Tablet im Querformat behalten die bisherigen zwei Spalten.
+    if (kompakt) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            RechteSpalte(answer, qr, qrGroesse = 240.dp)
+            Spacer(Modifier.height(24.dp))
+            LinkeSpalte(onLogin = onLogin, fr = fr)
         }
-        Column(Modifier.width(300.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Way(stringResource(R.string.g4k_way_qr_title), stringResource(R.string.g4k_way_qr_body))
-            Spacer(Modifier.height(10.dp))
-            qr?.let {
-                Image(
-                    bitmap = it.asImageBitmap(),
-                    contentDescription = null,
-                    modifier = Modifier.size(172.dp).clip(RoundedCornerShape(14.dp)).background(Color.White).padding(8.dp),
-                    contentScale = ContentScale.Fit,
-                )
-                Spacer(Modifier.height(8.dp))
-            }
-            Text(stringResource(R.string.g4k_einrichten_short), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
-            Spacer(Modifier.height(14.dp))
-            Text(stringResource(R.string.g4k_mac), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
-            Text(answer.mac.uppercase(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = colors.primary, letterSpacing = 2.sp)
-            Spacer(Modifier.height(6.dp))
-            Text(stringResource(R.string.g4k_device_code), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
-            Text(answer.deviceKey, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = colors.primary, letterSpacing = 4.sp)
+    } else {
+        Row(horizontalArrangement = Arrangement.spacedBy(28.dp), verticalAlignment = Alignment.Top) {
+            LinkeSpalte(Modifier.width(300.dp), onLogin = onLogin, fr = fr)
+            RechteSpalte(answer, qr, Modifier.width(300.dp), qrGroesse = 172.dp)
         }
     }
     Spacer(Modifier.height(28.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        OwnTVButton(stringResource(R.string.g4k_retry_button), onClick = onRetry, style = OwnTVButtonStyle.SECONDARY)
-        OwnTVButton(stringResource(R.string.g4k_manual_button), onClick = onManual, style = OwnTVButtonStyle.SECONDARY)
+    if (kompakt) {
+        // Untereinander: zwei Knoepfe nebeneinander werden auf dem Handy sonst abgeschnitten.
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            OwnTVButton(stringResource(R.string.g4k_retry_button), onClick = onRetry, style = OwnTVButtonStyle.SECONDARY)
+            OwnTVButton(stringResource(R.string.g4k_manual_button), onClick = onManual, style = OwnTVButtonStyle.SECONDARY)
+        }
+    } else {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            OwnTVButton(stringResource(R.string.g4k_retry_button), onClick = onRetry, style = OwnTVButtonStyle.SECONDARY)
+            OwnTVButton(stringResource(R.string.g4k_manual_button), onClick = onManual, style = OwnTVButtonStyle.SECONDARY)
+        }
+    }
+}
+
+/** German4K: Linke Spalte der Anmeldung (Anmelden-Weg + Foto-Weg) — Inhalt unveraendert. */
+@Composable
+private fun LinkeSpalte(modifier: Modifier = Modifier, onLogin: () -> Unit, fr: FocusRequester) {
+    val colors = OwnTVTheme.colors
+    Column(modifier) {
+        Way(stringResource(R.string.g4k_way_login_title), stringResource(R.string.g4k_way_login_body))
+        Spacer(Modifier.height(10.dp))
+        OwnTVButton(stringResource(R.string.g4k_login_button), onClick = onLogin, icon = OwnTVIcon.PLAY, modifier = Modifier.focusRequester(fr))
+        Spacer(Modifier.height(22.dp))
+        Way(stringResource(R.string.g4k_way_photo_title), stringResource(R.string.g4k_way_photo_body))
+        Spacer(Modifier.height(6.dp))
+        Text(stringResource(R.string.g4k_contact), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+    }
+}
+
+/** German4K: Rechte Spalte der Anmeldung (QR-Code, MAC, Kopplungscode) — Inhalt unveraendert, nur [qrGroesse] variabel. */
+@Composable
+private fun RechteSpalte(
+    answer: German4kPanelAnswer,
+    qr: android.graphics.Bitmap?,
+    modifier: Modifier = Modifier,
+    qrGroesse: Dp,
+) {
+    val colors = OwnTVTheme.colors
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Way(stringResource(R.string.g4k_way_qr_title), stringResource(R.string.g4k_way_qr_body))
+        Spacer(Modifier.height(10.dp))
+        qr?.let {
+            Image(
+                bitmap = it.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.size(qrGroesse).clip(RoundedCornerShape(14.dp)).background(Color.White).padding(8.dp),
+                contentScale = ContentScale.Fit,
+            )
+            Spacer(Modifier.height(8.dp))
+        }
+        Text(stringResource(R.string.g4k_einrichten_short), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+        Spacer(Modifier.height(14.dp))
+        Text(stringResource(R.string.g4k_mac), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+        Text(answer.mac.uppercase(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = colors.primary, letterSpacing = 2.sp)
+        Spacer(Modifier.height(6.dp))
+        Text(stringResource(R.string.g4k_device_code), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+        Text(answer.deviceKey, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = colors.primary, letterSpacing = 4.sp)
     }
 }
 
