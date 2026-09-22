@@ -147,18 +147,20 @@ private fun UncoupledView(answer: German4kPanelAnswer, loginFailed: Boolean, onL
     }
     Spacer(Modifier.height(24.dp))
     // German4K: Auf dem Handy passen zwei Spalten nicht nebeneinander — dort steht alles
-    // untereinander, und zwar in derselben Reihenfolge wie auf dem Fernseher: erst das Anmelden
-    // (1), dann der QR-Code (2), nur groesser. Ein Handy kann seinen eigenen QR-Code nicht
-    // abfotografieren — der gehoert nach unten, und die Ziffern in den Texten lesen sich wieder
-    // 1 → 2 → 3. Fernseher und Tablet im Querformat behalten die bisherigen zwei Spalten.
+    // untereinander, und zwar in der Reihenfolge der Ziffern: 1 Anmelden, 2 QR-Code (nur groesser),
+    // 3 Foto an uns schicken. Ein Handy kann seinen eigenen QR-Code nicht abfotografieren, deshalb
+    // steht das Anmelden oben; der Foto-Weg wandert dafuer aus der linken Spalte hinter den QR.
+    // Fernseher und Tablet im Querformat behalten die bisherigen zwei Spalten.
     if (kompakt) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            LinkeSpalte(onLogin = onLogin, fr = fr)
+            LinkeSpalte(onLogin = onLogin, fr = fr, mitFoto = false)
             Spacer(Modifier.height(24.dp))
             RechteSpalte(answer, qr, qrGroesse = 240.dp)
+            Spacer(Modifier.height(24.dp))
+            FotoWeg()
         }
     } else {
         Row(horizontalArrangement = Arrangement.spacedBy(28.dp), verticalAlignment = Alignment.Top) {
@@ -183,19 +185,29 @@ private fun UncoupledView(answer: German4kPanelAnswer, loginFailed: Boolean, onL
     }
 }
 
-/** German4K: Linke Spalte der Anmeldung (Anmelden-Weg + Foto-Weg) — Inhalt unveraendert. */
+/** German4K: Linke Spalte der Anmeldung (Anmelden-Weg, darunter der Foto-Weg). [mitFoto] = false
+ *  laesst den Foto-Weg weg — auf dem Handy steht er weiter unten, hinter dem QR-Code. */
 @Composable
-private fun LinkeSpalte(modifier: Modifier = Modifier, onLogin: () -> Unit, fr: FocusRequester) {
-    val colors = OwnTVTheme.colors
+private fun LinkeSpalte(modifier: Modifier = Modifier, onLogin: () -> Unit, fr: FocusRequester, mitFoto: Boolean = true) {
     Column(modifier) {
         Way(stringResource(R.string.g4k_way_login_title), stringResource(R.string.g4k_way_login_body))
         Spacer(Modifier.height(10.dp))
         OwnTVButton(stringResource(R.string.g4k_login_button), onClick = onLogin, icon = OwnTVIcon.PLAY, modifier = Modifier.focusRequester(fr))
-        Spacer(Modifier.height(22.dp))
-        Way(stringResource(R.string.g4k_way_photo_title), stringResource(R.string.g4k_way_photo_body))
-        Spacer(Modifier.height(6.dp))
-        Text(stringResource(R.string.g4k_contact), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+        if (mitFoto) {
+            Spacer(Modifier.height(22.dp))
+            FotoWeg()
+        }
     }
+}
+
+/** German4K: Weg 3 — Foto an uns schicken, samt Kontaktzeile. Inhalt unveraendert, nur eigenstaendig,
+ *  damit er auf dem Handy hinter dem QR-Code stehen kann. */
+@Composable
+private fun FotoWeg() {
+    val colors = OwnTVTheme.colors
+    Way(stringResource(R.string.g4k_way_photo_title), stringResource(R.string.g4k_way_photo_body))
+    Spacer(Modifier.height(6.dp))
+    Text(stringResource(R.string.g4k_contact), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
 }
 
 /** German4K: Rechte Spalte der Anmeldung (QR-Code, MAC, Kopplungscode) — Inhalt unveraendert, nur [qrGroesse] variabel. */
