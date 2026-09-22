@@ -54,8 +54,10 @@ import tv.own.owntv.R
 import tv.own.owntv.core.backup.BackupManager
 import tv.own.owntv.core.i18n.SupportedLocales
 import tv.own.owntv.core.model.MediaType
+import tv.own.owntv.core.nav.MainSection
 import tv.own.owntv.core.settings.SettingsRepository
 import tv.own.owntv.core.theme.GlassSurface
+import tv.own.owntv.features.mobil.german4kNavIcon
 import tv.own.owntv.features.settings.BackupScreen
 import tv.own.owntv.features.settings.LocalSyncScreen
 import tv.own.owntv.features.settings.SettingsViewModel
@@ -115,6 +117,11 @@ fun MoreScreen(
     onFullscreen: () -> Unit,
     onChildFocused: () -> Unit,
     modifier: Modifier = Modifier,
+    // German4K: Auf Handy/Tablet hat die untere Leiste nur fuenf Plaetze — Suche, Downloads und
+    // TV-Programm bekommen deshalb hier oben je eine Zeile. Auf dem Fernseher bleibt die Liste
+    // leer, dort steht jedes dieser Ziele in der Seitenleiste, und dieser Schirm bleibt wie er war.
+    onOpenSection: ((MainSection) -> Unit)? = null,
+    zusatzSections: List<MainSection> = emptyList(),
     counts: MoreCountsViewModel = koinViewModel(),
     settingsVm: SettingsViewModel = koinViewModel(),
 ) {
@@ -250,6 +257,23 @@ fun MoreScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 8.dp, vertical = 10.dp),
             ) {
+                // German4K: die Bereiche, die auf Handy/Tablet keinen Platz in der unteren Leiste
+                // haben. Sie fuehren aus "Mehr" heraus, taugen also nicht als Auswahl fuer die
+                // rechte Tafel — sie lassen `selected` in Ruhe und oeffnen beim Klick den Bereich.
+                zusatzSections.forEach { section ->
+                    SpineItem(
+                        label = stringResource(section.labelRes),
+                        summary = stringResource(R.string.g4k_mehr_bereich_summary),
+                        icon = section.german4kNavIcon,
+                        count = 0,
+                        showBadge = false,
+                        selected = false,
+                        active = false,
+                        onFocused = {},
+                        onClick = { onOpenSection?.invoke(section) },
+                    )
+                }
+
                 // No head of its own: the outer panel's head already names the screen, and a second
                 // title inside the spine would say "More" twice.
                 SpineRow(

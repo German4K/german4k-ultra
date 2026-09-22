@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -60,6 +61,7 @@ import tv.own.owntv.core.update.UpdateManager
 import tv.own.owntv.features.update.UpdateDialog
 import tv.own.owntv.features.update.UpdateStatusToast
 import tv.own.owntv.features.downloads.DownloadsScreen
+import tv.own.owntv.features.mobil.German4kBottomBar
 import tv.own.owntv.features.epg.EpgScreen
 import tv.own.owntv.features.home.HomeScreen
 import tv.own.owntv.features.home.HomeViewModel
@@ -94,6 +96,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import androidx.compose.ui.res.stringResource
 import tv.own.owntv.player.alignment
+import tv.own.owntv.ui.LocalFormfaktor
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.LocalRemoteShortcuts
 import tv.own.owntv.ui.components.RemoteShortcutEnvironment
@@ -160,6 +163,8 @@ fun OwnTVShell(
     val sidebarFocus = remember { FocusRequester() }
     val homeFirstRowFocus = remember { FocusRequester() }
     var focusedLayer by remember { mutableStateOf(ShellLayer.SIDEBAR) }
+    // German4K: Handy/Tablet oder Fernseher — entscheidet ueber untere Leiste statt Seitenleiste.
+    val formfaktor = LocalFormfaktor.current
     var showExit by remember { mutableStateOf(false) }
     var showAvatarPicker by remember { mutableStateOf(false) }
     var showAvatarChooser by remember { mutableStateOf(false) }
@@ -704,6 +709,12 @@ fun OwnTVShell(
             // happened. Handled here as well so the answer is the same whichever handler fires; a
             // sub-screen of Settings still wins, because its handler is composed deeper than this.
             selectedSection == MainSection.SETTINGS -> onSelectSection(MainSection.MORE)
+            // German4K: Auf Handy/Tablet gibt es keine Seitenleiste, auf die Zurueck zurueckfallen
+            // koennte. Zurueck fuehrt deshalb aus jedem Bereich nach Start, und auf Start fragt es
+            // nach dem Beenden — das ist, was ein Android-Nutzer von der Zurueck-Taste erwartet.
+            formfaktor.mobil ->
+                if (selectedSection == MainSection.HOME) showExit = true
+                else onSelectSection(MainSection.HOME)
             focusedLayer == ShellLayer.SIDEBAR -> showExit = true
             else -> runCatching { sidebarFocus.requestFocus() }
         }
@@ -844,31 +855,10 @@ fun OwnTVShell(
                 .focusGroup(),
         ) {
           if (isOffline) OfflineBanner()
-          Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            Sidebar(
-                selected = selectedSection,
-                onSelect = { section ->
-                    if (trendingSearchActive || section == MainSection.SEARCH) {
-                        searchVm.setQuery("")
-                        trendingSearchActive = false
-                        restoreTrendingSearchFocus = false
-                    }
-                    onSelectSection(section)
-                },
-                visibleSections = visibleSections,
-                avatarId = avatarId,
-                avatarPath = avatarPath,
-                onPickAvatar = { showAvatarPicker = true },
-                profileName = profileName,
-                sourceSummary = sourceSummary,
-                onSwitchProfile = onSwitchProfile,
-                selectedItemFocusRequester = sidebarFocus,
-                onFocused = { focusedLayer = ShellLayer.SIDEBAR },
-                topInset = shellTopBarHeight,
-                nowPlaying = nowPlayingRail,
-                onNowPlaying = enterNowPlaying,
-            )
-
+          // German4K: Der Inhalt neben der Seitenleiste — einmal geschrieben, von beiden Zweigen
+          // gerufen. RowScope, weil er drinnen Modifier.weight nutzt; auf dem Handy steht er
+          // deshalb in einer Row ohne Seitenleiste statt in einer Box.
+          val browseInhalt: @Composable RowScope.() -> Unit = {
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -967,6 +957,15 @@ fun OwnTVShell(
                         selectedSection == MainSection.MORE -> tv.own.owntv.features.more.MoreScreen(
                             onOpenSettings = { onSelectSection(MainSection.SETTINGS) },
                             onFullscreen = { openFullscreen() },
+                            // German4K: In der unteren Leiste ist nur fuer fuenf Ziele Platz — Suche,
+                            // Downloads und TV-Programm haengen deshalb auf Handy/Tablet hier mit
+                            // drin. Auf dem Fernseher bleibt die Liste leer, dort hat jedes dieser
+                            // Ziele seinen eigenen Platz in der Seitenleiste.
+                            onOpenSection = onSelectSection,
+                            zusatzSections = if (formfaktor.mobil) {
+                                listOf(MainSection.SEARCH, MainSection.DOWNLOADS, MainSection.EPG)
+                                    .filter { it == MainSection.SEARCH || it in visibleSections }
+                            } else emptyList(),
                             onChildFocused = { focusedLayer = ShellLayer.CONTENT },
                             modifier = Modifier
                                 .fillMaxSize()
@@ -1109,7 +1108,12 @@ fun OwnTVShell(
                         )
 
                         selectedSection == MainSection.EPG -> EpgScreen(
-                            onBack = { runCatching { sidebarFocus.requestFocus() } },
+                            // German4K: Auf Handy/Tablet gibt es keine Seitenleiste, die den Fokus
+                            // aufnehmen koennte — ohne diesen Zweig waere Zurueck im TV-Programm tot.
+                            onBack = {
+                                if (formfaktor.mobil) onSelectSection(MainSection.HOME)
+                                else runCatching { sidebarFocus.requestFocus() }
+                            },
                             onFullscreen = { openFullscreen() },
                             onPlayChannel = { ch, _ ->
                                 restoreFocus = false
@@ -1171,6 +1175,42 @@ fun OwnTVShell(
                     }
                 }
             }
+          }
+          if (formfaktor.mobil) {
+              // German4K: Handy/Tablet — kein Seitenmenue, die Bereiche liegen in der unteren Leiste.
+              Row(modifier = Modifier.weight(1f).fillMaxWidth()) { browseInhalt() }
+              German4kBottomBar(
+                  selected = selectedSection,
+                  visibleSections = visibleSections,
+                  onSelect = onSelectSection,
+              )
+          } else {
+          Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            Sidebar(
+                selected = selectedSection,
+                onSelect = { section ->
+                    if (trendingSearchActive || section == MainSection.SEARCH) {
+                        searchVm.setQuery("")
+                        trendingSearchActive = false
+                        restoreTrendingSearchFocus = false
+                    }
+                    onSelectSection(section)
+                },
+                visibleSections = visibleSections,
+                avatarId = avatarId,
+                avatarPath = avatarPath,
+                onPickAvatar = { showAvatarPicker = true },
+                profileName = profileName,
+                sourceSummary = sourceSummary,
+                onSwitchProfile = onSwitchProfile,
+                selectedItemFocusRequester = sidebarFocus,
+                onFocused = { focusedLayer = ShellLayer.SIDEBAR },
+                topInset = shellTopBarHeight,
+                nowPlaying = nowPlayingRail,
+                onNowPlaying = enterNowPlaying,
+            )
+            browseInhalt()
+          }
           }
         }
         // The solid-mode wizard aura is deliberately drawn after the opaque browse surfaces so it

@@ -4290,6 +4290,10 @@ internal fun SpineItem(
      * already showing. More's rows *navigate*, so they pass one.
      */
     onClick: (() -> Unit)? = null,
+    // German4K: Zeilen ohne Zahl (die Bereichs-Zeilen, die "Mehr" auf Handy/Tablet zusaetzlich
+    // zeigt) lassen die Plakette ganz weg — eine leere oder eine "0" waere eine Angabe, die es
+    // nicht gibt. Standard true: fuer alle bisherigen Aufrufer aendert sich nichts.
+    showBadge: Boolean = true,
 ) {
     val colors = OwnTVTheme.colors
     val shape = SettingsSkin.RowShape
@@ -4352,16 +4356,18 @@ internal fun SpineItem(
                     modifier = Modifier.padding(top = 2.dp),
                 )
             }
-            Box(
-                modifier = Modifier
-                    .heightIn(min = 24.dp)
-                    .widthIn(min = 26.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(if (hot) colors.primary.copy(alpha = 0.15f) else SettingsSkin.veil2)
-                    .padding(horizontal = 7.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                MonoText(badge ?: count.toString(), 11.5.sp, if (hot) colors.primary else colors.onSurfaceVariant)
+            if (showBadge) {
+                Box(
+                    modifier = Modifier
+                        .heightIn(min = 24.dp)
+                        .widthIn(min = 26.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (hot) colors.primary.copy(alpha = 0.15f) else SettingsSkin.veil2)
+                        .padding(horizontal = 7.dp, vertical = 4.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    MonoText(badge ?: count.toString(), 11.5.sp, if (hot) colors.primary else colors.onSurfaceVariant)
+                }
             }
         }
         if (selected) {
