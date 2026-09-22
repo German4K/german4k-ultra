@@ -53,7 +53,6 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import androidx.compose.ui.draw.rotate
 import tv.own.owntv.ui.components.longPressMenuGuard
-import tv.own.owntv.ui.components.ChannelGenre
 import tv.own.owntv.ui.components.NavAccentBar
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.OwnTVPopup
@@ -354,13 +353,8 @@ private fun RailPill(
             if (category.icon != null) {
                 OwnTVIcon(icon = category.icon, tint = ladder.icon, filled = activeSelected, modifier = Modifier.size(if (expanded) 20.dp else Dimens.RailPillSize / 2))
                 if (expanded) Spacer(Modifier.width(8.dp))
-            } else if (expanded && category.showGenreDot) {
-                // Genre hint dot (Sport/News/Movies/Action/…); unknown categories show the grey
-                // "Other" dot rather than an empty slot, so every row has a consistent marker.
-                val genreDot = ChannelGenre.fromCategory(category.fullName).dot
-                Box(Modifier.size(8.dp).clip(CircleShape).background(genreDot))
-                Spacer(Modifier.width(10.dp))
             }
+            // German4K: kein Genre-Punkt vor den Kategorien — die geratenen Farben verwirren mehr, als sie ordnen (Traian, 22.09.2026).
             if (expanded) {
                 Text(
                     text = category.labelRes?.let { stringResource(it) } ?: category.fullName,
