@@ -841,6 +841,7 @@ class SettingsViewModel(
     val g4kDetailseite: StateFlow<Boolean> = settings.g4kDetailseite.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
     fun setG4kDetailseite(an: Boolean) { viewModelScope.launch { settings.setG4kDetailseite(an) } }
 
+    // German4K: Darstellung-Schalter (Automatisch/Fernseher/Handy) fuer den Formfaktor, siehe SettingsScreen.
     val g4kDarstellung: StateFlow<tv.own.owntv.core.settings.G4kDarstellung> =
         settings.g4kDarstellung.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.settings.G4kDarstellung.AUTO)
     fun setG4kDarstellung(d: tv.own.owntv.core.settings.G4kDarstellung) { viewModelScope.launch { settings.setG4kDarstellung(d) } }
