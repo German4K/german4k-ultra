@@ -482,14 +482,6 @@ fun SettingsScreen(
             onClick = { settingsVm.setDirectTune(!channelNumbers) },
         ),
         RootRow(
-            "quick_g4k_detailseite", TileTone.PRIMARY, OwnTVIcon.MOVIES,
-            title = stringResource(R.string.g4k_detailseite_titel),
-            desc = stringResource(R.string.g4k_detailseite_text),
-            chip = stringResource(if (g4kDetailseite) R.string.common_on else R.string.common_off),
-            chipTone = if (g4kDetailseite) TileTone.PRIMARY else TileTone.SECONDARY,
-            onClick = { settingsVm.setG4kDetailseite(!g4kDetailseite) },
-        ),
-        RootRow(
             "quick_hdr", TileTone.SECONDARY, OwnTVIcon.VIDEO,
             title = stringResource(R.string.settings_quick_hdr),
             chip = stringResource(if (hdr) R.string.common_on else R.string.common_off),
@@ -712,6 +704,17 @@ fun SettingsScreen(
             onClick = { open(SettingsTab.OPEN_SUBTITLES) },
         ),
         RootGroup("group_playback", stringResource(R.string.settings_playback_group), OwnTVIcon.VIDEO, stringResource(R.string.settings_group_summary_playback)),
+        // German4K: eigener Schalter, deshalb fest in Wiedergabe statt nur in Quick — Quick zeigt nur
+        // angepinnte Reihen (quickPinned), neue Zeilen sind dort sonst unsichtbar bis zum Anpinnen.
+        // Hier bleibt der Schlüssel gleich, die Zeile lässt sich zusätzlich weiter nach Quick anpinnen.
+        RootRow(
+            "quick_g4k_detailseite", TileTone.PRIMARY, OwnTVIcon.MOVIES,
+            title = stringResource(R.string.g4k_detailseite_titel),
+            desc = stringResource(R.string.g4k_detailseite_text),
+            chip = stringResource(if (g4kDetailseite) R.string.common_on else R.string.common_off),
+            chipTone = if (g4kDetailseite) TileTone.PRIMARY else TileTone.SECONDARY,
+            onClick = { settingsVm.setG4kDetailseite(!g4kDetailseite) },
+        ),
         RootRow(
             tabRowKey(SettingsTab.VIDEO), TileTone.TERTIARY, OwnTVIcon.VIDEO,
             title = stringResource(R.string.settings_video_player), desc = stringResource(R.string.settings_video_player_description),
