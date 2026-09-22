@@ -120,7 +120,15 @@ fun TopBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            // German4K: Im Hochformat darf die linke Gruppe nur so breit werden, wie nach Uhr und
+            // Profil uebrig bleibt. Sobald "Letzter Sender" dazukommt (bis 240 dp), schob sie beide
+            // sonst aus dem Bild; mit dem Gewicht kuerzt stattdessen der Chip seinen Text.
+            // fill = false, damit sie ohne den Chip nicht kuenstlich breit wird. TV unveraendert.
+            modifier = if (LocalFormfaktor.current.kompakt) Modifier.weight(1f, fill = false) else Modifier,
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
             SectionChip(label = sectionLabel)
             SearchPill(onClick = onSearchClick, visible = searchVisible)
             // Only focusable while the nav panel holds focus (same rule as the search pill) so it can
