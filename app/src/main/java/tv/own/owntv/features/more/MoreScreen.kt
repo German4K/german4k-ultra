@@ -370,67 +370,67 @@ fun MoreScreen(
 
             // --- The pane: what is behind the highlighted row. Read-only, and never focusable.
             if (!formfaktor.mobil) {
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .clip(paneShape)
-                    .glass(surface = GlassSurface.CARDS, baseFill = colors.surfaceContainerLow, shape = paneShape)
-                    .border(1.dp, colors.outlineVariant, paneShape),
-            ) {
-                val destination = when (selected) {
-                    MoreRow.SETTINGS -> stringResource(R.string.common_nav_settings)
-                    MoreRow.FAVORITES -> stringResource(R.string.content_category_favorites)
-                    MoreRow.HISTORY -> stringResource(R.string.content_category_history)
-                    MoreRow.BACKUP -> stringResource(R.string.settings_backup_restore)
-                    MoreRow.LOCAL_SYNC -> stringResource(R.string.local_sync_title)
-                    MoreRow.ERROR_LOG -> stringResource(R.string.settings_playback_error_log)
-                    MoreRow.ABOUT -> stringResource(R.string.settings_about)
-                }
-                // Settings' own sheet header: 18 sp title, 12.5 sp summary, bordered mono tag.
-                SheetHeader(
-                    title = destination,
-                    // The pane takes the LONG description where one exists — the spine's short
-                    // summary is short because the spine is 294 dp, not because the app has nothing
-                    // more to say.
-                    summary = when (selected) {
-                        MoreRow.SETTINGS -> stringResource(R.string.more_spine_settings_summary)
-                        MoreRow.FAVORITES -> stringResource(R.string.more_pane_favorites_summary)
-                        MoreRow.HISTORY -> stringResource(R.string.more_pane_history_summary)
-                        MoreRow.BACKUP -> stringResource(R.string.settings_backup_restore_description)
-                        MoreRow.LOCAL_SYNC -> stringResource(R.string.local_sync_description)
-                        MoreRow.ERROR_LOG -> stringResource(R.string.settings_playback_error_description)
-                        MoreRow.ABOUT -> stringResource(R.string.settings_about_description)
-                    },
-                    tag = when (selected) {
-                        MoreRow.SETTINGS ->
-                            pluralStringResource(R.plurals.settings_pinned_count, quickPinned.size, quickPinned.size)
-                        MoreRow.FAVORITES -> favorites.total.toString()
-                        MoreRow.HISTORY -> history.total.toString()
-                        MoreRow.BACKUP -> backupAge ?: neverBadge
-                        MoreRow.LOCAL_SYNC -> syncValue
-                        MoreRow.ERROR_LOG -> (logEntries?.size ?: 0).toString()
-                        MoreRow.ABOUT -> BuildConfig.VERSION_NAME
-                    },
-                    tagHot = false,
-                )
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(horizontal = 18.dp, vertical = 6.dp),
+                        .fillMaxHeight()
+                        .clip(paneShape)
+                        .glass(surface = GlassSurface.CARDS, baseFill = colors.surfaceContainerLow, shape = paneShape)
+                        .border(1.dp, colors.outlineVariant, paneShape),
                 ) {
-                    when (selected) {
-                        MoreRow.SETTINGS -> SettingsPane(quickPreview)
-                        MoreRow.FAVORITES -> CountsPane(favorites, favoriteItems)
-                        MoreRow.HISTORY -> CountsPane(history, historyItems)
-                        MoreRow.BACKUP -> BackupPane(lastBackup)
-                        MoreRow.LOCAL_SYNC -> LocalSyncPane(sync)
-                        MoreRow.ERROR_LOG -> ErrorLogPane(logEntries)
-                        MoreRow.ABOUT -> AboutPane()
+                    val destination = when (selected) {
+                        MoreRow.SETTINGS -> stringResource(R.string.common_nav_settings)
+                        MoreRow.FAVORITES -> stringResource(R.string.content_category_favorites)
+                        MoreRow.HISTORY -> stringResource(R.string.content_category_history)
+                        MoreRow.BACKUP -> stringResource(R.string.settings_backup_restore)
+                        MoreRow.LOCAL_SYNC -> stringResource(R.string.local_sync_title)
+                        MoreRow.ERROR_LOG -> stringResource(R.string.settings_playback_error_log)
+                        MoreRow.ABOUT -> stringResource(R.string.settings_about)
                     }
+                    // Settings' own sheet header: 18 sp title, 12.5 sp summary, bordered mono tag.
+                    SheetHeader(
+                        title = destination,
+                        // The pane takes the LONG description where one exists — the spine's short
+                        // summary is short because the spine is 294 dp, not because the app has nothing
+                        // more to say.
+                        summary = when (selected) {
+                            MoreRow.SETTINGS -> stringResource(R.string.more_spine_settings_summary)
+                            MoreRow.FAVORITES -> stringResource(R.string.more_pane_favorites_summary)
+                            MoreRow.HISTORY -> stringResource(R.string.more_pane_history_summary)
+                            MoreRow.BACKUP -> stringResource(R.string.settings_backup_restore_description)
+                            MoreRow.LOCAL_SYNC -> stringResource(R.string.local_sync_description)
+                            MoreRow.ERROR_LOG -> stringResource(R.string.settings_playback_error_description)
+                            MoreRow.ABOUT -> stringResource(R.string.settings_about_description)
+                        },
+                        tag = when (selected) {
+                            MoreRow.SETTINGS ->
+                                pluralStringResource(R.plurals.settings_pinned_count, quickPinned.size, quickPinned.size)
+                            MoreRow.FAVORITES -> favorites.total.toString()
+                            MoreRow.HISTORY -> history.total.toString()
+                            MoreRow.BACKUP -> backupAge ?: neverBadge
+                            MoreRow.LOCAL_SYNC -> syncValue
+                            MoreRow.ERROR_LOG -> (logEntries?.size ?: 0).toString()
+                            MoreRow.ABOUT -> BuildConfig.VERSION_NAME
+                        },
+                        tagHot = false,
+                    )
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 18.dp, vertical = 6.dp),
+                    ) {
+                        when (selected) {
+                            MoreRow.SETTINGS -> SettingsPane(quickPreview)
+                            MoreRow.FAVORITES -> CountsPane(favorites, favoriteItems)
+                            MoreRow.HISTORY -> CountsPane(history, historyItems)
+                            MoreRow.BACKUP -> BackupPane(lastBackup)
+                            MoreRow.LOCAL_SYNC -> LocalSyncPane(sync)
+                            MoreRow.ERROR_LOG -> ErrorLogPane(logEntries)
+                            MoreRow.ABOUT -> AboutPane()
+                        }
+                    }
+                    PaneHint(destination)
                 }
-                PaneHint(destination)
-            }
             }
         }
         }
