@@ -236,6 +236,9 @@ fun SettingsScreen(
     var showBgRemote by remember { mutableStateOf(false) }
     var showAmbientGlow by remember { mutableStateOf(false) }
     var showBrowsing by remember { mutableStateOf(false) }
+    // German4K: Darstellung (Automatisch/Fernseher/Handy) — kein rowFocus/dialogReturn wie beim
+    // Theme-Picker, dieselbe Wahl wie bei quick_g4k_detailseite direkt daneben.
+    var showDarstellung by remember { mutableStateOf(false) }
     val browsingRowFocus = remember { FocusRequester() }
     // U2 — background-image ingest copies a multi-megabyte file; it runs here, off the main thread.
     val ingestScope = rememberCoroutineScope()
@@ -305,6 +308,7 @@ fun SettingsScreen(
     val livePreviewPanelActive by settingsVm.livePreviewPanelActive.collectAsStateWithLifecycle()
     val previewAudio by settingsVm.livePreviewAudio.collectAsStateWithLifecycle()
     val g4kDetailseite by settingsVm.g4kDetailseite.collectAsStateWithLifecycle()
+    val g4kDarstellung by settingsVm.g4kDarstellung.collectAsStateWithLifecycle()
     val hdr by settingsVm.hdrEnabled.collectAsStateWithLifecycle()
     val autoFrameRate by settingsVm.autoFrameRate.collectAsStateWithLifecycle()
     val surroundMode by settingsVm.surroundMode.collectAsStateWithLifecycle()
@@ -714,6 +718,13 @@ fun SettingsScreen(
             chip = stringResource(if (g4kDetailseite) R.string.common_on else R.string.common_off),
             chipTone = if (g4kDetailseite) TileTone.PRIMARY else TileTone.SECONDARY,
             onClick = { settingsVm.setG4kDetailseite(!g4kDetailseite) },
+        ),
+        RootRow(
+            "quick_g4k_darstellung", TileTone.SECONDARY, OwnTVIcon.SETTINGS,
+            title = stringResource(R.string.g4k_darstellung_titel),
+            desc = stringResource(R.string.g4k_darstellung_text),
+            chip = darstellungLabel(g4kDarstellung),
+            onClick = { showDarstellung = true },
         ),
         RootRow(
             tabRowKey(SettingsTab.VIDEO), TileTone.TERTIARY, OwnTVIcon.VIDEO,
@@ -1418,6 +1429,15 @@ fun SettingsScreen(
             onDismiss = { showTheme = false },
         )
     }
+    if (showDarstellung) {
+        tv.own.owntv.features.settings.PickerDialog(
+            title = stringResource(R.string.g4k_darstellung_dialog),
+            options = tv.own.owntv.core.settings.G4kDarstellung.entries.map { it.name to darstellungLabel(it) },
+            selected = g4kDarstellung.name,
+            onSelect = { settingsVm.setG4kDarstellung(tv.own.owntv.core.settings.G4kDarstellung.valueOf(it)); showDarstellung = false },
+            onDismiss = { showDarstellung = false },
+        )
+    }
     if (showStartup) {
         tv.own.owntv.features.settings.PickerDialog(
             title = stringResource(R.string.settings_app_startup_dialog),
@@ -1701,6 +1721,15 @@ private fun themeLabel(mode: ThemeMode): String = stringResource(
         ThemeMode.DARK -> R.string.settings_theme_dark
         ThemeMode.LIGHT -> R.string.settings_theme_light
         ThemeMode.SYSTEM -> R.string.settings_theme_system
+    },
+)
+
+@Composable
+private fun darstellungLabel(d: tv.own.owntv.core.settings.G4kDarstellung): String = stringResource(
+    when (d) {
+        tv.own.owntv.core.settings.G4kDarstellung.AUTO -> R.string.g4k_darstellung_auto
+        tv.own.owntv.core.settings.G4kDarstellung.TV -> R.string.g4k_darstellung_tv
+        tv.own.owntv.core.settings.G4kDarstellung.MOBIL -> R.string.g4k_darstellung_mobil
     },
 )
 

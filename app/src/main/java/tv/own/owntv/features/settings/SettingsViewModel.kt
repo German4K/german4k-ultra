@@ -841,6 +841,10 @@ class SettingsViewModel(
     val g4kDetailseite: StateFlow<Boolean> = settings.g4kDetailseite.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
     fun setG4kDetailseite(an: Boolean) { viewModelScope.launch { settings.setG4kDetailseite(an) } }
 
+    val g4kDarstellung: StateFlow<tv.own.owntv.core.settings.G4kDarstellung> =
+        settings.g4kDarstellung.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.settings.G4kDarstellung.AUTO)
+    fun setG4kDarstellung(d: tv.own.owntv.core.settings.G4kDarstellung) { viewModelScope.launch { settings.setG4kDarstellung(d) } }
+
     // Weather chip: visibility toggle + manual location override (for VPN users).
     val weatherEnabled: StateFlow<Boolean> =
         settings.weatherEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)

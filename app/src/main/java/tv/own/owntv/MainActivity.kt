@@ -371,6 +371,9 @@ class MainActivity : ComponentActivity() {
                 popupFontSizePercent = fontCustomization.popupFontSizePercent,
                 popupSizePercent = fontCustomization.popupSizePercent,
             ) {
+                // German4K: Formfaktor einmal berechnen; Setup, Gate und Shell lesen ihn ueber LocalFormfaktor.
+                val formfaktor = tv.own.owntv.ui.rememberGerman4kFormfaktor()
+                CompositionLocalProvider(tv.own.owntv.ui.LocalFormfaktor provides formfaktor) {
                 val base = LocalDensity.current
                 // Glass is "always on" (Option B): panels go translucent whenever at least one surface is
                 // scoped, independent of a background image. With a photo the glass frosts it; without one,
@@ -530,6 +533,7 @@ class MainActivity : ComponentActivity() {
                     }
                     } // end LocalizedContent
                 }
+                } // end German4K CompositionLocalProvider(LocalFormfaktor)
             }
         }
     }
