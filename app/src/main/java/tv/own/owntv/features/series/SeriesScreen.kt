@@ -38,7 +38,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -1739,7 +1738,12 @@ private fun EpisodeView(
                                     // das entstand je Zeile und Frame eine neue EpisodeEntity-Kopie,
                                     // und eine neue Instanz laesst Compose die Zeile fuer geaendert
                                     // halten, obwohl sich nichts geaendert hat.
-                                    val anzeige = remember(ep.id, series.name, formfaktor.kompakt) {
+                                    //
+                                    // Geschluesselt auf `ep` selbst, nicht auf `ep.id`: die Kennung
+                                    // bleibt gleich, wenn das Modell dieselbe Folge mit neuem Namen
+                                    // oder neuem Bild nachliefert — auf die Kennung gemerkt haette
+                                    // die Zeile dann die alte Fassung behalten, auch am Fernseher.
+                                    val anzeige = remember(ep, series.name, formfaktor.kompakt) {
                                         if (formfaktor.kompakt) ep.ohneSerienPraefix(series.name) else ep
                                     }
                                     EpisodeRow(

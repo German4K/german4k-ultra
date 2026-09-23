@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -84,7 +87,23 @@ fun German4kSetup(onReady: (Long?) -> Unit, onManual: () -> Unit, modifier: Modi
         if (s is German4kProvisioner.State.Ready) onReady(s.profileId)
     }
 
-    Box(modifier = modifier.fillMaxSize().background(OwnTVTheme.colors.background)) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(OwnTVTheme.colors.background)
+            // German4K: Dieser Schirm steht vor der Huelle — beim ersten Start sieht man auf dem
+            // Handy ihn und sonst nichts, und ab Android 15 zeichnet das System randlos. Ohne den
+            // Abstand laege die Anmeldung unter Status- und Navigationsleiste. Hier alle vier
+            // Seiten (systemBars), denn es gibt keine untere Leiste, die ihren eigenen Abstand
+            // haelt. Am Fernseher und auf Android 14 und aelter ohne Wirkung.
+            .then(
+                if (LocalFormfaktor.current.mobil) {
+                    Modifier.windowInsetsPadding(WindowInsets.systemBars)
+                } else {
+                    Modifier
+                },
+            ),
+    ) {
         Box(Modifier.fillMaxSize().padding(40.dp), contentAlignment = Alignment.Center) {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()).widthIn(max = 980.dp),

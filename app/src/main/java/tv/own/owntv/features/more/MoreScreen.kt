@@ -111,9 +111,11 @@ private enum class MoreRow { SETTINGS, FAVORITES, HISTORY, BACKUP, LOCAL_SYNC, E
  * **Eine Tuer je Ziel — aber je Formfaktor gezaehlt.** Am Fernseher hat jedes Ziel schon einen
  * Platz in der Seitenleiste (Downloads in `browseOrder`, das Profil am Fuss der Leiste), also gibt
  * es hier keine Zeile dafuer. Auf Handy und Tablet tritt die untere Leiste an die Stelle der
- * Seitenleiste, und dort ist nur fuer fuenf Ziele Platz — Suche, Downloads und TV-Programm bekommen
- * ihre Tuer deshalb hier (`zusatzSections`, gefuellt von `OwnTVShell`). Beide Male fuehrt genau ein
- * Weg zu jedem Ziel; es ist nur nicht ueberall derselbe. Eine Profilzeile gibt es in keinem Fall.
+ * Seitenleiste, und dort ist nur fuer fuenf Ziele Platz — Suche und Downloads bekommen ihre Tuer
+ * deshalb hier (`zusatzSections`, gefuellt von `OwnTVShell`). Das TV-Programm ebenfalls, aber erst
+ * ab Handy quer und Tablet: im Hochformat ist sein Raster aus Senderspalte und Stunden unbedienbar,
+ * dort gibt es die Zeile gar nicht. Wo ein Ziel eine Tuer hat, ist es genau eine; sie steht nur
+ * nicht ueberall an derselben Stelle. Eine Profilzeile gibt es in keinem Fall.
  */
 @Composable
 fun MoreScreen(
@@ -121,9 +123,11 @@ fun MoreScreen(
     onFullscreen: () -> Unit,
     onChildFocused: () -> Unit,
     modifier: Modifier = Modifier,
-    // German4K: Auf Handy/Tablet hat die untere Leiste nur fuenf Plaetze — Suche, Downloads und
-    // TV-Programm bekommen deshalb hier oben je eine Zeile. Auf dem Fernseher bleibt die Liste
-    // leer, dort steht jedes dieser Ziele in der Seitenleiste, und dieser Schirm bleibt wie er war.
+    // German4K: Auf Handy/Tablet hat die untere Leiste nur fuenf Plaetze — Suche und Downloads
+    // bekommen deshalb hier oben je eine Zeile, das TV-Programm nur ab Handy quer und Tablet (im
+    // Hochformat ist sein Raster unbedienbar, die Huelle laesst es dort weg). Auf dem Fernseher
+    // bleibt die Liste leer, dort steht jedes dieser Ziele in der Seitenleiste, und dieser Schirm
+    // bleibt wie er war.
     onOpenSection: ((MainSection) -> Unit)? = null,
     zusatzSections: List<MainSection> = emptyList(),
     counts: MoreCountsViewModel = koinViewModel(),

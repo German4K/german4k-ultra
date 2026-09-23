@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.aspectRatio
@@ -865,9 +867,21 @@ fun OwnTVShell(
             modifier = Modifier.fillMaxSize()
                 // German4K: Ab Android 15 zeichnet das System randlos — ohne diesen Abstand liegt
                 // die Kopfzeile unter der Statusleiste (Uhrzeit und Akku ueber dem Bereichsnamen).
+                // Oben UND an den Seiten: im Querformat sitzt die Navigationsleiste mit drei
+                // Knoepfen am rechten (oder linken) Rand und schnitte sonst in den Inhalt. Unten
+                // wird bewusst nichts abgezogen — dort haelt die untere Leiste ihren eigenen
+                // Abstand, sonst entstuende er zweimal.
                 // Nur auf Handy/Tablet: am Fernseher gibt es keine Systemleisten, und auf Android
                 // 14 und aelter ist der Abstand 0, dort aendert die Zeile also nichts.
-                .then(if (formfaktor.mobil) Modifier.windowInsetsPadding(WindowInsets.statusBars) else Modifier)
+                .then(
+                    if (formfaktor.mobil) {
+                        Modifier.windowInsetsPadding(
+                            WindowInsets.systemBars.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+                        )
+                    } else {
+                        Modifier
+                    },
+                )
                 // One group with a restorer: leaving for the mini player and coming back lands on the
                 // exact control that was focused, without every screen having to remember its own.
                 .focusRequester(shellContentFocus)
