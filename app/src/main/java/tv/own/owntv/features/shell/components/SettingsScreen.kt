@@ -1520,9 +1520,14 @@ fun SettingsScreen(
     }
     if (showAbmelden) {
         val abmeldenStand by settingsVm.g4kAbmeldenStand.collectAsStateWithLifecycle()
-        tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = { showAbmelden = false }) {
+        val abmeldenGrund by settingsVm.g4kAbmeldenGrund.collectAsStateWithLifecycle()
+        val abmeldenLaeuft = abmeldenStand == SettingsViewModel.G4kAbmeldenStand.LAEUFT
+        // Auch der Klick daneben darf waehrend des Loeschens nichts schliessen — sonst steht der
+        // Kunde wieder in den Einstellungen, waehrend der Katalog unter ihm verschwindet.
+        tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = { if (!abmeldenLaeuft) showAbmelden = false }) {
             German4kAbmeldenDialog(
                 stand = abmeldenStand,
+                grund = abmeldenGrund,
                 onConfirm = { settingsVm.g4kAbmelden() },
                 onDismiss = { showAbmelden = false },
             )
@@ -2448,13 +2453,15 @@ internal fun AutoFrameRateWarningDialog(onEnable: () -> Unit, onDismiss: () -> U
 /**
  * German4K: Rueckfrage vor „Zugang von diesem Geraet entfernen".
  *
- * Erst das Panel, dann das Geraet — solange [stand] LAEUFT, sind beide Knoepfe aus, damit niemand
- * mitten im Loeschen ein zweites Mal drueckt. Bei FEHLER bleibt der Dialog offen und sagt, dass
- * nichts passiert ist; genau das ist der Punkt, denn geloescht wurde dann auch nichts.
+ * Erst das Panel, dann das Geraet — solange [stand] LAEUFT, sind beide Knoepfe aus und auch der
+ * Klick daneben schliesst nicht, damit niemand mitten im Loeschen dazwischenfunkt. Bei FEHLER bleibt
+ * der Dialog offen und sagt, dass nichts passiert ist; genau das ist der Punkt, denn geloescht wurde
+ * dann auch nichts. [grund] ist der Satz des Panels, wenn es einen mitgeschickt hat.
  */
 @Composable
 internal fun German4kAbmeldenDialog(
     stand: SettingsViewModel.G4kAbmeldenStand,
+    grund: String?,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -2482,7 +2489,9 @@ internal fun German4kAbmeldenDialog(
             if (stand == SettingsViewModel.G4kAbmeldenStand.FEHLER) {
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    stringResource(R.string.g4k_abmelden_fehler),
+                    // Sagt das Panel selbst, warum es nein sagt (Sperrfrist o. ae.), steht sein Satz
+                    // da — er ist genauer als "Server nicht erreichbar" und schon Kundentext.
+                    grund ?: stringResource(R.string.g4k_abmelden_fehler),
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.primary,
                 )

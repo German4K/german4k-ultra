@@ -294,17 +294,28 @@ fun HomeScreen(
     }
     // German4K: Der erste Katalog braucht auf einem Fernseher Minuten (gemessen 4:48 bei 105.513
     // Eintraegen). Die Startseite war so lange leer und der Kunde hielt die App fuer haengen
-    // geblieben. Solange ein Katalog-Import laeuft UND noch gar nichts angekommen ist, steht hier
-    // statt des leeren Bereichs eine Karte mit den mitlaufenden Zaehlern — dieselbe Quelle, die auch
-    // die Sync-Pille speist, also kein zweiter Weg, der auseinanderlaufen koennte.
+    // geblieben. Solange der ERSTE Import einer von uns angelegten Quelle laeuft, steht hier statt
+    // des leeren Bereichs eine Karte mit den mitlaufenden Zaehlern — dieselbe Quelle, die auch die
+    // Sync-Pille speist, also kein zweiter Weg, der auseinanderlaufen koennte.
+    //
+    // "Erster Import" ist woertlich gemeint (`lastSyncAt == null`, siehe SyncActivityTracker). Eine
+    // Karte, die bloss an "keine Reihe hat Daten" haengt, erschiene sonst bei jedem 12-Stunden-
+    // Abgleich wieder: alle Home-Reihen sind Verlaufsreihen, und wer nie etwas geschaut hat, hat
+    // keine — der haette dann alle zwoelf Stunden "Dein Katalog wird geladen" vor sich, obwohl der
+    // Katalog laengst da ist.
     val g4kSyncTracker: tv.own.owntv.core.sync.SyncActivityTracker = koinInject()
+    val g4kProvisioner: tv.own.owntv.core.german4k.German4kProvisioner = koinInject()
     val g4kSyncAktiv by g4kSyncTracker.active.collectAsStateWithLifecycle()
+    val g4kVerwaltet by g4kProvisioner.verwaltet.collectAsStateWithLifecycle()
     val g4kNichtsDa = state.heroItems.isEmpty() &&
         HomeRow.entries.none { it != HomeRow.HERO && rowHasData(it, state) }
-    if (g4kNichtsDa && g4kSyncAktiv.isNotEmpty()) {
+    // Laufen mehrere Quellen gleichzeitig (Ausweichhost im Hintergrund), zaehlt die, die wirklich
+    // zum ersten Mal laedt — nicht die erstbeste.
+    val g4kErstsync = g4kSyncAktiv.values.firstOrNull { it.erstlauf && it.sourceId in g4kVerwaltet }
+    if (g4kNichtsDa && g4kErstsync != null) {
         // Ohne stage sind wir noch vor der ersten Rueckmeldung des Importers: dann stehen dort Nullen,
         // was ehrlicher ist als gar keine Karte.
-        German4kErstsyncKarte(stage = g4kSyncAktiv.values.first().stage, modifier = modifier.fillMaxSize())
+        German4kErstsyncKarte(stage = g4kErstsync.stage, modifier = modifier.fillMaxSize())
         return
     }
     if (showAllHiddenState) {

@@ -1326,6 +1326,10 @@ class SettingsViewModel(
     private val _g4kAbmeldenStand = MutableStateFlow(G4kAbmeldenStand.BEREIT)
     val g4kAbmeldenStand: StateFlow<G4kAbmeldenStand> = _g4kAbmeldenStand.asStateFlow()
 
+    /** Der Satz, den das Panel selbst geschickt hat (z. B. eine Sperrfrist). Null = allgemeiner Text. */
+    private val _g4kAbmeldenGrund = MutableStateFlow<String?>(null)
+    val g4kAbmeldenGrund: StateFlow<String?> = _g4kAbmeldenGrund.asStateFlow()
+
     /**
      * Erst das Panel, dann das Geraet: der Provisioner loescht nur, wenn die Entkopplung dort
      * wirklich angekommen ist. Bei Erfolg steht das aktive Profil auf -1, MainActivity zeigt dann
@@ -1334,17 +1338,26 @@ class SettingsViewModel(
     fun g4kAbmelden() {
         if (_g4kAbmeldenStand.value == G4kAbmeldenStand.LAEUFT) return
         _g4kAbmeldenStand.value = G4kAbmeldenStand.LAEUFT
+        _g4kAbmeldenGrund.value = null
         viewModelScope.launch {
-            // Vor dem Loeschen merken: laufende Katalog-Importe muessen danach abbestellt werden,
-            // sonst schreibt ein Worker in eine Quelle, die es nicht mehr gibt.
-            val ids = runCatching { sourceDao.getAllOnce().map { it.id } }.getOrDefault(emptyList())
-            val ok = withContext(NonCancellable) { runCatching { german4kProvisioner.abmelden() }.getOrDefault(false) }
+            // Nur UNSERE Quellen: ein Kunde, der sich zusaetzlich eine eigene Wiedergabeliste
+            // angelegt hat, soll deren laufenden Import nicht mitverlieren.
+            val ids = german4kProvisioner.verwaltet.value
+            val (ok, grund) = withContext(NonCancellable) {
+                runCatching { german4kProvisioner.abmelden() }.getOrDefault(Pair(false, null))
+            }
+            // Erst nach dem Loeschen abbestellen, sonst schreibt ein Worker in eine Quelle, die es
+            // nicht mehr gibt.
             if (ok) ids.forEach { runCatching { catalogSyncScheduler.cancelSync(it) } }
+            _g4kAbmeldenGrund.value = grund.takeIf { !ok }
             _g4kAbmeldenStand.value = if (ok) G4kAbmeldenStand.BEREIT else G4kAbmeldenStand.FEHLER
         }
     }
 
-    fun g4kAbmeldenZuruecksetzen() { _g4kAbmeldenStand.value = G4kAbmeldenStand.BEREIT }
+    fun g4kAbmeldenZuruecksetzen() {
+        _g4kAbmeldenStand.value = G4kAbmeldenStand.BEREIT
+        _g4kAbmeldenGrund.value = null
+    }
 
     fun resetImport() {
         _importState.value = ImportState.Idle
