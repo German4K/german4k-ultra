@@ -636,7 +636,7 @@ private fun SeriesGrid(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 SearchBar(query = searchQuery, onQueryChange = vm::setSearchQuery, placeholder = stringResource(R.string.content_search_series, selectedLabel), modifier = Modifier.weight(1f))
                 Spacer(Modifier.width(10.dp))
-                SortChip(mode = sortMode, onToggle = vm::toggleSort, playlistLabel = stringResource(R.string.content_provider))
+                SortChip(mode = sortMode, onSelect = vm::setSort, playlistLabel = stringResource(R.string.content_provider))
                 Spacer(Modifier.width(10.dp))
                 tv.own.owntv.ui.components.OwnTVButton(
                     label = stringResource(if (viewMode == SettingsRepository.VodViewMode.GRID) R.string.settings_view_grid else R.string.settings_view_list),

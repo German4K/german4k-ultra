@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,6 +53,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -142,6 +147,11 @@ fun German4kDetailScreen(
     val scroll = rememberSaveable(ui.schluessel, saver = ScrollState.Saver) { ScrollState(0) }
     val ersterKnopf = remember(ui.schluessel) { FocusRequester() }
     var trailerLaeuft by remember(ui.schluessel) { mutableStateOf(false) }
+    // Fokusziel im Querbild — nur waehrend des Trailers vorhanden, siehe LaunchedEffect unten.
+    val heroFokus = remember(ui.schluessel) { FocusRequester() }
+    // Merkt, dass ein Trailer wirklich lief; sonst holte der Effekt schon beim Oeffnen der Seite
+    // den Fokus, obwohl das LaunchedEffect(ui.schluessel) genau dafuer zustaendig ist.
+    var trailerLief by remember(ui.schluessel) { mutableStateOf(false) }
     // Merkt sich, dass der Trailer auf diesem Geraet nicht geht (keine brauchbare WebView, gesperrtes
     // Video). Dann verschwindet der Knopf, statt bei jedem Druck dasselbe Nichts zu zeigen.
     var trailerUnmoeglich by remember(ui.schluessel) { mutableStateOf(false) }
@@ -160,6 +170,23 @@ fun German4kDetailScreen(
     // drueckt. Deshalb den Fokus hier ausdruecklich zurueck auf den ersten Knopf holen.
     LaunchedEffect(trailerUnmoeglich) {
         if (trailerUnmoeglich) fokusMitWiederholung(ersterKnopf)
+    }
+
+    // German4K: Kundenfall Aleks959 (23.09.2026) — wer erst nach unten zur Besetzung blaettert und
+    // dann wieder hoch auf „Trailer" drueckt, steht mit der Seite tief unten: das Querbild, in dem
+    // der Trailer laeuft, liegt ueber dem Bildrand, der Kunde hoert nur Ton. Der Fokus bleibt dabei
+    // auf dem Trailer-Knopf, und Compose zieht die Seite zu ihm zurueck — bloss zu scrollen reicht
+    // also nicht, der Fokus muss mit nach oben. Beim Beenden (Zurueck, Trailerende) geht er wieder
+    // auf die Knopfzeile, sonst faellt das einzige Fokusziel weg und das D-Pad waere tot.
+    LaunchedEffect(trailerLaeuft) {
+        if (trailerLaeuft) {
+            trailerLief = true
+            scroll.animateScrollTo(0)
+            fokusMitWiederholung(heroFokus)
+        } else if (trailerLief) {
+            trailerLief = false
+            fokusMitWiederholung(ersterKnopf)
+        }
     }
 
     // Ohne Besetzung und ohne Fassungen (Nachtrag, Tafel-Line) sind die Knoepfe das einzige
@@ -199,6 +226,10 @@ fun German4kDetailScreen(
                 trailerLaeuft = trailerLaeuft,
                 onTrailerEnde = { trailerLaeuft = false },
                 onTrailerUnmoeglich = { trailerUnmoeglich = true; trailerLaeuft = false },
+                // German4K: Fokusziel nur waehrend des Trailers. Dauerhaft focusable() waere ein
+                // unsichtbares Feld ueber der Knopfzeile, in dem das D-Pad beim Hochdruecken
+                // haengen bliebe — das Fernseher-Verhalten soll sonst unveraendert bleiben.
+                modifier = if (trailerLaeuft) Modifier.focusRequester(heroFokus).focusable() else Modifier,
             )
 
             // German4K: 48 dp Rand sind auf 360 dp Breite ein Viertel des Bildes. Im Hochformat
@@ -257,13 +288,14 @@ private fun Hero(
     trailerLaeuft: Boolean,
     onTrailerEnde: () -> Unit,
     onTrailerUnmoeglich: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val colors = OwnTVTheme.colors
     val formfaktor = LocalFormfaktor.current
     val details = ui.details
     val trailer = details?.trailer
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             // 16:6 statt 16:9 — auf 960x540 dp bleibt das Querbild damit 360 dp hoch, und die ersten
             // Zeilen der Handlung stehen beim Oeffnen schon im Bild statt unter der Falz.
@@ -310,7 +342,7 @@ private fun Hero(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            val meta = metaZeile(details)
+            val meta = metaZeile(details, quelleFarbe = colors.primary)
             if (meta.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 Text(meta, style = MaterialTheme.typography.titleMedium, color = colors.onSurfaceVariant)
@@ -375,13 +407,18 @@ private fun HeroTrailer(schluessel: String, onEnde: () -> Unit, onUnmoeglich: ()
 }
 
 /**
- * „15.10.1999 · Drama · 122 Min." — Datum in der Schreibweise des Geraets, fehlende Teile fallen
- * ersatzlos weg (kein „· ·"), und ohne volles Datum reicht das Jahr.
+ * „15.10.1999 • Netflix • Drama • 122 Min." — Datum in der Schreibweise des Geraets, fehlende
+ * Teile fallen ersatzlos weg (kein „• •"), und ohne volles Datum reicht das Jahr.
+ *
+ * German4K: die Quelle (das Plattform-Regal, aus dem der Titel stammt) steht direkt hinter dem
+ * Datum und traegt die Akzentfarbe — Kunden fragen staendig „von wo ist der Film?", und die
+ * Antwort soll ohne Suchen ins Auge fallen. Deshalb AnnotatedString statt einfachem Text.
  */
 @Composable
-private fun metaZeile(details: German4kDetails?): String {
-    if (details == null) return ""
+private fun metaZeile(details: German4kDetails?, quelleFarbe: Color): AnnotatedString {
+    if (details == null) return AnnotatedString("")
     val datum = details.datum.takeIf { it.isNotBlank() }?.let { datumLesbar(it) } ?: details.jahr.takeIf { it.isNotBlank() }
+    val quelle = details.quelle.takeIf { it.isNotBlank() }
     val genre = details.genre.takeIf { it.isNotBlank() }
     val dauer = (details.dauerSek / 60).takeIf { it > 0 }?.let { stringResource(R.string.g4k_detail_dauer, it) }
     // German4K: derselbe Trenner wie ueberall sonst in der App (Vorschauspalte, Spielerleiste).
@@ -389,7 +426,20 @@ private fun metaZeile(details: German4kDetails?): String {
     // Einheitlichkeit wiegt schwerer als die alte Optik dieser einen Zeile.
     // German4K: die Ressource verliert beim Bauen ihre Leerzeichen (unquotiert) — deshalb hier selbst einrahmen.
     val trenner = " " + stringResource(R.string.content_metadata_separator).trim() + " "
-    return listOfNotNull(datum, genre, dauer).joinToString(trenner)
+    // Zweiter Wert: nur die Quelle wird hervorgehoben.
+    val teile = listOfNotNull(
+        datum?.let { it to false },
+        quelle?.let { it to true },
+        genre?.let { it to false },
+        dauer?.let { it to false },
+    )
+    return buildAnnotatedString {
+        teile.forEachIndexed { i, (text, hervor) ->
+            if (i > 0) append(trenner)
+            if (hervor) withStyle(SpanStyle(color = quelleFarbe, fontWeight = FontWeight.SemiBold)) { append(text) }
+            else append(text)
+        }
+    }
 }
 
 private fun datumLesbar(iso: String): String? = runCatching {

@@ -572,7 +572,16 @@ fun LiveScreen(
                     modifier = Modifier.weight(1f).onFocusChanged { if (it.hasFocus && previewEnabled) vm.stopPreview() },
                 )
                 Spacer(Modifier.size(10.dp))
-                SortChip(mode = sortMode, onToggle = vm::toggleSort)
+                SortChip(
+                    mode = sortMode,
+                    onSelect = vm::setSort,
+                    // German4K: Bewertung und Hinzugefuegt am gibt es fuer Sender nicht (siehe
+                    // SettingsRepository.SortMode) — im Menue stehen deshalb nur die zwei echten Ordnungen.
+                    modi = listOf(
+                        tv.own.owntv.core.settings.SettingsRepository.SortMode.PLAYLIST,
+                        tv.own.owntv.core.settings.SettingsRepository.SortMode.ALPHA,
+                    ),
+                )
             }
             Spacer(Modifier.height(14.dp))
 

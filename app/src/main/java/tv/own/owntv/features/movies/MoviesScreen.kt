@@ -589,7 +589,7 @@ fun MoviesScreen(
                     modifier = Modifier.weight(1f),
                 )
                 Spacer(Modifier.width(10.dp))
-                SortChip(mode = sortMode, onToggle = vm::toggleSort, playlistLabel = stringResource(R.string.content_provider))
+                SortChip(mode = sortMode, onSelect = vm::setSort, playlistLabel = stringResource(R.string.content_provider))
                 Spacer(Modifier.width(10.dp))
                 // View mode (#10): poster wall vs a compact list (more titles at once).
                 tv.own.owntv.ui.components.OwnTVButton(

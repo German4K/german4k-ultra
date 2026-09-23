@@ -246,6 +246,15 @@ class SeriesViewModel(
     val sortMode: StateFlow<SettingsRepository.SortMode> = settings.sortSeries
         .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.SortMode.ALPHA)
 
+    /**
+     * German4K: Der Sortier-Chip oeffnet jetzt ein Menue statt weiterzuschalten — der Kunde waehlt
+     * direkt, statt sich durch die Stufen zu druecken. [toggleSort] bleibt fuer Aufrufer, die eine
+     * Stufe weiterschalten wollen (Fernbedienungstaste, Altbestand).
+     */
+    fun setSort(mode: SettingsRepository.SortMode) {
+        viewModelScope.launch { settings.setSortSeries(mode) }
+    }
+
     fun toggleSort() {
         viewModelScope.launch {
             // Cycle Provider → A–Z → Rating → Provider.

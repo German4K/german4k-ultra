@@ -266,6 +266,15 @@ class LiveViewModel(
     val sortMode: StateFlow<SettingsRepository.SortMode> = settings.sortLive
         .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.SortMode.PLAYLIST)
 
+    /**
+     * German4K: Der Sortier-Chip oeffnet jetzt ein Menue statt weiterzuschalten — der Kunde waehlt
+     * direkt, statt sich durch die Stufen zu druecken. [toggleSort] bleibt fuer Aufrufer, die eine
+     * Stufe weiterschalten wollen (Fernbedienungstaste, Altbestand).
+     */
+    fun setSort(mode: SettingsRepository.SortMode) {
+        viewModelScope.launch { settings.setSortLive(mode) }
+    }
+
     fun toggleSort() {
         viewModelScope.launch {
             settings.setSortLive(
