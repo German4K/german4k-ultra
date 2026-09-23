@@ -78,6 +78,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
@@ -289,6 +290,21 @@ fun HomeScreen(
     // isLoading is true only for the initial state; it flips false on the first load and never goes back.
     if (state.isLoading) {
         HomeSkeleton(modifier = modifier.fillMaxSize())
+        return
+    }
+    // German4K: Der erste Katalog braucht auf einem Fernseher Minuten (gemessen 4:48 bei 105.513
+    // Eintraegen). Die Startseite war so lange leer und der Kunde hielt die App fuer haengen
+    // geblieben. Solange ein Katalog-Import laeuft UND noch gar nichts angekommen ist, steht hier
+    // statt des leeren Bereichs eine Karte mit den mitlaufenden Zaehlern — dieselbe Quelle, die auch
+    // die Sync-Pille speist, also kein zweiter Weg, der auseinanderlaufen koennte.
+    val g4kSyncTracker: tv.own.owntv.core.sync.SyncActivityTracker = koinInject()
+    val g4kSyncAktiv by g4kSyncTracker.active.collectAsStateWithLifecycle()
+    val g4kNichtsDa = state.heroItems.isEmpty() &&
+        HomeRow.entries.none { it != HomeRow.HERO && rowHasData(it, state) }
+    if (g4kNichtsDa && g4kSyncAktiv.isNotEmpty()) {
+        // Ohne stage sind wir noch vor der ersten Rueckmeldung des Importers: dann stehen dort Nullen,
+        // was ehrlicher ist als gar keine Karte.
+        German4kErstsyncKarte(stage = g4kSyncAktiv.values.first().stage, modifier = modifier.fillMaxSize())
         return
     }
     if (showAllHiddenState) {
@@ -1940,6 +1956,61 @@ private fun HeroFallbackPane(
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.onSurfaceVariant,
                 maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/**
+ * German4K: Die Karte, die den leeren Startbereich waehrend des ersten Katalog-Imports fuellt.
+ *
+ * Nicht fokussierbar (wie [EmptyHomeState]): sie soll erklaeren, nicht den Fokus klauen — Leiste und
+ * Seitenmenue bleiben bedienbar. Zahlen mit Tausenderpunkt statt der Kurzform der Sync-Pille: hier
+ * ist Platz, und nur an einer mitwachsenden Zahl sieht man, dass etwas passiert ("105K" stuende
+ * minutenlang still.)
+ */
+@Composable
+private fun German4kErstsyncKarte(
+    stage: tv.own.owntv.core.sync.ImportStage?,
+    modifier: Modifier = Modifier,
+) {
+    val colors = OwnTVTheme.colors
+    val locale = LocalConfiguration.current.locales[0]
+    val zahl = remember(locale) { java.text.NumberFormat.getIntegerInstance(locale) }
+    Box(
+        modifier = modifier
+            .focusProperties { canFocus = false }
+            .background(colors.surface),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.widthIn(max = 640.dp).padding(horizontal = 24.dp),
+        ) {
+            BrandLockup(markSize = 84, textSize = 48)
+            Spacer(Modifier.height(16.dp))
+            OwnTVSpinner()
+            Spacer(Modifier.height(16.dp))
+            Text(
+                text = stringResource(R.string.g4k_sync_erstlauf_titel),
+                style = MaterialTheme.typography.titleLarge,
+                color = colors.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(
+                    R.string.g4k_sync_erstlauf_text,
+                    zahl.format(stage?.liveProcessed ?: 0),
+                    zahl.format(stage?.moviesProcessed ?: 0),
+                    zahl.format(stage?.seriesProcessed ?: 0),
+                ),
+                style = MaterialTheme.typography.bodyLarge,
+                color = colors.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                maxLines = 4,
                 overflow = TextOverflow.Ellipsis,
             )
         }

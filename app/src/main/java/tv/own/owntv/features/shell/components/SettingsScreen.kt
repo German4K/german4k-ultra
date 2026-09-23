@@ -241,6 +241,9 @@ fun SettingsScreen(
     // German4K: Darstellung (Automatisch/Fernseher/Handy) — Dialog nach dem Theme-Muster,
     // inklusive Fokus-Rueckkehr (darstellungRowFocus/dialogReturn unten).
     var showDarstellung by remember { mutableStateOf(false) }
+    // German4K: Zugang von diesem Geraet entfernen — Rueckfrage nach dem Muster der anderen
+    // Warndialoge; der Stand (laeuft/Fehler) kommt aus dem ViewModel.
+    var showAbmelden by remember { mutableStateOf(false) }
     val browsingRowFocus = remember { FocusRequester() }
     // U2 — background-image ingest copies a multi-megabyte file; it runs here, off the main thread.
     val ingestScope = rememberCoroutineScope()
@@ -261,6 +264,7 @@ fun SettingsScreen(
     // would otherwise fall spatially back to the sidebar).
     val themeRowFocus = remember { FocusRequester() }
     val darstellungRowFocus = remember { FocusRequester() }
+    val abmeldenRowFocus = remember { FocusRequester() }
     val accentRowFocus = remember { FocusRequester() }
     val focusHighlightRowFocus = remember { FocusRequester() }
     val zoomRowFocus = remember { FocusRequester() }
@@ -292,13 +296,13 @@ fun SettingsScreen(
         savedIndex = listState.firstVisibleItemIndex
         savedOffset = listState.firstVisibleItemScrollOffset
     }
-    val anyDialogOpen = showZoom || showPopupSize || showFontCustomization || showTheme || showAccent || showUpdate || showCatchupTime || showEpgOffset || showAnimations || showStartup || showStartupChannelPicker || showAfrWarning || showLivePreviewPanelWarning || showBgImageChooser || showBgPicker || showAmbientGlow || showBrowsing || showFocusHighlight || showBgRemote || showDarstellung
+    val anyDialogOpen = showZoom || showPopupSize || showFontCustomization || showTheme || showAccent || showUpdate || showCatchupTime || showEpgOffset || showAnimations || showStartup || showStartupChannelPicker || showAfrWarning || showLivePreviewPanelWarning || showBgImageChooser || showBgPicker || showAmbientGlow || showBrowsing || showFocusHighlight || showBgRemote || showDarstellung || showAbmelden
     // When a dialog closes, restore focus to the row that opened it. NOTE: this restore crosses
     // INTO the root focus group from outside (the dialog), but onEnter does NOT fire for programmatic
     // requestsFocus (only for directional entry) — so dialogReturn must be cleared HERE, not in onEnter.
     // If it's left set, the next directional entry (e.g. sidebar→here) would re-route to a stale row.
     var dialogReturn by remember { mutableStateOf<FocusRequester?>(null) }
-    LaunchedEffect(showZoom, showPopupSize, showFontCustomization, showTheme, showAccent, showUpdate, showCatchupTime, showEpgOffset, showAnimations, showStartup, showStartupChannelPicker, showAfrWarning, showLivePreviewPanelWarning, showBgImageChooser, showBgPicker, showAmbientGlow, showBrowsing, showFocusHighlight, showBgRemote, showDarstellung) {
+    LaunchedEffect(showZoom, showPopupSize, showFontCustomization, showTheme, showAccent, showUpdate, showCatchupTime, showEpgOffset, showAnimations, showStartup, showStartupChannelPicker, showAfrWarning, showLivePreviewPanelWarning, showBgImageChooser, showBgPicker, showAmbientGlow, showBrowsing, showFocusHighlight, showBgRemote, showDarstellung, showAbmelden) {
         if (!anyDialogOpen) {
             // Focus back on the opener row, with the scroll offset held still the whole way — see
             // [restoreAfterDialogClose] for why doing those two in sequence made the highlight travel.
@@ -732,6 +736,16 @@ fun SettingsScreen(
             chip = darstellungLabel(g4kDarstellung),
             focus = darstellungRowFocus,
             onClick = { saveScroll(); dialogReturn = darstellungRowFocus; showDarstellung = true },
+        ),
+        // German4K: Zugang von diesem Geraet entfernen. Steht direkt unter der Darstellung-Zeile,
+        // weil beide zum Geraet gehoeren und nicht zum Inhalt. Rueckfrage zwingend: danach ist der
+        // Katalog weg und die App wieder am Anmeldebildschirm.
+        RootRow(
+            "quick_g4k_abmelden", TileTone.SECONDARY, OwnTVIcon.POWER,
+            title = stringResource(R.string.g4k_abmelden_titel),
+            desc = stringResource(R.string.g4k_abmelden_text),
+            focus = abmeldenRowFocus,
+            onClick = { saveScroll(); dialogReturn = abmeldenRowFocus; settingsVm.g4kAbmeldenZuruecksetzen(); showAbmelden = true },
         ),
         RootRow(
             tabRowKey(SettingsTab.VIDEO), TileTone.TERTIARY, OwnTVIcon.VIDEO,
@@ -1503,6 +1517,16 @@ fun SettingsScreen(
             onSelect = { settingsVm.setThemeMode(ThemeMode.valueOf(it)); showTheme = false },
             onDismiss = { showTheme = false },
         )
+    }
+    if (showAbmelden) {
+        val abmeldenStand by settingsVm.g4kAbmeldenStand.collectAsStateWithLifecycle()
+        tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = { showAbmelden = false }) {
+            German4kAbmeldenDialog(
+                stand = abmeldenStand,
+                onConfirm = { settingsVm.g4kAbmelden() },
+                onDismiss = { showAbmelden = false },
+            )
+        }
     }
     if (showDarstellung) {
         tv.own.owntv.features.settings.PickerDialog(
@@ -2414,6 +2438,66 @@ internal fun AutoFrameRateWarningDialog(onEnable: () -> Unit, onDismiss: () -> U
                 OwnTVButton(
                     stringResource(R.string.settings_auto_frame_rate_turn_on_anyway),
                     onClick = onEnable,
+                    style = OwnTVButtonStyle.SECONDARY,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * German4K: Rueckfrage vor „Zugang von diesem Geraet entfernen".
+ *
+ * Erst das Panel, dann das Geraet — solange [stand] LAEUFT, sind beide Knoepfe aus, damit niemand
+ * mitten im Loeschen ein zweites Mal drueckt. Bei FEHLER bleibt der Dialog offen und sagt, dass
+ * nichts passiert ist; genau das ist der Punkt, denn geloescht wurde dann auch nichts.
+ */
+@Composable
+internal fun German4kAbmeldenDialog(
+    stand: SettingsViewModel.G4kAbmeldenStand,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = OwnTVTheme.colors
+    val focus = remember { FocusRequester() }
+    val laeuft = stand == SettingsViewModel.G4kAbmeldenStand.LAEUFT
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    BackHandler { if (!laeuft) onDismiss() }
+    Box(
+        modifier = Modifier.fillMaxSize().modalScrim().trapAllFocusExit().focusGroup(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(Modifier.dialogPanel(width = 500.dp, padding = 28.dp)) {
+            Text(
+                stringResource(R.string.g4k_abmelden_titel),
+                style = MaterialTheme.typography.titleLarge,
+                color = colors.onSurface,
+            )
+            Spacer(Modifier.height(10.dp))
+            Text(
+                stringResource(R.string.g4k_abmelden_text),
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurfaceVariant,
+            )
+            if (stand == SettingsViewModel.G4kAbmeldenStand.FEHLER) {
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    stringResource(R.string.g4k_abmelden_fehler),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.primary,
+                )
+            }
+            Spacer(Modifier.height(22.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OwnTVButton(
+                    stringResource(R.string.common_cancel),
+                    onClick = { if (!laeuft) onDismiss() },
+                    modifier = Modifier.focusRequester(focus),
+                )
+                Spacer(Modifier.weight(1f))
+                OwnTVButton(
+                    stringResource(R.string.g4k_abmelden_bestaetigen),
+                    onClick = { if (!laeuft) onConfirm() },
                     style = OwnTVButtonStyle.SECONDARY,
                 )
             }

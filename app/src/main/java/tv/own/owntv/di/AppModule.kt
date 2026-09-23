@@ -164,6 +164,7 @@ val appModule = module {
             player = get(),
             livePreview = get(),
             enginePool = get(),
+            german4kProvisioner = get(),
         )
     }
     viewModelOf(::LocalSyncViewModel)
