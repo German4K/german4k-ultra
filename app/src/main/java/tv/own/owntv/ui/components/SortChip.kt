@@ -43,7 +43,8 @@ fun SortChip(
     onSelect: (SortMode) -> Unit,
     modifier: Modifier = Modifier,
     playlistLabel: String? = null,
-    modi: List<SortMode> = listOf(SortMode.PLAYLIST, SortMode.ALPHA, SortMode.RATING, SortMode.DATE_ADDED),
+    // German4K: YEAR = Erscheinungsjahr (Kundenwunsch Aleks959).
+    modi: List<SortMode> = listOf(SortMode.PLAYLIST, SortMode.ALPHA, SortMode.RATING, SortMode.DATE_ADDED, SortMode.YEAR),
 ) {
     val colors = OwnTVTheme.colors
     val resolvedPlaylistLabel = playlistLabel ?: stringResource(R.string.settings_sort_playlist)
@@ -55,6 +56,7 @@ fun SortChip(
             // sprengt er die Zeile neben dem Suchfeld.
             SortMode.RATING -> stringResource(R.string.settings_sort_rating)
             SortMode.DATE_ADDED -> stringResource(R.string.settings_sort_date_added)
+            SortMode.YEAR -> stringResource(R.string.g4k_sort_jahr) // German4K: Aleks959
         }
     }
     var offen by remember { mutableStateOf(false) }

@@ -263,7 +263,9 @@ class SeriesViewModel(
                     SettingsRepository.SortMode.PLAYLIST -> SettingsRepository.SortMode.ALPHA
                     SettingsRepository.SortMode.ALPHA -> SettingsRepository.SortMode.RATING
                     SettingsRepository.SortMode.RATING -> SettingsRepository.SortMode.DATE_ADDED
-                    SettingsRepository.SortMode.DATE_ADDED -> SettingsRepository.SortMode.PLAYLIST
+                    // German4K: Erscheinungsjahr als weitere Stufe (Kundenwunsch Aleks959).
+                    SettingsRepository.SortMode.DATE_ADDED -> SettingsRepository.SortMode.YEAR
+                    SettingsRepository.SortMode.YEAR -> SettingsRepository.SortMode.PLAYLIST
                 },
             )
         }
@@ -1330,6 +1332,7 @@ class SeriesViewModel(
         val playlist = sort == SettingsRepository.SortMode.PLAYLIST
         val rating = sort == SettingsRepository.SortMode.RATING
         val dateAdded = sort == SettingsRepository.SortMode.DATE_ADDED
+        val year = sort == SettingsRepository.SortMode.YEAR // German4K: Erscheinungsjahr (Aleks959)
         return if (query.isBlank()) when (key) {
             // Catch-up is a Live TV-only rail (channels have archives, series don't), but the rail model
             // is shared across all three sections — so it degrades to All here rather than existing.
@@ -1337,6 +1340,7 @@ class SeriesViewModel(
                 rating -> seriesDao.pagingAllRating(ids)
                 playlist -> seriesDao.pagingAllOriginal(ids)
                 dateAdded -> seriesDao.pagingAllDateAdded(ids)
+                year -> seriesDao.pagingAllYear(ids) // German4K: Aleks959
                 else -> seriesDao.pagingAll(ids)
             }
             LiveKey.Favorites -> seriesDao.pagingFavoritesManual(c.profileId, ContentOrderEntity.FAV_CONTEXT, ids)
@@ -1347,6 +1351,7 @@ class SeriesViewModel(
                 when {
                     rating -> seriesDao.pagingByCategoryRating(key.id)
                     dateAdded -> seriesDao.pagingByCategoryDateAdded(key.id)
+                    year -> seriesDao.pagingByCategoryYear(key.id) // German4K: Aleks959
                     // C3 fast path: no manual order in this folder → the plain indexed query has
                     // the identical (sortOrder, name) order without the join-sort.
                     ctxKey !in orderedContexts.value -> seriesDao.pagingByCategory(key.id)
@@ -1356,12 +1361,14 @@ class SeriesViewModel(
         } else when (key) {
             LiveKey.All, LiveKey.Catchup ->
                 if (dateAdded) seriesDao.searchAllDateAdded(query, ids)
+                else if (year) seriesDao.searchAllYear(query, ids) // German4K: Aleks959
                 else seriesDao.searchAll(query, ids)
             LiveKey.Favorites -> seriesDao.searchFavorites(query, c.profileId, ids)
             LiveKey.History -> seriesDao.searchHistory(query, c.profileId, ids)
             is LiveKey.Custom -> customCategoryDao.searchSeries(query, c.profileId, key.id, ids)
             is LiveKey.Folder ->
                 if (dateAdded) seriesDao.searchInCategoryDateAdded(query, key.id)
+                else if (year) seriesDao.searchInCategoryYear(query, key.id) // German4K: Aleks959
                 else seriesDao.searchInCategory(query, key.id)
         }
     }
