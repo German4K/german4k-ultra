@@ -94,7 +94,14 @@ internal fun SportSpielScreen(
     val mitVorschau = !formfaktor.mobil && previewEnabled
 
     BackHandler { onBack() }
-    DisposableEffect(Unit) { onDispose { liveVm.stopPreview() } }
+    // ⚠️ stopPreview() hält auch den HAUPTplayer an (LiveViewModel: previewEngine.stop() + player.stop()).
+    // Startet der Kunde ein Spiel, verlässt er diese Seite in genau dem Moment, in dem der Vollbild-
+    // Player anläuft — ein bedingungsloses Aufräumen hier stoppte ihn wieder (gemessen 29.09. am
+    // Android-9-Emulator: Player offen, pausiert, kein einziger Stream-Abruf). Deshalb nur aufräumen,
+    // wenn eine Vorschau lief und nicht gerade abgespielt wird.
+    val abspielen = remember { mutableStateOf(false) }
+    val vorschauLief = remember { mutableStateOf(false) }
+    DisposableEffect(Unit) { onDispose { if (vorschauLief.value && !abspielen.value) liveVm.stopPreview() } }
 
     // Welche Zeile hat den Fokus, und welcher Kanal gehört dazu (null = nicht in der eigenen Liste).
     var fokusIndex by remember { mutableStateOf(-1) }
@@ -113,6 +120,7 @@ internal fun SportSpielScreen(
         liveVm.onChannelFocused(ch)
         if (!mitVorschau) return@LaunchedEffect
         delay(700)
+        vorschauLief.value = true
         liveVm.playPreview(ch)
     }
 
@@ -125,7 +133,7 @@ internal fun SportSpielScreen(
                 is SpielZeile.Sender -> {
                     if (z.sender.an == false) return@launch
                     val ch = vm.kanalFuer(spiel.id, z.sender)
-                    if (ch != null) onPlayChannel(ch) else onOpenLiveTv(null)
+                    if (ch != null) { abspielen.value = true; onPlayChannel(ch) } else onOpenLiveTv(null)
                 }
                 is SpielZeile.Marke -> onOpenLiveTv(vm.kategorieId(z.kategorie))
                 is SpielZeile.Bereich -> onOpenLiveTv(vm.kategorieId(z.name))
