@@ -1108,6 +1108,32 @@ fun OwnTVShell(
                             modifier = Modifier.fillMaxSize(),
                         )
 
+                        // German4K 3.0: Bereich Fußball (Sport-Hub). Abspielen wie aus der Suche,
+                        // Kategorie/Bereich öffnen springt in Live TV auf den passenden Ordner.
+                        selectedSection == MainSection.SPORT -> tv.own.owntv.features.sport.SportScreen(
+                            liveVm = liveVm,
+                            onPlayChannel = { ch ->
+                                restoreFocus = false
+                                liveVm.watchFromGuide(ch)
+                                zapSource = MainSection.LIVE_TV
+                                homeVm.stopPreview()
+                                if (playerMode != PlayerMode.MINI && !liveVm.externalPlayerOn.value) playerMode = PlayerMode.FULLSCREEN
+                            },
+                            onOpenLiveTv = { categoryId: Long? ->
+                                categoryId?.let { liveVm.select(tv.own.owntv.core.live.LiveKey.Folder(it)); liveKategorieOffen = true }
+                                onSelectSection(MainSection.LIVE_TV)
+                            },
+                            onBack = {
+                                if (formfaktor.mobil) onSelectSection(MainSection.HOME)
+                                else runCatching { sidebarFocus.requestFocus() }
+                            },
+                            onChildFocused = { focusedLayer = ShellLayer.CONTENT },
+                            previewEnabled = playerMode == PlayerMode.NONE,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .onFocusChanged { if (it.hasFocus) focusedLayer = ShellLayer.CONTENT },
+                        )
+
                         selectedSection == MainSection.LIVE_TV -> LiveScreen(
                             onFullscreen = { openFullscreen() },
                             onChildFocused = { focusedLayer = ShellLayer.CONTENT },
@@ -1780,6 +1806,7 @@ private val MainSection.emptyIcon: OwnTVIcon
         MainSection.SEARCH -> OwnTVIcon.SEARCH
         MainSection.HOME -> OwnTVIcon.HOME
         MainSection.LIVE_TV -> OwnTVIcon.LIVE_TV
+        MainSection.SPORT -> OwnTVIcon.LIVE_TV // German4K: kein eigenes Glyph; die Leiste zeichnet den Ball (NavDuotoneIcon)
         MainSection.MOVIES -> OwnTVIcon.MOVIES
         MainSection.SERIES -> OwnTVIcon.SERIES
         MainSection.DOWNLOADS -> OwnTVIcon.DOWNLOADS
@@ -1792,6 +1819,7 @@ private fun railCategoriesFor(section: MainSection): List<RailCategory> = when (
     MainSection.SEARCH -> emptyList()
     MainSection.HOME -> emptyList()
     MainSection.EPG -> emptyList()
+    MainSection.SPORT -> emptyList()
     MainSection.LIVE_TV -> listOf(
         RailCategory("Favorites", OwnTVIcon.FAVORITE, tv.own.owntv.R.string.content_category_favorites),
         RailCategory("History", OwnTVIcon.HISTORY, tv.own.owntv.R.string.content_category_history),
@@ -1829,7 +1857,7 @@ private fun railCategoriesFor(section: MainSection): List<RailCategory> = when (
 
 @Composable
 private fun placeholderCount(section: MainSection): String = when (section) {
-    MainSection.SEARCH, MainSection.HOME, MainSection.EPG, MainSection.SETTINGS, MainSection.MORE -> ""
+    MainSection.SEARCH, MainSection.HOME, MainSection.EPG, MainSection.SPORT, MainSection.SETTINGS, MainSection.MORE -> ""
     MainSection.LIVE_TV -> stringResource(R.string.content_zero_channels)
     MainSection.MOVIES -> stringResource(R.string.content_zero_movies)
     MainSection.SERIES -> stringResource(R.string.content_zero_series)

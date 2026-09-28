@@ -3,6 +3,7 @@ package tv.own.owntv.di
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.module.dsl.viewModelOf
+import tv.own.owntv.features.sport.SportViewModel
 import tv.own.owntv.features.more.MoreCountsViewModel
 import org.koin.dsl.module
 import tv.own.owntv.features.customize.CustomizeItemsViewModel
@@ -56,6 +57,8 @@ val appModule = module {
     singleOf(::SearchReader)
     singleOf(::HomeFeedReader)
     viewModelOf(::HomeViewModel)
+    // German4K 3.0: Bereich Fußball (Sport-Hub).
+    viewModelOf(::SportViewModel)
     viewModelOf(::SetupViewModel)
     viewModelOf(::DisplaySizeViewModel)
     // Takes a Context first; Koin resolves it from androidContext().

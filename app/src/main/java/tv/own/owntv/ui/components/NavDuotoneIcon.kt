@@ -73,6 +73,18 @@ fun NavDuotoneIcon(
                 dot(50f, 22f, 2.5f, fill)
             }
 
+            // ---- German4K Fußball — Ball: Kreis + Fünfeck in der Mitte + kurze Nähte --
+            MainSection.SPORT -> {
+                drawCircle(soft, radius = 33f * s, center = o(50f, 50f))
+                drawCircle(fill, radius = 33f * s, center = o(50f, 50f), style = stroke)
+                drawPath(polyC(50f,37f, 62f,46f, 58f,60f, 42f,60f, 38f,46f), fill, style = Fill)
+                drawPath(poly(50f,37f, 50f,19f), fill, style = thin)
+                drawPath(poly(62f,46f, 79f,40f), fill, style = thin)
+                drawPath(poly(58f,60f, 68f,75f), fill, style = thin)
+                drawPath(poly(42f,60f, 32f,75f), fill, style = thin)
+                drawPath(poly(38f,46f, 21f,40f), fill, style = thin)
+            }
+
             // ---- Movies — film strip sprocket + play ------------------------------
             MainSection.MOVIES -> {
                 drawPath(polyC(21f,33f, 76f,21f, 79f,36f, 24f,48f), soft)

@@ -538,6 +538,7 @@ private val MainSection.navIcon: OwnTVIcon
         MainSection.SEARCH -> OwnTVIcon.SEARCH
         MainSection.HOME -> OwnTVIcon.HOME
         MainSection.LIVE_TV -> OwnTVIcon.LIVE_TV
+        MainSection.SPORT -> OwnTVIcon.LIVE_TV // German4K: kein eigenes Glyph; die Leiste zeichnet den Ball (NavDuotoneIcon)
         MainSection.MOVIES -> OwnTVIcon.MOVIES
         MainSection.SERIES -> OwnTVIcon.SERIES
         MainSection.DOWNLOADS -> OwnTVIcon.DOWNLOADS

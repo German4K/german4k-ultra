@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -24,6 +25,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.core.nav.MainSection
@@ -42,6 +44,7 @@ internal val MainSection.german4kNavIcon: OwnTVIcon
         MainSection.SEARCH -> OwnTVIcon.SEARCH
         MainSection.HOME -> OwnTVIcon.HOME
         MainSection.LIVE_TV -> OwnTVIcon.LIVE_TV
+        MainSection.SPORT -> OwnTVIcon.LIVE_TV // German4K: kein eigenes Glyph; die Leiste zeichnet den Ball (NavDuotoneIcon)
         MainSection.MOVIES -> OwnTVIcon.MOVIES
         MainSection.SERIES -> OwnTVIcon.SERIES
         MainSection.DOWNLOADS -> OwnTVIcon.DOWNLOADS
@@ -58,8 +61,8 @@ val German4kBottomBarHoehe = 72.dp
  * (22.09.2026).
  *
  * Warum eine eigene Leiste statt der Sidebar: auf einem Hochformat-Handy frisst die Seitenleiste
- * ein Drittel der Breite, und niemand bedient sie mit dem Daumen. Fuenf Ziele sind das Maximum,
- * das nebeneinander noch lesbar ist — deshalb nur die vier meistgenutzten Bereiche plus "Mehr";
+ * ein Drittel der Breite, und niemand bedient sie mit dem Daumen. Fuenf Ziele waren das Maximum,
+ * seit 3.0 kommt Fußball als sechstes dazu (kleinere Schrift) — die meistgenutzten Bereiche plus "Mehr";
  * Suche, Downloads und TV-Programm haengen in Mobil unter "Mehr" (siehe MoreScreen.zusatzSections).
  *
  * "Mehr" bleibt hell, waehrend die Einstellungen offen sind — genau wie in der Sidebar, denn dort
@@ -78,7 +81,9 @@ fun German4kBottomBar(
 ) {
     val colors = OwnTVTheme.colors
     val eintraege = remember(visibleSections) {
-        listOf(MainSection.HOME, MainSection.LIVE_TV, MainSection.MOVIES, MainSection.SERIES)
+        // German4K 3.0: Fußball steht zwischen Live TV und Filme (Entscheidung Betreiber). Ist das
+        // Feature aus, fehlt SPORT in visibleSections und die Leiste hat wieder fuenf Felder.
+        listOf(MainSection.HOME, MainSection.LIVE_TV, MainSection.SPORT, MainSection.MOVIES, MainSection.SERIES)
             .filter { it in visibleSections } + MainSection.MORE
     }
     Column(
@@ -134,12 +139,16 @@ fun German4kBottomBar(
                             modifier = Modifier.size(24.dp),
                         )
                         Spacer(Modifier.height(4.dp))
+                        // German4K: bei sechs Feldern auf 360 dp bleiben ~60 dp je Feld — eine Zeile,
+                        // etwas kleiner, notfalls Auslassungspunkte statt Umbruch.
                         Text(
                             text = stringResource(section.labelRes),
-                            style = MaterialTheme.typography.labelSmall,
+                            style = if (eintraege.size > 5) MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp) else MaterialTheme.typography.labelSmall,
                             color = ton,
                             maxLines = 1,
+                            softWrap = false,
                             overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 2.dp),
                         )
                     }
                 }
