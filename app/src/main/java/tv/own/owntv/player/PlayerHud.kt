@@ -648,7 +648,14 @@ fun PlayerHud(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .then(if (mobil) Modifier.windowInsetsPadding(WindowInsets.statusBars) else Modifier),
-                trailing = if (error == null && !kompaktKopf) liveEpgCard else null,
+                // German4K: Im Hochformat faellt die Programmkachel weg — damit man trotzdem oben sieht,
+                // dass es live ist, steht dort die kompakte LIVE-Plakette (dieselbe wie im Dock).
+                trailing = when {
+                    error != null -> null
+                    !kompaktKopf -> liveEpgCard
+                    isLive -> { { LiveStateBadge(timeshiftOffset) } }
+                    else -> null
+                },
                 // Hidden behind an error overlay along with the rest of the chrome: a clock ticking
                 // over a failure message just draws the eye to the wrong thing.
                 centre = if (error == null && !kompaktKopf) {

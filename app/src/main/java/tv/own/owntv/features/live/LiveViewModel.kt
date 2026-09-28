@@ -901,6 +901,8 @@ class LiveViewModel(
             _previewBlockedSingleSession.value = true
             return
         }
+        // German4K: mpv gibt den einen Stream der Line gerade frei — gleich danach nachholen.
+        if (mpvWirdFrei(targetUrl)) { wartendeVorschau = channel; return }
         _previewBlockedSingleSession.value = false
         // Already previewing this channel (e.g. re-focus)? Just re-apply the preview mute, no reload.
         if (previewEngine.currentUrl == targetUrl &&
@@ -1002,6 +1004,7 @@ class LiveViewModel(
                 _previewBlockedSingleSession.value = true
                 return@launch
             }
+            if (mpvWirdFrei(url)) { wartendeVorschau = channel; return@launch } // German4K: siehe playPreview
             _previewBlockedSingleSession.value = false
             stalkerPreviewCmd = channel.streamUrl
             setStalkerReconnect(channel.streamUrl) // C-3: re-resolve on reconnect if the URL expires
@@ -1138,6 +1141,30 @@ class LiveViewModel(
             previewEngine.stop()
         }
     }
+
+    // German4K: Fehler 460 — die Line erlaubt nur einen Stream. mpv gibt ihn beim Verlassen des
+    // Vollbilds asynchron frei; oeffnete die Vorschau sofort, zaehlte der Server kurz zwei Streams.
+    // Deshalb erst die Freigabe abwarten, eine in der Zeit angefragte Vorschau danach nachholen.
+    private var mpvFreigabe: Job? = null
+    private var wartendeVorschau: ChannelEntity? = null
+
+    fun onFullscreenExitedReleasingMpv() {
+        onFullscreenExited()
+        if (!player.hasActiveStream) { player.stop(); return }
+        mpvFreigabe?.cancel()
+        wartendeVorschau = null
+        mpvFreigabe = viewModelScope.launch {
+            player.stopAndAwaitRelease() // stop() laeuft sofort, gewartet wird nur auf den mpv-Thread
+            delay(tv.own.owntv.player.OwnTVPlayer.SURFACE_HANDOFF_MS)
+            val kanal = wartendeVorschau
+            wartendeVorschau = null
+            mpvFreigabe = null
+            if (kanal != null) playPreview(kanal)
+        }
+    }
+
+    private fun mpvWirdFrei(url: String): Boolean =
+        mpvFreigabe?.isActive == true && LiveStreamQuirks.isSingleSession(url)
 
     fun clearLiveOnExo() {
         exoOutcomeJob?.cancel()

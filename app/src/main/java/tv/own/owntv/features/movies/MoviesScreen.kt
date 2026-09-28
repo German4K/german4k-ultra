@@ -36,6 +36,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -323,8 +324,14 @@ fun MoviesScreen(
     // @Composable/rememberSaveable call here would register slots conditionally and corrupt the slot table.
     val effectiveGridState = if (rememberMovies) perCategoryGrid.getOrPut(selectedKey) { LazyGridState() } else gridState
     val effectiveListState = if (rememberMovies) perCategoryList.getOrPut(selectedKey) { LazyListState() } else listState
+    // German4K: Nur bei echtem Kategoriewechsel nach oben. Beim Drehen des Handys wird die Activity
+    // neu gebaut, der Effekt lief erneut und warf den (gespeicherten) Scrollstand nach oben.
+    var letzteKategorie by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(selectedKey, rememberMovies) {
-        if (!rememberMovies) { runCatching { gridState.scrollToItem(0) }; runCatching { listState.scrollToItem(0) } }
+        val kategorie = selectedKey.toString()
+        val gewechselt = letzteKategorie != null && letzteKategorie != kategorie
+        letzteKategorie = kategorie
+        if (!rememberMovies && gewechselt) { runCatching { gridState.scrollToItem(0) }; runCatching { listState.scrollToItem(0) } }
     }
     val catListState = rememberLazyListState()
     val chromeScrollThresholdPx = with(LocalDensity.current) { 8.dp.roundToPx() }

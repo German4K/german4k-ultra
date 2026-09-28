@@ -35,6 +35,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -163,7 +164,16 @@ private fun SectionChip(label: String) {
     // Keeps its accent tint (marks the current section) but frosts in glass mode like the other chips.
     val shape = RoundedCornerShape(TopBarChipCorner)
     Box(Modifier.clip(shape).glass(GlassSurface.TOPBAR, colors.primaryContainer, shape, frostScale = TopBarFrost, condenseChrome = true).padding(horizontal = 14.dp, vertical = 7.dp)) {
-        Text(label, style = MaterialTheme.typography.labelLarge, color = colors.onPrimaryContainer, fontWeight = FontWeight.Bold)
+        // German4K: Im Hochformat brach der Bereichsname um und wurde abgeschnitten — einzeilig mit "…".
+        Text(
+            label,
+            style = MaterialTheme.typography.labelLarge,
+            color = colors.onPrimaryContainer,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -262,7 +272,10 @@ private fun German4kExpiryChip() {
     val answer by provisioner.answer.collectAsStateWithLifecycle()
     val a = answer ?: return
     val test = a.test
-    val days = with(tv.own.owntv.features.setup.German4kDays) { a.daysLeft() }
+    // German4K: Restlaufzeit zuerst vom Panel (kunde.tageOffen) — die Geräteuhr kann falsch gehen.
+    // Fehlt sie, rechnen wir wie bisher aus dem Ablaufdatum. Gezeigt wird nur 0..7 Tage.
+    val days = a.kunde.tageOffen?.takeIf { it in 0..7 }
+        ?: if (a.kunde.tageOffen == null) with(tv.own.owntv.features.setup.German4kDays) { a.daysLeft() } else null
     if (test == null && days == null) return
     val colors = OwnTVTheme.colors
     val shape = RoundedCornerShape(TopBarChipCorner)
@@ -270,7 +283,8 @@ private fun German4kExpiryChip() {
         test != null && test.stundenOffen <= 1 -> stringResource(R.string.g4k_test_chip_bald)
         test != null -> stringResource(R.string.g4k_test_chip, test.stundenOffen)
         days == 0 -> stringResource(R.string.g4k_expires_today)
-        else -> stringResource(R.string.g4k_expires_chip, days ?: 0)
+        // German4K: Plural — "in 1 Tagen" war falsch.
+        else -> pluralStringResource(R.plurals.g4k_expires_chip_tage, days ?: 0, days ?: 0)
     }
     Box(Modifier.clip(shape).glass(GlassSurface.TOPBAR, colors.primary.copy(alpha = 0.25f), shape, frostScale = TopBarFrost, condenseChrome = true).padding(horizontal = 14.dp, vertical = 7.dp)) {
         Text(text, style = MaterialTheme.typography.labelLarge, color = colors.primary, fontWeight = FontWeight.Bold)

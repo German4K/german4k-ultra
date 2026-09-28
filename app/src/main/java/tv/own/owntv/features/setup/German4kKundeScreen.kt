@@ -28,6 +28,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -75,7 +76,7 @@ fun German4kKundeScreen(onBack: () -> Unit) {
             Text(stringResource(R.string.g4k_kunde_titel), style = MaterialTheme.typography.headlineMedium, color = colors.onSurface)
             k?.tageOffen?.takeIf { it >= 0 }?.let {
                 Spacer(Modifier.height(6.dp))
-                Text(stringResource(R.string.g4k_kunde_tage, it), style = MaterialTheme.typography.bodyMedium, color = colors.primary)
+                Text(pluralStringResource(R.plurals.g4k_kunde_tage_plural, it, it), style = MaterialTheme.typography.bodyMedium, color = colors.primary)
             }
             answer?.expireDate?.takeIf { it.isNotBlank() }?.let {
                 Text(stringResource(R.string.g4k_expires, it), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)

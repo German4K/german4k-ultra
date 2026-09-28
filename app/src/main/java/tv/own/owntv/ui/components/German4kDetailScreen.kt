@@ -37,6 +37,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
@@ -272,6 +275,30 @@ fun German4kDetailScreen(
 
                 BesetzungReihe(details?.besetzung.orEmpty(), onPerson)
                 FassungenReihe(details?.fassungen.orEmpty(), onFassung)
+            }
+        }
+
+        // German4K: Am Handy gibt es keine Zurück-Taste auf der Fernbedienung, und die Wischgeste
+        // kennt nicht jeder. Deshalb oben links ein sichtbarer Pfeil — er tut dasselbe wie Zurück
+        // (erst Trailer beenden, dann Seite schließen). Der Fernseher bleibt unverändert.
+        if (formfaktor.kompakt) {
+            val zurueck = stringResource(R.string.g4k_mobil_zurueck)
+            FocusableSurface(
+                onClick = { if (trailerLaeuft) trailerLaeuft = false else onExit() },
+                shape = CircleShape,
+                unfocusedContainerColor = colors.background.copy(alpha = 0.55f),
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .padding(8.dp)
+                    .size(44.dp)
+                    .semantics { contentDescription = zurueck },
+            ) { _ ->
+                OwnTVIcon(
+                    icon = OwnTVIcon.BACK,
+                    tint = colors.onSurface,
+                    modifier = Modifier.size(22.dp),
+                )
             }
         }
     }

@@ -483,8 +483,10 @@ fun OwnTVShell(
         showChannelList = false
         showHistoryList = false
         liveVm.hideCategoryBrowser()
-        liveVm.onFullscreenExited() // no longer full-screen on ExoPlayer → let the preview re-take the engine
-        player.stop()
+        // German4K: no longer full-screen → the preview may re-take the engine, but only once mpv has
+        // really released the stream (one-connection lines answered the preview with error 460).
+        // Stops the player itself (same instance as `player`).
+        liveVm.onFullscreenExitedReleasingMpv()
         subtitleController.clear() // leaving the player drops the OpenSubtitles item context
         if (selectedSection != MainSection.LIVE_TV) liveVm.clearLiveOnExo()
         restoreFocus = true

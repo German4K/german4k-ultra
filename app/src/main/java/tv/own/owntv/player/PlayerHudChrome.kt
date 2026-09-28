@@ -169,11 +169,16 @@ internal fun TopBar(
       // German4K: Ohne Uhr gibt es auch nichts Rechtes — beide Seiten setzt derselbe Aufrufer
       // gemeinsam (PlayerHud: `centre` und `trailing` haengen beide an `error == null &&
       // !kompaktKopf`). Der frueher hier stehende Zweig "keine Uhr, aber trailing" konnte deshalb
-      // nie laufen und ist raus.
+      // nie laufen und war raus — seit der LIVE-Plakette im Hochformat gibt es ihn wieder (unten).
       if (centre != null) {
           Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.Top) {
               if (trailing != null) trailing()
           }
+      } else if (trailing != null) {
+          // German4K: Im Hochformat (keine Uhr) haengt hier nur noch die kleine LIVE-Plakette —
+          // ungewichtet, damit der Sendername links den Rest bekommt.
+          Spacer(Modifier.width(10.dp))
+          trailing()
       }
     }
 }

@@ -12,11 +12,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -31,6 +34,7 @@ import tv.own.owntv.ui.Breitenklasse
 import tv.own.owntv.ui.LocalFormfaktor
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.OwnTVIcon
+import tv.own.owntv.ui.components.SearchBar
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 /**
@@ -91,13 +95,49 @@ fun German4kMobilRahmen(
                 // Rueckkehr aus einer Kategorie soll dort landen, wo man sie verlassen hat — bei
                 // ueber hundert Ordnern ist ein Sprung an den Listenanfang jedes Mal aergerlich.
                 val listenZustand = rememberLazyListState()
+                // German4K: Suche wie in der Fernseher-Rail — bei vielen Ordnern (Laender, Anbieter)
+                // ist Scrollen am Handy muehsam. Gefiltert wird nach Namen; jede Zeile behaelt ihren
+                // ORIGINAL-Index, damit Auswahl und onSelect weiter stimmen.
+                var suche by remember { mutableStateOf("") }
+                val sichtbar = remember(kategorien, suche) {
+                    val q = suche.trim()
+                    if (q.isEmpty()) kategorien.indices.toList()
+                    else kategorien.indices.filter { kategorien[it].fullName.contains(q, ignoreCase = true) }
+                }
+                if (kategorien.size > 12) {
+                    SearchBar(
+                        query = suche,
+                        onQueryChange = { suche = it },
+                        placeholder = stringResource(R.string.content_search_categories),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
+                    )
+                }
+                // German4K: Neuer Suchbegriff → an den Anfang, sonst steht der erste Treffer halb
+                // unter dem Suchfeld (die Liste behielte die Scrollposition der vollen Liste).
+                LaunchedEffect(suche) {
+                    if (suche.isNotEmpty()) runCatching { listenZustand.scrollToItem(0) }
+                }
                 LaunchedEffect(selectedIndex, kategorien.size) {
-                    if (selectedIndex in kategorien.indices) {
+                    if (suche.isEmpty() && selectedIndex in kategorien.indices) {
                         runCatching { listenZustand.scrollToItem(selectedIndex) }
                     }
                 }
                 LazyColumn(state = listenZustand, modifier = Modifier.fillMaxSize()) {
-                    itemsIndexed(kategorien) { i, k ->
+                    if (sichtbar.isEmpty()) {
+                        item {
+                            Text(
+                                stringResource(R.string.content_no_categories_match),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = colors.onSurfaceVariant,
+                                modifier = Modifier.padding(16.dp),
+                            )
+                        }
+                    }
+                    items(count = sichtbar.size, key = { sichtbar[it] }) { pos ->
+                        val i = sichtbar[pos]
+                        val k = kategorien[i]
                         // German4K: Hier bewusst KEIN requestFocus wie in der unteren Leiste — der
                         // Tipp ersetzt die Liste im selben Zug durch Ebene 2, die angeforderte Zeile
                         // ist also schon weg, bevor der Fokus ankaeme.

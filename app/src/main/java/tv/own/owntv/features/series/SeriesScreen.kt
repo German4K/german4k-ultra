@@ -40,6 +40,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -390,8 +391,14 @@ private fun SeriesGrid(
     // @Composable/rememberSaveable call here would register slots conditionally and corrupt the slot table.
     val effectiveGridState = if (rememberSeries) perCategoryGrid.getOrPut(selectedKey) { androidx.compose.foundation.lazy.grid.LazyGridState() } else gridState
     val effectiveListState = if (rememberSeries) perCategoryList.getOrPut(selectedKey) { androidx.compose.foundation.lazy.LazyListState() } else listState
+    // German4K: Nur bei echtem Kategoriewechsel nach oben. Beim Drehen des Handys wird die Activity
+    // neu gebaut, der Effekt lief erneut und warf den (gespeicherten) Scrollstand nach oben.
+    var letzteKategorie by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(selectedKey, rememberSeries) {
-        if (!rememberSeries) { runCatching { gridState.scrollToItem(0) }; runCatching { listState.scrollToItem(0) } }
+        val kategorie = selectedKey.toString()
+        val gewechselt = letzteKategorie != null && letzteKategorie != kategorie
+        letzteKategorie = kategorie
+        if (!rememberSeries && gewechselt) { runCatching { gridState.scrollToItem(0) }; runCatching { listState.scrollToItem(0) } }
     }
     val catListState = androidx.compose.foundation.lazy.rememberLazyListState()
     var gridPaneFocused by remember { mutableStateOf(false) }

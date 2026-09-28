@@ -90,7 +90,15 @@ fun German4kBereicheScreen(onBack: () -> Unit) {
             fokusGesetzt = runCatching { focus.requestFocus() }.isSuccess
         }
     }
-    BackHandler { onBack() }
+    // German4K: Nach einer Änderung beim Verlassen gleich neu einrichten, damit die Liste sofort
+    // nachzieht statt erst beim nächsten Start. force = true, denn
+    // provision() allein überspringt Läufe innerhalb von 30 s nach dem letzten.
+    val provisioner: tv.own.owntv.core.german4k.German4kProvisioner = koinInject()
+    val verlassen: () -> Unit = {
+        if (geaendert) provisioner.provision(force = true)
+        onBack()
+    }
+    BackHandler { verlassen() }
 
     Box(
         Modifier.fillMaxSize().background(colors.background).modalScrim().trapAllFocusExit().focusGroup(),
@@ -151,7 +159,7 @@ fun German4kBereicheScreen(onBack: () -> Unit) {
             }
 
             Spacer(Modifier.height(18.dp))
-            OwnTVButton(stringResource(R.string.g4k_kunde_zu), onClick = onBack)
+            OwnTVButton(stringResource(R.string.g4k_kunde_zu), onClick = verlassen)
         }
     }
 }
