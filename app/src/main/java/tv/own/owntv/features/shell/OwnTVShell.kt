@@ -249,6 +249,9 @@ fun OwnTVShell(
     val movieVm = org.koin.androidx.compose.koinViewModel<MovieViewModel>()
     val seriesVm = org.koin.androidx.compose.koinViewModel<SeriesViewModel>()
     val searchVm = org.koin.androidx.compose.koinViewModel<SearchViewModel>()
+    // German4K 3.0/32 (D2): dieselbe Instanz wie im Fußball-Bereich — ein Klick auf der Startseite
+    // legt das Spiel dort offen, der Bereich zeigt dann gleich die Spielseite.
+    val sportVm = org.koin.androidx.compose.koinViewModel<tv.own.owntv.features.sport.SportViewModel>()
     // Same activity-scoped instances the Live/Guide screens use — lets the fullscreen HUD zap channels
     // up/down (CH+/CH-). Guide tunes start through LiveViewModel too (they set zapSource = LIVE_TV), so
     // there is exactly ONE zap path: liveVm's. The Guide keeps its own EpgViewModel only for the grid.
@@ -1087,6 +1090,16 @@ fun OwnTVShell(
                             previewEnabled = playerMode == PlayerMode.NONE,
                             firstRowFocusRequester = homeFirstRowFocus,
                             onContentScrolled = { contentScrolled = it },
+                            onOpenSportSpiel = { spiel ->
+                                homeVm.stopPreview()
+                                sportVm.oeffne(spiel)
+                                onSelectSection(MainSection.SPORT)
+                            },
+                            onOpenMovie = { id ->
+                                homeVm.stopPreview()
+                                onSelectSection(MainSection.MOVIES)
+                                movieVm.openDetails(id)
+                            },
                             modifier = Modifier.fillMaxSize(),
                         )
 
@@ -1518,6 +1531,8 @@ fun OwnTVShell(
                     // Non-null only while an archive is on screen, so movies, episodes and live TV get
                     // the single real clock and catch-up gets the pair.
                     watchingWallMs = { watchingWallState.value },
+                    // German4K 3.0/32 (Q2): Kopf mit Logo + Sendername bei beiden Motoren.
+                    liveKanal = previewChannel?.takeIf { isTunedLive }?.let { tv.own.owntv.player.LiveKopf(it.name, it.logoUrl) },
                     timeshiftOffsetSec = if (isTunedLive) { { timeshiftOffsetState.value } } else null,
                     onTuneToNumber = if (directTuneEnabled && isTunedLive && isLiveStream && !timeshifted && previewChannel != null) liveVm::tuneByNumber else null,
                     directTuneContextKey = previewChannel?.id ?: 0L,

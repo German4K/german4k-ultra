@@ -211,6 +211,8 @@ fun PlayerHud(
     // the present, and only the real clock shows. Drives the second, framed clock at top centre.
     // Lambda for the same reason as [timeshiftOffsetSec]: this instant advances every second too.
     watchingWallMs: (() -> Long?)? = null,
+    // German4K 3.0/32 (Q2): Sender fuer den Kopf (Logo + Name), auch wenn mpv ihn noch nicht meldet.
+    liveKanal: LiveKopf? = null,
     modifier: Modifier = Modifier,
 ) {
     val timeshiftOffset = timeshiftOffsetSec?.invoke()
@@ -661,6 +663,7 @@ fun PlayerHud(
                 centre = if (error == null && !kompaktKopf) {
                     { PlayerClock(watchingMs = watchingWall) }
                 } else null,
+                liveKanal = liveKanal,
             )
 
             // Hide the transport (play/seek/prev/next) and bottom bar while an error is up — the error

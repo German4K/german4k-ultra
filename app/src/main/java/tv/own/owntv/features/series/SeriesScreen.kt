@@ -356,15 +356,23 @@ private fun SeriesGrid(
     // findet der `LaunchedEffect(detailsSeries, tmdbDetailsSeries)` weiter unten nach „Zurueck"
     // wieder zu GENAU dieser Kachel zurueck. `contextSeries` bleibt dabei null — das Langdruck-
     // Menue oeffnet also nicht mit.
-    val oeffneSerie: (tv.own.owntv.core.database.entity.SeriesEntity, Int) -> Unit = { s, index ->
+    val oeffneSerieDirekt: (tv.own.owntv.core.database.entity.SeriesEntity, tv.own.owntv.core.database.entity.SeriesEntity, Int) -> Unit = { ziel, kachel, index ->
         if (detailseite) {
-            contextSeriesId = s.id
+            contextSeriesId = kachel.id
             contextSeriesIndex = index
-            detailsSeries = s
+            detailsSeries = ziel
         } else {
-            vm.openSeries(s)
+            vm.openSeries(ziel)
         }
     }
+    // German4K 3.0/32 (I2): Eine gebündelte Kachel öffnet die bevorzugte Fassung (deutsch, 4K, erste).
+    val g4kScope = rememberCoroutineScope()
+    val oeffneSerie: (tv.own.owntv.core.database.entity.SeriesEntity, Int) -> Unit = { s, index ->
+        val zielId = vm.bevorzugteFassung(s.id)
+        if (zielId == s.id) oeffneSerieDirekt(s, s, index)
+        else g4kScope.launch { oeffneSerieDirekt(vm.seriesById(zielId) ?: s, s, index) }
+    }
+    val fassungsAnzahl by vm.fassungsAnzahl.collectAsStateWithLifecycle()
 
     val selectedIndex = railItems.indexOfFirst { it.key == selectedKey }.coerceAtLeast(0)
     val selectedItem = railItems.getOrNull(selectedIndex)
@@ -698,10 +706,10 @@ private fun SeriesGrid(
                     // German4K: Kachelbreite je Breitenklasse. Auf einem Handy im Hochformat waeren
                     // 130 dp so schmal, dass der Titel nicht mehr zu lesen ist — dort 150 dp (zwei
                     // Spalten). Quer und auf dem Tablet bleibt es beim Fernseher-Mass 130 dp.
+                    // German4K 3.0/32 (I2): am Fernseher sechs Spalten.
                     columns = when {
                         formfaktor.mobil -> GridCells.Adaptive(minSize = if (formfaktor.kompakt) 150.dp else 130.dp)
-                        detailseite -> GridCells.Fixed(3)
-                        else -> GridCells.Adaptive(minSize = 130.dp)
+                        else -> GridCells.Fixed(TV_SERIEN_SPALTEN)
                     },
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -719,6 +727,7 @@ private fun SeriesGrid(
                                 rating = s.rating,
                                 isFavorite = favoriteIds.contains(s.id),
                                 providerName = providerNames[s.sourceId],
+                                fassungen = fassungsAnzahl[s.id] ?: 0,
                                 modifier = Modifier.gridFocusTarget(
                                     itemId = s.id, index = index,
                                     contextId = contextSeriesId, contextFocus = contextFocus,
@@ -887,7 +896,7 @@ private fun SeriesGrid(
                         }
                     }
                     Spacer(Modifier.height(14.dp))
-                    Text(s.name, style = MaterialTheme.typography.titleLarge, color = OwnTVTheme.colors.onSurface)
+                    Text(tv.own.owntv.core.german4k.German4kTitel.titel(s.name), style = MaterialTheme.typography.titleLarge, color = OwnTVTheme.colors.onSurface)
                     val metaBits = listOfNotNull(year?.let { localizedInteger(it, grouping = false) }, rating?.let { stringResource(R.string.content_rating, it) })
                     if (metaBits.isNotEmpty()) {
                         Spacer(Modifier.height(4.dp))
@@ -1022,7 +1031,7 @@ private fun SeriesGrid(
         tv.own.owntv.ui.components.German4kDetailScreen(
             ui = tv.own.owntv.ui.components.German4kDetailUi(
                 schluessel = s.remoteId ?: "true:${s.name}",
-                titel = s.name,
+                titel = tv.own.owntv.core.german4k.German4kTitel.titel(s.name),
                 plakat = s.posterUrl,
                 details = seitenDetails,
                 serie = true,
@@ -1608,7 +1617,7 @@ private fun EpisodeView(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 zurueckKnopf()
                 Text(
-                    series.name,
+                    tv.own.owntv.core.german4k.German4kTitel.titel(series.name),
                     style = if (formfaktor.kompakt) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineLarge,
                     color = OwnTVTheme.colors.onSurface,
                     maxLines = 1,
@@ -1629,7 +1638,7 @@ private fun EpisodeView(
         } else {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             zurueckKnopf()
-            Text(series.name, style = MaterialTheme.typography.headlineLarge, color = OwnTVTheme.colors.onSurface)
+            Text(tv.own.owntv.core.german4k.German4kTitel.titel(series.name), style = MaterialTheme.typography.headlineLarge, color = OwnTVTheme.colors.onSurface)
             Spacer(Modifier.weight(1f))
             kopfSchalter()
         }
@@ -2202,7 +2211,7 @@ private fun SeriesListRow(
             }
             Column(Modifier.weight(1f)) {
                 Text(
-                    series.name,
+                    tv.own.owntv.core.german4k.German4kTitel.titel(series.name),
                     style = MaterialTheme.typography.titleSmall,
                     color = if (focused) colors.primary else colors.onSurface,
                     maxLines = 1,
@@ -2303,3 +2312,6 @@ private fun SortingRow(
         )
     }
 }
+
+/** German4K 3.0/32 (I2): Spalten des Serienrasters am Fernseher. */
+private const val TV_SERIEN_SPALTEN = 6

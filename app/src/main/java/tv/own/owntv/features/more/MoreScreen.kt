@@ -87,8 +87,14 @@ import tv.own.owntv.ui.theme.glass
 /** Which of More's own pages is on screen. [ROOT] is the hub itself. */
 private enum class MorePage { ROOT, FAVORITES, HISTORY, BACKUP, LOCAL_SYNC }
 
-/** The rows, in the order the spine shows them. */
-private enum class MoreRow { SETTINGS, FAVORITES, HISTORY, BACKUP, LOCAL_SYNC, ERROR_LOG, ABOUT }
+/**
+ * The rows, in the order the spine shows them.
+ *
+ * German4K 3.0/32 (P2/W2): Mein Zugang, Länder & Bereiche, Favoriten (+ Verlauf), die Bereichszeilen
+ * (Downloads …), Einstellungen, Hilfe & Verbindung, Über. Sicherung, lokale Synchronisierung und das
+ * Fehlerprotokoll stehen jetzt in den Einstellungen unter „App".
+ */
+private enum class MoreRow { ZUGANG, BEREICHE, FAVORITES, HISTORY, SETTINGS, HILFE, ABOUT }
 
 /**
  * The hub the rail's last item opens — everything that is neither a channel nor a preference.
@@ -198,11 +204,15 @@ fun MoreScreen(
         }
     }
 
-    val context = LocalContext.current
-    // Read once, here: the spine's badge and the pane both want it, and reading it twice would be
-    // two file reads for one answer.
-    val logEntries by produceState<List<PlaybackErrorLog.Entry>?>(initialValue = null) {
-        value = withContext(Dispatchers.IO) { PlaybackErrorLog.read(context) }
+    // German4K 3.0/32 (P2): Restlaufzeit für „Mein Zugang" — aus der letzten Panel-Antwort.
+    val g4kAnswer by org.koin.compose.koinInject<tv.own.owntv.core.german4k.German4kProvisioner>().answer.collectAsStateWithLifecycle()
+    val g4kTage = g4kAnswer?.expireDate?.let { d ->
+        runCatching { java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), java.time.LocalDate.parse(d)).toInt() }.getOrNull()
+    }
+    val g4kZugangText = when {
+        g4kTage == null -> ""
+        g4kTage < 0 -> stringResource(R.string.g4k_mehr_zugang_abgelaufen)
+        else -> pluralStringResource(R.plurals.g4k_mehr_zugang_tage, g4kTage, g4kTage)
     }
 
     val colors = OwnTVTheme.colors
@@ -243,14 +253,7 @@ fun MoreScreen(
                 fontWeight = FontWeight.Bold,
                 color = colors.onSurface,
             )
-            Text(
-                text = stringResource(R.string.more_spine_header_summary),
-                fontSize = 12.sp,
-                color = colors.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 3.dp),
-            )
+            // German4K 3.0/32 (O2): keine Unterzeile mehr („Alles, was kein Kanal …" sagte nichts).
         }
         BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f)) {
         // 294 dp is the design width, but at 150% UI Zoom the whole panel is not much wider than
@@ -275,39 +278,32 @@ fun MoreScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 8.dp, vertical = 10.dp),
             ) {
-                // German4K: die Bereiche, die auf Handy/Tablet keinen Platz in der unteren Leiste
-                // haben. Sie fuehren aus "Mehr" heraus, taugen also nicht als Auswahl fuer die
-                // rechte Tafel — sie lassen `selected` in Ruhe und oeffnen beim Klick den Bereich.
-                zusatzSections.forEach { section ->
-                    SpineItem(
-                        label = stringResource(section.labelRes),
-                        summary = stringResource(R.string.g4k_mehr_bereich_summary),
-                        icon = section.german4kNavIcon,
-                        iconVector = section.navVector(selected = false),
-                        count = 0,
-                        showBadge = false,
-                        selected = false,
-                        active = false,
-                        onFocused = {},
-                        onClick = { onOpenSection?.invoke(section) },
-                    )
-                }
-
-                // No head of its own: the outer panel's head already names the screen, and a second
-                // title inside the spine would say "More" twice.
-                SpineRow(
-                    row = MoreRow.SETTINGS,
-                    icon = OwnTVIcon.SETTINGS,
-                    title = stringResource(R.string.common_nav_settings),
-                    summary = stringResource(R.string.more_spine_settings_summary),
-                    badge = quickPinned.size.toString(),
-                    selected = selected,
-                    focus = rowFocus.getValue(MoreRow.SETTINGS),
-                    onSelected = { selected = it },
-                    onClick = { focusRow(MoreRow.SETTINGS); onOpenSettings() },
+                // German4K 3.0/32 (P2/W2): feste Reihenfolge — Zugang, Länder & Bereiche, Favoriten,
+                // Verlauf, die Bereichszeilen (Downloads …), Einstellungen, Hilfe & Verbindung, Über.
+                SpineItem(
+                    label = stringResource(R.string.g4k_mehr_zugang),
+                    summary = g4kZugangText,
+                    icon = OwnTVIcon.INFO,
+                    count = 0,
+                    showBadge = false,
+                    selected = selected == MoreRow.ZUGANG,
+                    active = false,
+                    onFocused = { selected = MoreRow.ZUGANG },
+                    onClick = { focusRow(MoreRow.ZUGANG); tv.own.owntv.core.german4k.German4kSupport.kundeOeffnen() },
+                    modifier = Modifier.focusRequester(rowFocus.getValue(MoreRow.ZUGANG)),
                 )
-
-                SpineGroup(stringResource(R.string.settings_group_data))
+                SpineItem(
+                    label = stringResource(R.string.g4k_bereiche_titel),
+                    summary = "",
+                    icon = OwnTVIcon.LANGUAGE,
+                    count = 0,
+                    showBadge = false,
+                    selected = selected == MoreRow.BEREICHE,
+                    active = false,
+                    onFocused = { selected = MoreRow.BEREICHE },
+                    onClick = { focusRow(MoreRow.BEREICHE); tv.own.owntv.core.german4k.German4kSupport.bereicheOeffnen() },
+                    modifier = Modifier.focusRequester(rowFocus.getValue(MoreRow.BEREICHE)),
+                )
                 SpineRow(
                     row = MoreRow.FAVORITES,
                     icon = OwnTVIcon.FAVORITE,
@@ -330,41 +326,48 @@ fun MoreScreen(
                     onSelected = { selected = it },
                     onClick = { focusRow(MoreRow.HISTORY); page = MorePage.HISTORY },
                 )
-                SpineRow(
-                    row = MoreRow.BACKUP,
-                    icon = OwnTVIcon.BACKUP,
-                    title = stringResource(R.string.settings_backup_restore),
-                    summary = stringResource(R.string.more_spine_backup_summary),
-                    // How long ago, or a dash while no backup has ever been taken.
-                    badge = backupAge ?: neverBadge,
-                    selected = selected,
-                    focus = rowFocus.getValue(MoreRow.BACKUP),
-                    onSelected = { selected = it },
-                    onClick = { focusRow(MoreRow.BACKUP); page = MorePage.BACKUP },
-                )
-                SpineRow(
-                    row = MoreRow.LOCAL_SYNC,
-                    icon = OwnTVIcon.REFRESH,
-                    title = stringResource(R.string.local_sync_title),
-                    summary = stringResource(R.string.more_spine_local_sync_summary),
-                    badge = syncValue,
-                    selected = selected,
-                    focus = rowFocus.getValue(MoreRow.LOCAL_SYNC),
-                    onSelected = { selected = it },
-                    onClick = { focusRow(MoreRow.LOCAL_SYNC); page = MorePage.LOCAL_SYNC },
-                )
 
-                SpineGroup(stringResource(R.string.settings_app_group))
+                // German4K: die Bereiche, die in der Leiste keinen Platz haben (Downloads, auf Handy/
+                // Tablet auch Suche und TV-Programm). Sie fuehren aus "Mehr" heraus, taugen also nicht
+                // als Auswahl fuer die rechte Tafel — sie lassen `selected` in Ruhe und oeffnen beim
+                // Klick den Bereich. German4K 3.0/32 (P2): ohne Fuelltext („Bereich öffnen").
+                zusatzSections.forEach { section ->
+                    SpineItem(
+                        label = stringResource(section.labelRes),
+                        summary = "",
+                        icon = section.german4kNavIcon,
+                        iconVector = section.navVector(selected = false),
+                        count = 0,
+                        showBadge = false,
+                        selected = false,
+                        active = false,
+                        onFocused = {},
+                        onClick = { onOpenSection?.invoke(section) },
+                    )
+                }
+
                 SpineRow(
-                    row = MoreRow.ERROR_LOG,
-                    icon = OwnTVIcon.WARNING,
-                    title = stringResource(R.string.settings_playback_error_log),
-                    summary = stringResource(R.string.more_spine_error_log_summary),
-                    badge = (logEntries?.size ?: 0).toString(),
+                    row = MoreRow.SETTINGS,
+                    icon = OwnTVIcon.SETTINGS,
+                    title = stringResource(R.string.common_nav_settings),
+                    summary = stringResource(R.string.more_spine_settings_summary),
+                    badge = quickPinned.size.toString(),
                     selected = selected,
-                    focus = rowFocus.getValue(MoreRow.ERROR_LOG),
+                    focus = rowFocus.getValue(MoreRow.SETTINGS),
                     onSelected = { selected = it },
-                    onClick = { focusRow(MoreRow.ERROR_LOG); showErrorLog = true },
+                    onClick = { focusRow(MoreRow.SETTINGS); onOpenSettings() },
+                )
+                SpineItem(
+                    label = stringResource(R.string.g4k_help_open),
+                    summary = "",
+                    icon = OwnTVIcon.NETWORK,
+                    count = 0,
+                    showBadge = false,
+                    selected = selected == MoreRow.HILFE,
+                    active = false,
+                    onFocused = { selected = MoreRow.HILFE },
+                    onClick = { focusRow(MoreRow.HILFE); tv.own.owntv.core.german4k.German4kSupport.oeffnen() },
+                    modifier = Modifier.focusRequester(rowFocus.getValue(MoreRow.HILFE)),
                 )
                 SpineRow(
                     row = MoreRow.ABOUT,
@@ -394,12 +397,12 @@ fun MoreScreen(
                         .border(1.dp, colors.outlineVariant, paneShape),
                 ) {
                     val destination = when (selected) {
+                        MoreRow.ZUGANG -> stringResource(R.string.g4k_mehr_zugang)
+                        MoreRow.BEREICHE -> stringResource(R.string.g4k_bereiche_titel)
                         MoreRow.SETTINGS -> stringResource(R.string.common_nav_settings)
                         MoreRow.FAVORITES -> stringResource(R.string.content_category_favorites)
                         MoreRow.HISTORY -> stringResource(R.string.content_category_history)
-                        MoreRow.BACKUP -> stringResource(R.string.settings_backup_restore)
-                        MoreRow.LOCAL_SYNC -> stringResource(R.string.local_sync_title)
-                        MoreRow.ERROR_LOG -> stringResource(R.string.settings_playback_error_log)
+                        MoreRow.HILFE -> stringResource(R.string.g4k_help_open)
                         MoreRow.ABOUT -> stringResource(R.string.settings_about)
                     }
                     // Settings' own sheet header: 18 sp title, 12.5 sp summary, bordered mono tag.
@@ -409,22 +412,22 @@ fun MoreScreen(
                         // summary is short because the spine is 294 dp, not because the app has nothing
                         // more to say.
                         summary = when (selected) {
+                            MoreRow.ZUGANG -> g4kAnswer?.expireDate?.takeIf { it.isNotBlank() }
+                                ?.let { stringResource(R.string.g4k_expires, it) }.orEmpty()
+                            MoreRow.BEREICHE -> stringResource(R.string.g4k_bereiche_text)
                             MoreRow.SETTINGS -> stringResource(R.string.more_spine_settings_summary)
                             MoreRow.FAVORITES -> stringResource(R.string.more_pane_favorites_summary)
                             MoreRow.HISTORY -> stringResource(R.string.more_pane_history_summary)
-                            MoreRow.BACKUP -> stringResource(R.string.settings_backup_restore_description)
-                            MoreRow.LOCAL_SYNC -> stringResource(R.string.local_sync_description)
-                            MoreRow.ERROR_LOG -> stringResource(R.string.settings_playback_error_description)
+                            MoreRow.HILFE -> stringResource(R.string.g4k_help_subtitle)
                             MoreRow.ABOUT -> stringResource(R.string.settings_about_description)
                         },
                         tag = when (selected) {
+                            MoreRow.ZUGANG -> g4kZugangText
+                            MoreRow.BEREICHE, MoreRow.HILFE -> ""
                             MoreRow.SETTINGS ->
                                 pluralStringResource(R.plurals.settings_pinned_count, quickPinned.size, quickPinned.size)
                             MoreRow.FAVORITES -> favorites.total.toString()
                             MoreRow.HISTORY -> history.total.toString()
-                            MoreRow.BACKUP -> backupAge ?: neverBadge
-                            MoreRow.LOCAL_SYNC -> syncValue
-                            MoreRow.ERROR_LOG -> (logEntries?.size ?: 0).toString()
                             MoreRow.ABOUT -> BuildConfig.VERSION_NAME
                         },
                         tagHot = false,
@@ -435,12 +438,10 @@ fun MoreScreen(
                             .padding(horizontal = 18.dp, vertical = 6.dp),
                     ) {
                         when (selected) {
+                            MoreRow.ZUGANG, MoreRow.BEREICHE, MoreRow.HILFE -> Unit
                             MoreRow.SETTINGS -> SettingsPane(quickPreview)
                             MoreRow.FAVORITES -> CountsPane(favorites, favoriteItems)
                             MoreRow.HISTORY -> CountsPane(history, historyItems)
-                            MoreRow.BACKUP -> BackupPane(lastBackup)
-                            MoreRow.LOCAL_SYNC -> LocalSyncPane(sync)
-                            MoreRow.ERROR_LOG -> ErrorLogPane(logEntries)
                             MoreRow.ABOUT -> AboutPane()
                         }
                     }

@@ -579,10 +579,14 @@ class LiveViewModel(
                 )
                 val multiSourceNames = c.sourceNames.takeIf { it.size > 1 }.orEmpty()
                 val categoriesById = cats.associateBy { it.id }
-                railWithCatchup(catchupCount > 0) + folders.map { e ->
+                railWithCatchup(catchupCount > 0) + folders
+                    // German4K 3.0/32 (L2): Anbieterordner „Alle Filme/Serien/Sender" doppeln unseren
+                    // eigenen „Alle"-Eintrag oben — raus. Namen ohne Emoji-Schmuck, Flaggen bleiben.
+                    .filterNot { e -> e.categoryId != null && tv.own.owntv.core.german4k.German4kKategorie.istAlleOrdner(categoriesById[e.categoryId]?.name ?: e.displayName) }
+                    .map { e ->
                     LiveRailItem(
                         key = e.categoryId?.let { LiveKey.Folder(it) } ?: LiveKey.Custom(e.customId!!),
-                        title = e.displayName,
+                        title = tv.own.owntv.core.german4k.German4kKategorie.anzeige(e.displayName),
                         providerName = e.categoryId
                             ?.let(categoriesById::get)
                             ?.sourceId

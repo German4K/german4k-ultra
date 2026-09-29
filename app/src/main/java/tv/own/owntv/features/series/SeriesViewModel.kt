@@ -560,10 +560,14 @@ class SeriesViewModel(
                 )
                 val multiSourceNames = c.sourceNames.takeIf { it.size > 1 }.orEmpty()
                 val categoriesById = cats.associateBy { it.id }
-                defaultRail + folders.map { e ->
+                defaultRail + folders
+                    // German4K 3.0/32 (L2): Anbieterordner „Alle Filme/Serien/Sender" doppeln unseren
+                    // eigenen „Alle"-Eintrag oben — raus. Namen ohne Emoji-Schmuck, Flaggen bleiben.
+                    .filterNot { e -> e.categoryId != null && tv.own.owntv.core.german4k.German4kKategorie.istAlleOrdner(categoriesById[e.categoryId]?.name ?: e.displayName) }
+                    .map { e ->
                     LiveRailItem(
                         key = e.categoryId?.let { LiveKey.Folder(it) } ?: LiveKey.Custom(e.customId!!),
-                        title = e.displayName,
+                        title = tv.own.owntv.core.german4k.German4kKategorie.anzeige(e.displayName),
                         providerName = e.categoryId
                             ?.let(categoriesById::get)
                             ?.sourceId
@@ -573,6 +577,17 @@ class SeriesViewModel(
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), defaultRail)
+
+    // German4K 3.0/32 (I2): Bündelung der aktuell gezeigten Liste (siehe MovieViewModel).
+    private val _fassungsGruppen = MutableStateFlow<tv.own.owntv.core.german4k.German4kFassungsGruppen?>(null)
+    val fassungsAnzahl: StateFlow<Map<Long, Int>> = _fassungsGruppen
+        .flatMapLatest { it?.anzahl ?: flowOf(emptyMap()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    fun bevorzugteFassung(seriesId: Long): Long = _fassungsGruppen.value?.bevorzugt(seriesId) ?: seriesId
+
+    /** German4K 3.0/32 (I2): die Zeile zu einer Kennung — für die bevorzugte Fassung einer Kachel. */
+    suspend fun seriesById(seriesId: Long): SeriesEntity? = seriesDao.getSeriesById(seriesId)
 
     val series: Flow<PagingData<SeriesEntity>> = combine(
         _selected, ctx, _search.map { it.trim() }.debounce(300).distinctUntilChanged(), sortMode, _listRefresh,
@@ -589,7 +604,7 @@ class SeriesViewModel(
             }.flow.map { paging ->
                 val cust = cs.cust
                 val movedFrom = cust.movedFromOrigin
-                if (cust.hiddenItems.isEmpty() && cust.itemNames.isEmpty() && cs.hiddenCats.isEmpty() && movedFrom.isEmpty()) paging
+                val gefiltert = if (cust.hiddenItems.isEmpty() && cust.itemNames.isEmpty() && cs.hiddenCats.isEmpty() && movedFrom.isEmpty()) paging
                 else paging.filter { s ->
                     CustomizeKeys.series(s) !in cust.hiddenItems &&
                         (s.categoryId == null || s.categoryId !in cs.hiddenCats) &&
@@ -600,6 +615,16 @@ class SeriesViewModel(
                 }.map { s ->
                     // Bulk-renamed titles (Customize items screen) show here like Live TV does.
                     cust.itemNames[CustomizeKeys.series(s)]?.let { s.copy(name = it) } ?: s
+                }
+                // German4K 3.0/32 (I2): gleiche Titel zu einer Kachel bündeln (wie bei den Filmen);
+                // Favoriten und Verlauf bleiben ungebündelt.
+                if (args.key == LiveKey.Favorites || args.key == LiveKey.History) {
+                    _fassungsGruppen.value = null
+                    gefiltert
+                } else {
+                    val gruppen = tv.own.owntv.core.german4k.German4kFassungsGruppen()
+                    _fassungsGruppen.value = gruppen
+                    gefiltert.filter { s -> gruppen.annehmen(s.id, s.name, s.year ?: s.parsedYear) }
                 }
             }
         }

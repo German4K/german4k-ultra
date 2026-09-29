@@ -51,7 +51,8 @@ import tv.own.owntv.ui.theme.OwnTVTheme
 internal fun PlayerClock(watchingMs: Long?, modifier: Modifier = Modifier) {
     val colors = OwnTVTheme.colors
     val formatTime = rememberSystemTimeFormatter()
-    val formatDate = rememberBestDateFormatter("EEEdMMM")
+    // German4K 3.0/32 (Q2): Tag mit Ziffernmonat — deutsch „Di., 29.09.", nicht „DI., 29. SEPT.".
+    val formatDate = rememberBestDateFormatter("EEEddMM")
     // Minute precision is all that is displayed, so a 10 s tick keeps it honest without waking the
     // frame loop pointlessly. The HUD is only on screen in bursts anyway.
     var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -112,7 +113,8 @@ private fun ClockColumn(
             fontWeight = FontWeight.SemiBold,
         )
         Text(
-            date.uppercase(),
+            // German4K 3.0/32 (Q2): Datum in normaler Schreibung, nur das Etikett steht in Versalien.
+            date,
             style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.8.sp),
             color = dateColor,
         )

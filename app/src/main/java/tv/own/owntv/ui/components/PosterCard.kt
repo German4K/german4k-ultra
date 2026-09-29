@@ -1,6 +1,7 @@
 package tv.own.owntv.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -46,8 +47,13 @@ fun PosterCard(
     onFocus: () -> Unit = {},
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
+    // German4K 3.0/32 (I2): >1 = mehrere Fassungen desselben Titels in diesem Raster zu einer Kachel
+    // gebündelt; die Kachel sagt es mit „N Fassungen".
+    fassungen: Int = 0,
 ) {
     val colors = OwnTVTheme.colors
+    // German4K 3.0/32 (I2): Titel ohne Anbietervorsatz ("DE - …"), der Vorsatz als Kürzel aufs Plakat.
+    val anzeige = androidx.compose.runtime.remember(title) { tv.own.owntv.core.german4k.German4kTitel.anzeige(title) }
     FocusableSurface(
         onClick = onClick,
         onLongClick = onLongClick,
@@ -125,13 +131,26 @@ fun PosterCard(
                     )
                 }
 
-                providerName?.let {
-                    ProviderChip(
-                        name = it,
-                        maxWidth = 96.dp,
-                        compact = true,
-                        modifier = Modifier.align(Alignment.BottomStart).padding(start = 6.dp, bottom = 8.dp),
-                    )
+                // German4K 3.0/32 (I2): unten links Kürzel und Fassungen, darüber wie bisher der Anbieter.
+                Column(
+                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 6.dp, bottom = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    providerName?.let {
+                        ProviderChip(
+                            name = it,
+                            maxWidth = 96.dp,
+                            compact = true,
+                        )
+                    }
+                    if (anzeige.kuerzel != null || fassungen > 1) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            anzeige.kuerzel?.let { PlakatPlakette(it) }
+                            if (fassungen > 1) {
+                                PlakatPlakette(androidx.compose.ui.res.pluralStringResource(R.plurals.g4k_fassungen, fassungen, fassungen))
+                            }
+                        }
+                    }
                 }
                 if (progressFraction != null && progressFraction > 0f) {
                     Box(
@@ -152,7 +171,7 @@ fun PosterCard(
             }
             Spacer(Modifier.height(Dimens.PosterPadding))
             Text(
-                title,
+                anzeige.titel,
                 style = MaterialTheme.typography.labelLarge,
                 color = if (focused) colors.primary else colors.onSurface,
                 maxLines = 2,
@@ -163,4 +182,20 @@ fun PosterCard(
             )
         }
     }
+}
+
+/** German4K 3.0/32 (I2): kleine dunkle Plakette auf dem Plakat (Kürzel „DE", „4K", „3 Fassungen"). */
+@Composable
+private fun PlakatPlakette(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+        color = Color.White,
+        maxLines = 1,
+        modifier = Modifier
+            .clip(RoundedCornerShape(5.dp))
+            .background(Color.Black.copy(alpha = 0.72f))
+            .padding(horizontal = 5.dp, vertical = 2.dp),
+    )
 }

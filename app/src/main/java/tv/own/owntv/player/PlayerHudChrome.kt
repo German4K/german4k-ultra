@@ -69,10 +69,18 @@ internal fun TopBar(
     // The clock. Rendered between two equal-weight halves so it lands on the true centre of the screen
     // whatever the channel name and guide card happen to be doing on either side of it.
     centre: (@Composable () -> Unit)? = null,
+    // German4K 3.0/32 (Q2): der Sender, den die Huelle gerade zeigt. Bei mpv kommen Name/Logo erst
+    // nach dem asynchronen Aufloesen in die Metadaten, und `isLiveContent` ist dort nicht immer
+    // gesetzt — der Kopf stand dann leer da ("MPV" ohne Sendername). Mit diesem Wert sieht der Kopf
+    // bei beiden Motoren gleich aus: Logo + Sendername links, Programmkachel rechts.
+    liveKanal: LiveKopf? = null,
 ) {
     // Reactive meta so the title row updates instantly on a channel zap (the plain vars aren't observed).
     val meta by player.currentMeta.collectAsStateWithLifecycle()
+    @Suppress("NAME_SHADOWING")
+    val isLive = isLive || liveKanal != null
     val displayTitle = meta.title?.takeIf { it.isNotBlank() }
+        ?: liveKanal?.name
         ?: meta.episodeNumber?.let { stringResource(R.string.player_episode_number, it) }
         ?: ""
     val localizedSubtitle = meta.localizedSubtitle()
@@ -93,7 +101,7 @@ internal fun TopBar(
         // Live: the channel logo sits with the channel NAME (identity), not with the programme — so the
         // whole "which channel am I on" group reads as one unit however wide the TV is.
         if (isLive) {
-            ChannelLogo(meta.logoUrl, displayTitle, size = 46)
+            ChannelLogo(meta.logoUrl?.takeIf { it.isNotBlank() } ?: liveKanal?.logoUrl, displayTitle, size = 46)
             Spacer(Modifier.width(14.dp))
         }
         Column(Modifier.weight(1f)) {
@@ -182,6 +190,9 @@ internal fun TopBar(
       }
     }
 }
+
+/** German4K 3.0/32 (Q2): Senderkennung fuer den Kopf, unabhaengig vom Motor. */
+data class LiveKopf(val name: String, val logoUrl: String?)
 
 /** The channel logo tile, falling back to the first letters of the channel name. */
 @Composable

@@ -86,6 +86,12 @@ data class HomeUiState(
      * data publishes, and stays false thereafter (refreshes don't re-skeleton).
      */
     val isLoading: Boolean = true,
+    /** German4K 3.0/32 (E2): zuletzt gesehene Sender — eigene Querformat-Karten statt Hero-Kacheln. */
+    val liveWeiter: List<HeroItem.LiveHero> = emptyList(),
+    /** German4K 3.0/32 (E2): was auf diesen Sendern gerade läuft (Kanal-id → Sendung, gespeicherter Guide). */
+    val liveJetzt: Map<Long, tv.own.owntv.core.database.entity.EpgProgrammeEntity> = emptyMap(),
+    /** German4K 3.0/32 (D2): „Neu bei Filme". */
+    val neueFilme: List<tv.own.owntv.core.database.entity.MovieEntity> = emptyList(),
 )
 
 /** What the shared top-bar Continue chip points at (Batch 7). */
@@ -120,6 +126,10 @@ class HomeViewModel(
     private val progressDao: tv.own.owntv.core.database.dao.ProgressDao,
     private val metadata: MetadataRepository,
     private val trendingDao: TrendingDao,
+    // German4K 3.0/32 (D2/E2): Guide für die Live-Karten, Spielplan für „Jetzt im Fußball".
+    private val guide: tv.own.owntv.core.live.GuideReader,
+    private val customize: tv.own.owntv.core.customize.CustomizationStore,
+    private val sport: tv.own.owntv.core.german4k.German4kSportRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -309,17 +319,22 @@ class HomeViewModel(
     private suspend fun loadHomeData(profileId: Long) {
         val previous = _uiState.value
         val data = feed.load(profileId)
+        // German4K 3.0/32 (E2): Sender aus „Weiterschauen" herausnehmen — sie bekommen Querformat-
+        // Karten mit laufender Sendung. Filme/Folgen bleiben die Hero-Kacheln (samt Vorschau).
+        val liveWeiter = data.heroItems.filterIsInstance<HeroItem.LiveHero>()
+        val heroItems = data.heroItems.filterNot { it is HeroItem.LiveHero }
+        val liveJetzt = liveJetztFuer(profileId, liveWeiter.map { it.channel })
         _uiState.value = HomeUiState(
             trendingItems = data.trendingItems,
             activeTrendingIndex = previous.activeTrendingIndex
                 .coerceIn(0, (data.trendingItems.size - 1).coerceAtLeast(0)),
             trendingPreferredLanguage = data.trendingPreferredLanguage,
             trendingSeasonCounts = data.trendingSeasonCounts,
-            heroItems = data.heroItems,
+            heroItems = heroItems,
             activeHeroIndex = 0,
             continueMovies = data.continueMovies,
             continueSeries = data.continueSeries,
-            heroMetadata = previous.heroMetadata.filterKeys { key -> data.heroItems.any { it.homeKey == key } },
+            heroMetadata = previous.heroMetadata.filterKeys { key -> heroItems.any { it.homeKey == key } },
             continuationArtwork = previous.continuationArtwork
                 .filterKeys { key -> data.continueSeries.any { it.stableKey == key } },
             recentLive = data.recentLive,
@@ -328,6 +343,9 @@ class HomeViewModel(
             recentGuide = data.recentGuide,
             favoriteGuide = data.favoriteGuide,
             isLoading = false,
+            liveWeiter = liveWeiter,
+            liveJetzt = liveJetzt,
+            neueFilme = data.newMovies,
         )
         tv.own.owntv.core.util.Perf.stamp("home-data")
     }
@@ -391,9 +409,64 @@ class HomeViewModel(
             ?: series.posterUrl?.takeIf { it.isNotBlank() }
     }
 
+    /** German4K 3.0/32 (E2): laufende Sendung je Sender, nur aus dem gespeicherten Guide (kein Abruf). */
+    private suspend fun liveJetztFuer(
+        profileId: Long,
+        channels: List<ChannelEntity>,
+    ): Map<Long, tv.own.owntv.core.database.entity.EpgProgrammeEntity> {
+        if (channels.isEmpty()) return emptyMap()
+        return runCatching {
+            withContext(Dispatchers.IO) {
+                guide.onNow(
+                    channels = channels,
+                    cust = customize.observe(profileId, MediaType.LIVE).first(),
+                    globalShiftMinutes = settings.epgOffsetMinutes.first(),
+                    atMs = System.currentTimeMillis(),
+                    lookAheadMs = LIVE_JETZT_FENSTER_MS,
+                ).mapNotNull { (id, slot) -> slot.now?.let { id to it } }.toMap()
+            }
+        }.getOrDefault(emptyMap())
+    }
+
+    /**
+     * German4K 3.0/32 (D2): „Jetzt im Fußball" — laufende Spiele zuerst, dann die heutigen, höchstens
+     * acht. Leer, solange der Bereich aus ist oder der Server nichts meldet.
+     */
+    val fussball: StateFlow<List<tv.own.owntv.core.german4k.German4kSpiel>> =
+        combine(sport.antwort, tv.own.owntv.core.german4k.German4kFeatures.flow) { a, features ->
+            if (a == null || !a.ok || !tv.own.owntv.core.nav.NavVisibility.sportAn(features)) emptyList()
+            else {
+                val r = tv.own.owntv.core.german4k.regale(
+                    a.spiele,
+                    java.time.LocalDate.now(tv.own.owntv.core.german4k.SPORT_ZONE),
+                    tv.own.owntv.core.german4k.SPORT_ZONE,
+                )
+                (r.live + r.heute).take(FUSSBALL_MAX)
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /**
+     * Solange die Startseite offen ist: Spielplan holen, danach alle fünf Minuten. Bewusst seltener
+     * als der Fußball-Bereich selbst (60 s) — hier steht nur die Übersicht.
+     */
+    suspend fun fussballAuffrischen() {
+        while (true) {
+            if (tv.own.owntv.core.german4k.German4kFeatures.visible(tv.own.owntv.core.nav.NavVisibility.SPORT_FEATURE)) {
+                runCatching { sport.ladeJetzt() }
+            }
+            delay(FUSSBALL_INTERVALL_MS)
+        }
+    }
+
     private suspend fun currentProfileId(): Long? {
         val preferred = settings.activeProfileId.first()
         return if (preferred >= 0) profileDao.resolveExistingProfileId(preferred) else null
     }
 
+    private companion object {
+        // German4K 3.0/32: Fenster für die laufende Sendung, Fußball-Reihe.
+        const val LIVE_JETZT_FENSTER_MS = 3 * 60 * 60_000L
+        const val FUSSBALL_MAX = 8
+        const val FUSSBALL_INTERVALL_MS = 5 * 60_000L
+    }
 }

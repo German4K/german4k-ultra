@@ -151,9 +151,18 @@ fun HomeScreen(
     previewEnabled: Boolean = true,
     firstRowFocusRequester: FocusRequester? = null,
     onContentScrolled: (Boolean) -> Unit = {},
+    // German4K 3.0/32 (D2): Klick auf ein Spiel in „Jetzt im Fußball" / einen Film in „Neu bei Filme".
+    onOpenSportSpiel: (tv.own.owntv.core.german4k.German4kSpiel) -> Unit = {},
+    onOpenMovie: (movieId: Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
+    // German4K 3.0/32 (D2): Fußball-Reihe; der Spielplan wird geholt, solange die Startseite offen ist.
+    val g4kFussball by vm.fussball.collectAsStateWithLifecycle()
+    LaunchedEffect(vm) { vm.fussballAuffrischen() }
+    val g4kFussballFocus = remember { FocusRequester() }
+    val g4kNeuFilmeFocus = remember { FocusRequester() }
+    val g4kLiveWeiterFocus = remember { FocusRequester() }
     val trendingUnavailableMessage = stringResource(R.string.home_trending_unavailable)
     val heroPreviewEngine = koinInject<HeroPreviewEngine>()
     val engineState by heroPreviewEngine.state.collectAsStateWithLifecycle()
@@ -190,23 +199,39 @@ fun HomeScreen(
     var focusedHeroIndex by remember { mutableStateOf(-1) }
     val orderedRows = state.config.visibleOrder
     val heroVisible = HomeRow.HERO in orderedRows
-    val hasNonHeroContent = orderedRows.any { it != HomeRow.HERO && rowHasData(it, state) }
-    val showHeroFallback = heroVisible && state.heroItems.isEmpty() && !hasNonHeroContent
+    // German4K 3.0/32 (D2): die beiden eigenen Reihen zählen als Inhalt wie jede andere.
+    val g4kExtras = g4kFussball.isNotEmpty() || state.neueFilme.isNotEmpty()
+    val hasNonHeroContent = orderedRows.any { it != HomeRow.HERO && rowHasData(it, state) } || g4kExtras
+    val showHeroFallback = heroVisible && !rowHasData(HomeRow.HERO, state) && !hasNonHeroContent
     val renderRows = orderedRows.filter { rowCanRender(it, state, showHeroFallback) }
     val firstDataRow = renderRows.firstOrNull { it != HomeRow.HERO && rowHasData(it, state) }
-    val showAllHiddenState = orderedRows.isEmpty()
-    val showEmptyState = orderedRows.isNotEmpty() && renderRows.isEmpty()
-    val rowFocusRequester: (HomeRow) -> FocusRequester? = { row ->
-        if (row == renderRows.firstOrNull() && firstRowFocusRequester != null) {
+    val showAllHiddenState = orderedRows.isEmpty() && !g4kExtras
+    val showEmptyState = orderedRows.isNotEmpty() && renderRows.isEmpty() && !g4kExtras
+    // German4K 3.0/32 (D2): Reihenfolge „Jetzt im Fußball" → (Trends) → Weiterschauen → „Neu bei
+    // Filme" → übrige Reihen. Ohne Weiterschauen steht „Neu bei Filme" am Ende.
+    val slots: List<Any> = buildList {
+        if (g4kFussball.isNotEmpty()) add(G4kSlot.FUSSBALL)
+        renderRows.forEach { row ->
+            add(row)
+            if (row == HomeRow.HERO && state.neueFilme.isNotEmpty()) add(G4kSlot.NEU_FILME)
+        }
+        if (state.neueFilme.isNotEmpty() && G4kSlot.NEU_FILME !in this) add(G4kSlot.NEU_FILME)
+    }
+    val rowFocusRequester: (Any) -> FocusRequester? = { row ->
+        if (row == slots.firstOrNull() && firstRowFocusRequester != null) {
             firstRowFocusRequester
         } else when (row) {
+            G4kSlot.FUSSBALL -> g4kFussballFocus
+            G4kSlot.NEU_FILME -> g4kNeuFilmeFocus
             HomeRow.TRENDING -> trendingPrimaryFocus
             HomeRow.HERO -> when {
+                state.liveWeiter.isNotEmpty() -> g4kLiveWeiterFocus
                 state.heroItems.isNotEmpty() -> heroFocus
                 showHeroFallback -> fallbackFocus
                 else -> null
             }
-            else -> rowFirstFocusRequesters[row]
+            is HomeRow -> rowFirstFocusRequesters[row]
+            else -> null
         }
     }
 
@@ -251,20 +276,20 @@ fun HomeScreen(
         onDispose { heroPreviewEngine.stop() }
     }
 
-    LaunchedEffect(orderedRows, state.trendingItems, state.heroItems, state.recentLive, state.favoriteLive, state.recentGuide, state.favoriteGuide, state.continueMovies, state.continueSeries, restoreFocus, restoreTrendingSearchFocus) {
-        if (orderedRows.isEmpty()) {
+    LaunchedEffect(orderedRows, state.trendingItems, state.heroItems, state.liveWeiter, state.recentLive, state.favoriteLive, state.recentGuide, state.favoriteGuide, state.continueMovies, state.continueSeries, restoreFocus, restoreTrendingSearchFocus) {
+        if (slots.isEmpty()) {
             if (restoreFocus) onRestored()
             return@LaunchedEffect
         }
 
         val targetRow = when {
             restoreTrendingSearchFocus && state.trendingItems.isNotEmpty() -> HomeRow.TRENDING
-            restoreFocus && heroVisible && state.heroItems.isNotEmpty() -> HomeRow.HERO
+            restoreFocus && heroVisible && rowHasData(HomeRow.HERO, state) -> HomeRow.HERO
             restoreFocus && showHeroFallback -> HomeRow.HERO
             restoreFocus -> firstDataRow
             else -> null
         }
-        val targetIndex = targetRow?.let { renderRows.indexOf(it) } ?: 0
+        val targetIndex = targetRow?.let { slots.indexOf(it) } ?: 0
         runCatching { listState.scrollToItem(targetIndex.coerceAtLeast(0)) }
 
         // Only pull focus INTO the Home content when returning from the player (restoreFocus). On a cold
@@ -273,7 +298,7 @@ fun HomeScreen(
             kotlinx.coroutines.delay(60)
             val focusTarget = when {
                 restoreTrendingSearchFocus && state.trendingItems.isNotEmpty() -> trendingVersionsFocus
-                heroVisible && state.heroItems.isNotEmpty() -> rowFocusRequester(HomeRow.HERO)
+                heroVisible && rowHasData(HomeRow.HERO, state) -> rowFocusRequester(HomeRow.HERO)
                 showHeroFallback -> rowFocusRequester(HomeRow.HERO)
                 firstDataRow != null -> rowFocusRequester(firstDataRow)
                 else -> null
@@ -307,7 +332,7 @@ fun HomeScreen(
     val g4kProvisioner: tv.own.owntv.core.german4k.German4kProvisioner = koinInject()
     val g4kSyncAktiv by g4kSyncTracker.active.collectAsStateWithLifecycle()
     val g4kVerwaltet by g4kProvisioner.verwaltet.collectAsStateWithLifecycle()
-    val g4kNichtsDa = state.heroItems.isEmpty() &&
+    val g4kNichtsDa = !rowHasData(HomeRow.HERO, state) && !g4kExtras &&
         HomeRow.entries.none { it != HomeRow.HERO && rowHasData(it, state) }
     // Laufen mehrere Quellen gleichzeitig (Ausweichhost im Hintergrund), zaehlt die, die wirklich
     // zum ersten Mal laedt — nicht die erstbeste.
@@ -344,7 +369,7 @@ fun HomeScreen(
     }
 
     LaunchedEffect(trendingRowFocused.value) {
-        if (trendingRowFocused.value && renderRows.firstOrNull() == HomeRow.TRENDING) {
+        if (trendingRowFocused.value && slots.firstOrNull() == HomeRow.TRENDING) {
             listState.animateScrollToItem(0, 0)
         }
     }
@@ -360,15 +385,15 @@ fun HomeScreen(
         contentPadding = PaddingValues(vertical = Dimens.ScreenPaddingV),
         verticalArrangement = Arrangement.spacedBy(Dimens.GapLarge),
     ) {
-        itemsIndexed(renderRows, key = { _, row -> row.name }) { index, row ->
+        itemsIndexed(slots, key = { _, row -> (row as? HomeRow)?.name ?: (row as G4kSlot).name }) { index, row ->
             val firstItemFocusRequester = rowFocusRequester(row)
-            val nextRowIndex = renderRows
+            val nextRowIndex = slots
                 .drop(index + 1)
                 .indexOfFirst { rowFocusRequester(it) != null }
                 .takeIf { it >= 0 }
                 ?.let { index + 1 + it }
             val onMoveToNextRow: (() -> Unit)? = nextRowIndex?.let { targetIndex ->
-                val targetFocusRequester = rowFocusRequester(renderRows[targetIndex]) ?: return@let null
+                val targetFocusRequester = rowFocusRequester(slots[targetIndex]) ?: return@let null
                 {
                     homeScope.launch {
                         val targetIsVisible = listState.layoutInfo.visibleItemsInfo.any { it.index == targetIndex }
@@ -381,6 +406,19 @@ fun HomeScreen(
                 }
             }
             when (row) {
+                // German4K 3.0/32 (D2): eigene Reihen.
+                G4kSlot.FUSSBALL -> German4kFussballReihe(
+                    spiele = g4kFussball,
+                    onKlick = onOpenSportSpiel,
+                    onFocus = onNonHeroFocused,
+                    firstItemFocusRequester = firstItemFocusRequester,
+                )
+                G4kSlot.NEU_FILME -> German4kNeuFilmeReihe(
+                    filme = state.neueFilme,
+                    onKlick = { onOpenMovie(it.id) },
+                    onFocus = onNonHeroFocused,
+                    firstItemFocusRequester = firstItemFocusRequester,
+                )
                 // Two shapes, the user's choice: the full hero, or the plain strip of posters the
                 // rest of Home is made of. Same items, same order, either way.
                 HomeRow.TRENDING -> if (state.trendingItems.size < TrendingDao.MIN_ELIGIBLE_ITEMS) {
@@ -389,7 +427,7 @@ fun HomeScreen(
                     // whose value is thrown away, and says so on every build.
                 } else if (state.config.trendingStyle == HomeTrendingStyle.POSTERS) {
                     TrendingPosterRow(
-                        title = row.displayTitle(),
+                        title = (row as HomeRow).displayTitle(),
                         items = state.trendingItems,
                         onItemClick = { item ->
                             onActivateTrending(item) {
@@ -443,15 +481,28 @@ fun HomeScreen(
                     )
                 }
 
-                HomeRow.HERO -> {
+                HomeRow.HERO -> Column(Modifier.fillMaxWidth()) {
+                    // German4K 3.0/32 (E2): Sender als Querformat-Karten mit laufender Sendung, darunter
+                    // Filme/Folgen als gewohnte Hero-Kacheln — beides unter EINEM „Weiterschauen".
+                    if (state.liveWeiter.isNotEmpty()) {
+                        German4kLiveWeiterReihe(
+                            items = state.liveWeiter,
+                            jetzt = state.liveJetzt,
+                            onPlay = { onPlayChannel(it.channel.id, state.recentLive) },
+                            onFocus = onNonHeroFocused,
+                            firstItemFocusRequester = firstItemFocusRequester ?: g4kLiveWeiterFocus,
+                        )
+                        if (state.heroItems.isNotEmpty()) Spacer(Modifier.height(Dimens.GapLarge))
+                    }
                     if (state.heroItems.isNotEmpty()) {
                         HeroRowSection(
+                            showTitle = state.liveWeiter.isEmpty(),
                             items = state.heroItems,
                             activeHeroIndex = state.activeHeroIndex,
                             expandedIndex = expandedHeroIndex,
                             heroPreviewEngine = heroPreviewEngine,
                             engineState = engineState,
-                            heroFocusRequester = firstItemFocusRequester ?: heroFocus,
+                            heroFocusRequester = if (state.liveWeiter.isEmpty()) firstItemFocusRequester ?: heroFocus else heroFocus,
                             heroMetadata = state.heroMetadata,
                             onHeroFocusChanged = { index, hasFocus ->
                                 if (hasFocus) {
@@ -476,7 +527,7 @@ fun HomeScreen(
                             },
                             modifier = Modifier.fillMaxWidth(),
                         )
-                    } else {
+                    } else if (state.liveWeiter.isEmpty()) {
                         HeroFallbackPane(
                             modifier = Modifier.fillMaxWidth(),
                             focusRequester = firstItemFocusRequester ?: fallbackFocus,
@@ -487,7 +538,7 @@ fun HomeScreen(
 
                 HomeRow.RECENT_CHANNELS -> if (state.recentLive.isNotEmpty()) {
                     HomeLiveRow(
-                        title = row.displayTitle(),
+                        title = (row as HomeRow).displayTitle(),
                         mode = state.config.recentLiveMode,
                         channels = state.recentLive,
                         guide = state.recentGuide,
@@ -501,7 +552,7 @@ fun HomeScreen(
 
                 HomeRow.FAVORITE_CHANNELS -> if (state.favoriteLive.isNotEmpty()) {
                     HomeLiveRow(
-                        title = row.displayTitle(),
+                        title = (row as HomeRow).displayTitle(),
                         mode = state.config.favoriteLiveMode,
                         channels = state.favoriteLive,
                         guide = state.favoriteGuide,
@@ -515,7 +566,7 @@ fun HomeScreen(
 
                 HomeRow.CONTINUE_MOVIES -> if (state.continueMovies.isNotEmpty()) {
                     ContinueWatchingRow(
-                        title = row.displayTitle(),
+                        title = (row as HomeRow).displayTitle(),
                         items = state.continueMovies,
                         onItemClick = { onPlayMovie(it.sourceItemId, it.positionMs) },
                         onFocus = onNonHeroFocused,
@@ -525,7 +576,7 @@ fun HomeScreen(
 
                 HomeRow.CONTINUE_SERIES -> if (state.continueSeries.isNotEmpty()) {
                     ContinueWatchingRow(
-                        title = row.displayTitle(),
+                        title = (row as HomeRow).displayTitle(),
                         items = state.continueSeries,
                         posterOverrides = state.continuationArtwork,
                         landscapeTiles = true,
@@ -592,9 +643,12 @@ fun HomeScreen(
     InAppToast(trendingToast)
 }
 
+/** German4K 3.0/32 (D2): Startseiten-Reihen, die nicht in core's [HomeRow] stehen. */
+private enum class G4kSlot { FUSSBALL, NEU_FILME }
+
 private fun rowHasData(row: HomeRow, state: HomeUiState): Boolean = when (row) {
     HomeRow.TRENDING -> state.trendingItems.size >= TrendingDao.MIN_ELIGIBLE_ITEMS
-    HomeRow.HERO -> state.heroItems.isNotEmpty()
+    HomeRow.HERO -> state.heroItems.isNotEmpty() || state.liveWeiter.isNotEmpty()
     HomeRow.RECENT_CHANNELS -> when (state.config.recentLiveMode) {
         HomeLiveRowMode.CARDS -> state.recentLive.isNotEmpty()
         HomeLiveRowMode.ON_NOW -> state.recentGuide.hasContent
@@ -609,7 +663,7 @@ private fun rowHasData(row: HomeRow, state: HomeUiState): Boolean = when (row) {
 
 private fun rowCanRender(row: HomeRow, state: HomeUiState, showHeroFallback: Boolean): Boolean =
     when (row) {
-        HomeRow.HERO -> state.heroItems.isNotEmpty() || showHeroFallback
+        HomeRow.HERO -> rowHasData(HomeRow.HERO, state) || showHeroFallback
         else -> rowHasData(row, state)
     }
 
@@ -1120,6 +1174,8 @@ private fun trendingJsonList(json: String?): List<String> {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun HeroRowSection(
+    // German4K 3.0/32 (E2): false, wenn die Live-Karten darüber schon „Weiterschauen" tragen.
+    showTitle: Boolean = true,
     items: List<HeroItem>,
     activeHeroIndex: Int,
     expandedIndex: Int,
@@ -1182,6 +1238,7 @@ private fun HeroRowSection(
     val endPadding = (rowWidthDp - Dimens.HeroBaseWidth - Dimens.HomeRowPaddingH).coerceAtLeast(Dimens.HomeRowPaddingH)
 
     Column(modifier = modifier) {
+        if (showTitle) {
         Text(
             text = stringResource(R.string.home_keep_watching).uppercase(),
             style = MaterialTheme.typography.titleSmall,
@@ -1190,6 +1247,7 @@ private fun HeroRowSection(
             modifier = Modifier.padding(start = Dimens.HomeRowPaddingH),
         )
         Spacer(Modifier.height(10.dp))
+        }
 
         Box(
             modifier = Modifier
@@ -1388,8 +1446,8 @@ private fun HeroRowSection(
 
                                     Spacer(Modifier.height(8.dp))
                                     val title = when (item) {
-                                        is HeroItem.MovieHero -> item.item.title
-                                        is HeroItem.SeriesHero -> item.item.title
+                                        is HeroItem.MovieHero -> tv.own.owntv.core.german4k.German4kTitel.titel(item.item.title)
+                                        is HeroItem.SeriesHero -> tv.own.owntv.core.german4k.German4kTitel.titel(item.item.title)
                                         is HeroItem.LiveHero -> item.channel.name
                                     }
                                     Text(
@@ -1508,8 +1566,8 @@ private fun HeroRowSection(
                         ) {
                             val expandedMeta = heroMetadata[expandedItem.heroKey()]
                             val title = when (expandedItem) {
-                                is HeroItem.MovieHero -> expandedItem.item.title
-                                is HeroItem.SeriesHero -> expandedItem.item.title
+                                is HeroItem.MovieHero -> tv.own.owntv.core.german4k.German4kTitel.titel(expandedItem.item.title)
+                                is HeroItem.SeriesHero -> tv.own.owntv.core.german4k.German4kTitel.titel(expandedItem.item.title)
                                 is HeroItem.LiveHero -> expandedItem.channel.name
                             }
                             val logoUrl = expandedMeta?.logoUrl?.takeIf { expandedItem !is HeroItem.LiveHero }

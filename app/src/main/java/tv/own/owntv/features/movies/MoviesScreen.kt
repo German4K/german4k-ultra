@@ -225,6 +225,8 @@ fun MoviesScreen(
     val contextFocus = remember { FocusRequester() }
     val selectedProgress by vm.selectedProgress.collectAsStateWithLifecycle()
     val movieProgress by vm.movieProgress.collectAsStateWithLifecycle()
+    // German4K 3.0/32 (I2): gebündelte Fassungen je Kachel.
+    val fassungsAnzahl by vm.fassungsAnzahl.collectAsStateWithLifecycle()
     val downloadStates by vm.downloadStates.collectAsStateWithLifecycle()
     val movies = vm.movies.collectAsLazyPagingItems()
     // German4K: Wechselt die Detailseite auf einen anderen Titel (andere Fassung, Sprung aus der
@@ -266,14 +268,21 @@ fun MoviesScreen(
     // findet der `LaunchedEffect(detailsMovie, tmdbDetailsMovie)` weiter unten nach „Zurueck"
     // wieder zu GENAU dieser Kachel zurueck. `contextMovie` bleibt dabei null — das Langdruck-
     // Menue oeffnet also nicht mit, und beim Schliessen der Seite oeffnet es auch nicht nach.
-    val oeffneFilm: (MovieEntity, Int) -> Unit = { m, index ->
+    val oeffneFilmDirekt: (MovieEntity, MovieEntity, Int) -> Unit = { ziel, kachel, index ->
         if (detailseite) {
-            contextMovieId = m.id
+            contextMovieId = kachel.id
             contextMovieIndex = index
-            detailsMovie = m
+            detailsMovie = ziel
         } else {
-            startMovie(m)
+            startMovie(ziel)
         }
+    }
+    // German4K 3.0/32 (I2): Eine gebündelte Kachel öffnet die bevorzugte Fassung (deutsch, dann 4K,
+    // dann die erste); der Fokus kehrt trotzdem zur Kachel zurück, die im Raster steht.
+    val oeffneFilm: (MovieEntity, Int) -> Unit = { m, index ->
+        val zielId = vm.bevorzugteFassung(m.id)
+        if (zielId == m.id) oeffneFilmDirekt(m, m, index)
+        else scope.launch { oeffneFilmDirekt(vm.movieById(zielId) ?: m, m, index) }
     }
 
     // German4K: Auftrag aus dem Serienbereich — die Personenseite einer Serie nennt auch Filme.
@@ -655,10 +664,10 @@ fun MoviesScreen(
                     // 130 dp so schmal, dass der Titel nicht mehr zu lesen ist — dort 150 dp (zwei
                     // Spalten). Quer und auf dem Tablet ist Platz genug, da bleibt es beim
                     // Fernseher-Mass 130 dp, sonst stehen auf einem Tablet nur drei Kacheln nebeneinander.
+                    // German4K 3.0/32 (I2): am Fernseher sechs Spalten (kleinere Plakate, mehr Titel auf einen Blick).
                     columns = when {
                         formfaktor.mobil -> GridCells.Adaptive(minSize = if (formfaktor.kompakt) 150.dp else 130.dp)
-                        detailseite -> GridCells.Fixed(3)
-                        else -> GridCells.Adaptive(minSize = 130.dp)
+                        else -> GridCells.Fixed(TV_RASTER_SPALTEN)
                     },
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -681,6 +690,7 @@ fun MoviesScreen(
                                     else (prog.positionMs.toFloat() / prog.durationMs).takeIf { it > 0f },
                                 isFavorite = favoriteIds.contains(movie.id),
                                 providerName = providerNames[movie.sourceId],
+                                fassungen = fassungsAnzahl[movie.id] ?: 0,
                                 modifier = Modifier.gridFocusTarget(
                                     itemId = movie.id, index = index,
                                     contextId = contextMovieId, contextFocus = contextFocus,
@@ -978,7 +988,7 @@ fun MoviesScreen(
         tv.own.owntv.ui.components.German4kDetailScreen(
             ui = tv.own.owntv.ui.components.German4kDetailUi(
                 schluessel = m.remoteId ?: "false:${m.name}",
-                titel = m.name,
+                titel = tv.own.owntv.core.german4k.German4kTitel.titel(m.name),
                 plakat = m.posterUrl,
                 details = seitenDetails,
                 serie = false,
@@ -1300,7 +1310,7 @@ private fun MovieDetailsPane(
             )
             Spacer(Modifier.height(6.dp))
         }
-        Text(movie.name, style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
+        Text(tv.own.owntv.core.german4k.German4kTitel.titel(movie.name), style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
         Spacer(Modifier.height(6.dp))
         Text(metaLine(movie, meta, tmdbWins), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
         // German4K: Bewertungen je Quelle mit den Zeichen der Seiten (IMDb, TMDB, RT, Metacritic …).
@@ -1427,7 +1437,7 @@ private fun MovieListRow(
             }
             Column(Modifier.weight(1f)) {
                 Text(
-                    movie.name,
+                    tv.own.owntv.core.german4k.German4kTitel.titel(movie.name),
                     style = MaterialTheme.typography.titleSmall,
                     color = when {
                         focused -> colors.primary
@@ -1457,3 +1467,6 @@ private fun MovieListRow(
         }
     }
 }
+
+/** German4K 3.0/32 (I2): Spalten des Filmrasters am Fernseher. */
+private const val TV_RASTER_SPALTEN = 6

@@ -61,6 +61,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import tv.own.owntv.ui.components.German4kSchalter
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -226,6 +227,9 @@ fun SettingsScreen(
     var showAccent by remember { mutableStateOf(false) }
     var showFocusHighlight by remember { mutableStateOf(false) }
     var showUpdate by remember { mutableStateOf(false) }
+    // German4K 3.0/32 (W2): das Fehlerprotokoll steht jetzt hier statt oben in „Mehr".
+    var showErrorLog by remember { mutableStateOf(false) }
+    val errorLogRowFocus = remember { FocusRequester() }
     var showCatchupTime by remember { mutableStateOf(false) }
     var showEpgOffset by remember { mutableStateOf(false) }
     var showAnimations by remember { mutableStateOf(false) }
@@ -296,13 +300,13 @@ fun SettingsScreen(
         savedIndex = listState.firstVisibleItemIndex
         savedOffset = listState.firstVisibleItemScrollOffset
     }
-    val anyDialogOpen = showZoom || showPopupSize || showFontCustomization || showTheme || showAccent || showUpdate || showCatchupTime || showEpgOffset || showAnimations || showStartup || showStartupChannelPicker || showAfrWarning || showLivePreviewPanelWarning || showBgImageChooser || showBgPicker || showAmbientGlow || showBrowsing || showFocusHighlight || showBgRemote || showDarstellung || showAbmelden
+    val anyDialogOpen = showZoom || showPopupSize || showFontCustomization || showTheme || showAccent || showUpdate || showCatchupTime || showEpgOffset || showAnimations || showStartup || showStartupChannelPicker || showAfrWarning || showLivePreviewPanelWarning || showBgImageChooser || showBgPicker || showAmbientGlow || showBrowsing || showFocusHighlight || showBgRemote || showDarstellung || showAbmelden || showErrorLog
     // When a dialog closes, restore focus to the row that opened it. NOTE: this restore crosses
     // INTO the root focus group from outside (the dialog), but onEnter does NOT fire for programmatic
     // requestsFocus (only for directional entry) — so dialogReturn must be cleared HERE, not in onEnter.
     // If it's left set, the next directional entry (e.g. sidebar→here) would re-route to a stale row.
     var dialogReturn by remember { mutableStateOf<FocusRequester?>(null) }
-    LaunchedEffect(showZoom, showPopupSize, showFontCustomization, showTheme, showAccent, showUpdate, showCatchupTime, showEpgOffset, showAnimations, showStartup, showStartupChannelPicker, showAfrWarning, showLivePreviewPanelWarning, showBgImageChooser, showBgPicker, showAmbientGlow, showBrowsing, showFocusHighlight, showBgRemote, showDarstellung, showAbmelden) {
+    LaunchedEffect(showZoom, showPopupSize, showFontCustomization, showTheme, showAccent, showUpdate, showCatchupTime, showEpgOffset, showAnimations, showStartup, showStartupChannelPicker, showAfrWarning, showLivePreviewPanelWarning, showBgImageChooser, showBgPicker, showAmbientGlow, showBrowsing, showFocusHighlight, showBgRemote, showDarstellung, showAbmelden, showErrorLog) {
         if (!anyDialogOpen) {
             // Focus back on the opener row, with the scroll offset held still the whole way — see
             // [restoreAfterDialogClose] for why doing those two in sequence made the highlight travel.
@@ -812,6 +816,29 @@ fun SettingsScreen(
             chip = if (updateCheckOnStart) stringResource(R.string.common_on) else stringResource(R.string.common_off),
             chipTone = if (updateCheckOnStart) TileTone.PRIMARY else TileTone.SECONDARY,
             onClick = { settingsVm.setUpdateCheckOnStart(!updateCheckOnStart) },
+        ),
+        // German4K 3.0/32 (W2): Sicherung, lokale Synchronisierung und Fehlerprotokoll sind keine
+        // Ziele für jeden Tag — sie stehen jetzt hier unter „App" statt oben in „Mehr".
+        RootRow(
+            tabRowKey(SettingsTab.BACKUP), TileTone.TERTIARY, OwnTVIcon.BACKUP,
+            title = stringResource(R.string.settings_backup_restore),
+            desc = stringResource(R.string.more_spine_backup_summary),
+            focus = rowFocus.getValue(SettingsTab.BACKUP),
+            onClick = { open(SettingsTab.BACKUP) },
+        ),
+        RootRow(
+            tabRowKey(SettingsTab.LOCAL_SYNC), TileTone.TERTIARY, OwnTVIcon.REFRESH,
+            title = stringResource(R.string.local_sync_title),
+            desc = stringResource(R.string.more_spine_local_sync_summary),
+            focus = rowFocus.getValue(SettingsTab.LOCAL_SYNC),
+            onClick = { open(SettingsTab.LOCAL_SYNC) },
+        ),
+        RootRow(
+            "g4k_error_log", TileTone.SECONDARY, OwnTVIcon.WARNING,
+            title = stringResource(R.string.settings_playback_error_log),
+            desc = stringResource(R.string.more_spine_error_log_summary),
+            focus = errorLogRowFocus,
+            onClick = { saveScroll(); dialogReturn = errorLogRowFocus; showErrorLog = true },
         ),
         // Plan Z — About and the error log left with the Data group. A page of facts and a log are
         // not preferences; both are More rows now, opening the very same dialogs.
@@ -1486,6 +1513,11 @@ fun SettingsScreen(
     if (showUpdate) {
         tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = { showUpdate = false }) {
             UpdateDialog(onDismiss = { showUpdate = false }, checkOnOpen = true)
+        }
+    }
+    if (showErrorLog) {
+        tv.own.owntv.ui.components.OwnTVPopup(onDismissRequest = { showErrorLog = false }) {
+            PlaybackErrorLogDialog(onDismiss = { showErrorLog = false })
         }
     }
     if (showCatchupTime) {
@@ -4322,7 +4354,10 @@ private fun RootItemContent(
 // ---------------------------------------------------------------------------------------------
 
 /** The value column, the count badges and the eyebrows. Fixed on purpose — see [SettingsMono]. */
-private val SettingsMono = FontFamily(Font(R.font.jetbrains_mono_semibold, FontWeight.SemiBold))
+// German4K 3.0/32 (O2): keine Festbreitenschrift mehr — Werte, Plaketten und Chips in der normalen
+// Oberflächenschrift („Ein", „6 angeheftet", „Profil" sahen in Mono wie Programmcode aus). null =
+// die Schrift des jeweiligen Textstils erben.
+private val SettingsMono: FontFamily? = null
 
 /**
  * Design tokens, straight from the mockup's `:root`. `veil`/`veil2` are the neutral washes an idle
@@ -4531,7 +4566,8 @@ internal fun SpineItem(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(
+                // German4K 3.0/32 (P2): Zeilen ohne Unterzeile (leer) zeigen auch keine leere Zeile.
+                if (summary.isNotBlank()) Text(
                     text = summary,
                     fontSize = 11.5.sp,
                     lineHeight = 14.sp,
@@ -5073,6 +5109,8 @@ private class SettingsSearchEntry(
 @Composable
 private fun ValueText(text: String, active: Boolean) {
     val colors = OwnTVTheme.colors
+    // German4K 3.0/32 (O2): Ein/Aus als echter Schalter.
+    schalterStatt(text)?.let { German4kSchalter(an = it); return }
     Text(
         text = text,
         fontFamily = SettingsMono,
@@ -5085,8 +5123,18 @@ private fun ValueText(text: String, active: Boolean) {
     )
 }
 
+/** German4K 3.0/32 (O2): true/false, wenn [text] genau „Ein"/„Aus" der aktuellen Sprache ist. */
+@Composable
+private fun schalterStatt(text: String): Boolean? = when (text) {
+    stringResource(R.string.common_on) -> true
+    stringResource(R.string.common_off) -> false
+    else -> null
+}
+
 @Composable
 private fun ValueChip(text: String, tone: TileTone) {
+    // German4K 3.0/32 (O2): Ein/Aus als echter Schalter.
+    schalterStatt(text)?.let { German4kSchalter(an = it); return }
     val (bg, on) = tone.colors()
     Text(
         text = text,

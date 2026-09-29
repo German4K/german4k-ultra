@@ -282,8 +282,10 @@ private fun ResultsWithDetail(
                         ResultRow(
                             thumbUrl = item.movie.posterUrl,
                             fallbackIcon = OwnTVIcon.MOVIES,
-                            title = item.movie.name,
-                            subtitle = metaLine(item.movie.year, item.movie.rating, stringResource(R.string.search_movie)),
+                            // German4K 3.0/32 (I2): Titel ohne Vorsatz, das Kürzel vorn in der Unterzeile.
+                            title = tv.own.owntv.core.german4k.German4kTitel.titel(item.movie.name),
+                            subtitle = listOfNotNull(tv.own.owntv.core.german4k.German4kTitel.anzeige(item.movie.name).kuerzel, metaLine(item.movie.year, item.movie.rating, stringResource(R.string.search_movie)))
+                                .joinToString(stringResource(R.string.content_metadata_separator)),
                             isFavorite = false,
                             focusRequester = if (item == firstItem) firstRowFocus else null,
                             onFocused = { selected = item },
@@ -295,8 +297,10 @@ private fun ResultsWithDetail(
                         ResultRow(
                             thumbUrl = item.series.posterUrl,
                             fallbackIcon = OwnTVIcon.SERIES,
-                            title = item.series.name,
-                            subtitle = metaLine(item.series.year, item.series.rating, stringResource(R.string.search_series)),
+                            // German4K 3.0/32 (I2): Titel ohne Vorsatz, das Kürzel vorn in der Unterzeile.
+                            title = tv.own.owntv.core.german4k.German4kTitel.titel(item.series.name),
+                            subtitle = listOfNotNull(tv.own.owntv.core.german4k.German4kTitel.anzeige(item.series.name).kuerzel, metaLine(item.series.year, item.series.rating, stringResource(R.string.search_series)))
+                                .joinToString(stringResource(R.string.content_metadata_separator)),
                             isFavorite = false,
                             focusRequester = if (item == firstItem) firstRowFocus else null,
                             onFocused = { selected = item },
@@ -351,12 +355,12 @@ private fun DetailPane(
         }
         is SearchItem.MovieItem -> {
             posterUrl = item.movie.posterUrl; icon = OwnTVIcon.MOVIES
-            title = item.movie.name; subtitle = metaLine(item.movie.year, item.movie.rating, stringResource(R.string.search_movie)); plot = item.movie.plot
+            title = tv.own.owntv.core.german4k.German4kTitel.titel(item.movie.name); subtitle = metaLine(item.movie.year, item.movie.rating, stringResource(R.string.search_movie)); plot = item.movie.plot
             actionLabel = stringResource(R.string.search_play); action = { onPlayMovie(item.movie) }
         }
         is SearchItem.SeriesItem -> {
             posterUrl = item.series.posterUrl; icon = OwnTVIcon.SERIES
-            title = item.series.name; subtitle = metaLine(item.series.year, item.series.rating, stringResource(R.string.search_series)); plot = item.series.plot
+            title = tv.own.owntv.core.german4k.German4kTitel.titel(item.series.name); subtitle = metaLine(item.series.year, item.series.rating, stringResource(R.string.search_series)); plot = item.series.plot
             actionLabel = stringResource(R.string.search_open_series); action = { onOpenSeries(item.series) }
         }
     }

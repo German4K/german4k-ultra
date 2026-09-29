@@ -161,7 +161,7 @@
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveZapList.kt	direct tune: zap rebuild failed
 1	regex	app/src/main/java/tv/own/owntv/features/mobil/German4kFolgentitel.kt	^[Ss]\\d{1,3}[Ee]\\d{1,4}
 1	empty	app/src/main/java/tv/own/owntv/features/mobil/German4kMobilRahmen.kt	\0
-1	empty	app/src/main/java/tv/own/owntv/features/more/MoreScreen.kt	\0
+6	empty	app/src/main/java/tv/own/owntv/features/more/MoreScreen.kt	\0
 1	technical	app/src/main/java/tv/own/owntv/features/more/MoreScreen.kt	dMMM
 1	technical	app/src/main/java/tv/own/owntv/features/more/MoreScreen.kt	dMMMyyyy
 1	preference-key	app/src/main/java/tv/own/owntv/features/more/QuickPreview.kt	quick_autoplay
@@ -544,6 +544,7 @@
 1	protocol	app/src/main/java/tv/own/owntv/features/shell/components/SettingsScreen.kt	exoplayer
 1	technical	app/src/main/java/tv/own/owntv/features/shell/components/SettingsScreen.kt	focus_highlight
 1	technical	app/src/main/java/tv/own/owntv/features/shell/components/SettingsScreen.kt	fonts
+1	preference-key	app/src/main/java/tv/own/owntv/features/shell/components/SettingsScreen.kt	g4k_error_log
 1	url	app/src/main/java/tv/own/owntv/features/shell/components/SettingsScreen.kt	german4k.com
 1	url	app/src/main/java/tv/own/owntv/features/shell/components/SettingsScreen.kt	github.com/German4K/german4k-ultra
 1	technical	app/src/main/java/tv/own/owntv/features/shell/components/SettingsScreen.kt	group_app
@@ -660,7 +661,7 @@
 1	empty	app/src/main/java/tv/own/owntv/player/MiniPlayer.kt	\0
 1	technical	app/src/main/java/tv/own/owntv/player/MiniPlayer.kt	miniControls
 1	compiler	app/src/main/java/tv/own/owntv/player/MpvVideoSurface.kt	DEPRECATION
-1	technical	app/src/main/java/tv/own/owntv/player/PlayerClock.kt	EEEdMMM
+1	locale	app/src/main/java/tv/own/owntv/player/PlayerClock.kt	EEEddMM
 9	empty	app/src/main/java/tv/own/owntv/player/PlayerHud.kt	\0
 1	technical	app/src/main/java/tv/own/owntv/player/PlayerHud.kt	$k: $v
 1	technical	app/src/main/java/tv/own/owntv/player/PlayerHud.kt	/ $it
@@ -670,6 +671,7 @@
 1	technical	app/src/main/java/tv/own/owntv/player/PlayerHud.kt	position: $reportPosition${reportDuration?.let { " / $it" }.orEmpty()}
 3	empty	app/src/main/java/tv/own/owntv/player/PlayerHudChrome.kt	\0
 2	technical	app/src/main/java/tv/own/owntv/player/PlayerHudChrome.kt	?
+1	compiler	app/src/main/java/tv/own/owntv/player/PlayerHudChrome.kt	NAME_SHADOWING
 1	technical	app/src/main/java/tv/own/owntv/player/PlayerHudChrome.kt	tuneCaret
 1	technical	app/src/main/java/tv/own/owntv/player/PlayerHudChrome.kt	tuneCaretAlpha
 1	technical	app/src/main/java/tv/own/owntv/player/PlayerHudControls.kt	liveDot
@@ -1107,6 +1109,7 @@
 1	technical	app/src/main/java/tv/own/owntv/ui/components/German4kDetailScreen.kt	${person.id}#$n
 1	technical	app/src/main/java/tv/own/owntv/ui/components/German4kPersonScreen.kt	film_${it.id}
 1	technical	app/src/main/java/tv/own/owntv/ui/components/German4kPersonScreen.kt	serie_${it.id}
+1	log	app/src/main/java/tv/own/owntv/ui/components/German4kSchalter.kt	g4kSchalter
 1	empty	app/src/main/java/tv/own/owntv/ui/components/MoveOrderOverlay.kt	\0
 1	performance	app/src/main/java/tv/own/owntv/ui/components/NavLadder.kt	navAccentBar
 1	performance	app/src/main/java/tv/own/owntv/ui/components/NavLadder.kt	navLadderBg
