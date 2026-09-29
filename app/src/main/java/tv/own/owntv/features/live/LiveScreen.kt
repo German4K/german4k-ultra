@@ -52,6 +52,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.rounded.LiveTv
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemContentType
@@ -78,7 +79,6 @@ import tv.own.owntv.features.shell.components.CategoryContextMenu
 import tv.own.owntv.features.shell.components.CategoryRail
 import tv.own.owntv.ui.LocalFormfaktor
 import tv.own.owntv.ui.components.MoveOrderOverlay
-import tv.own.owntv.features.shell.components.PreviewPane
 import tv.own.owntv.features.shell.components.RailCategory
 import tv.own.owntv.ui.components.chNavPaging
 import tv.own.owntv.ui.components.jumpLazyListTo
@@ -546,29 +546,44 @@ fun LiveScreen(
             // German4K: Auf Handy und Tablet traegt schon die Kopfzeile des Mobil-Rahmens den
             // Kategorienamen — diese Brotkrume wuerde ihn ein zweites Mal zeigen und frisst auf
             // einem Handy ein Siebtel des Bildschirms. Die Zaehlerzeile darunter bleibt.
+            // German4K 3.0 (32), Entscheidung Betreiber 29.09.2026 (G2): EINE Zeile statt
+            // "Live-TV / Alle Sender" plus "Alle Sender (21214 Sender)" — Kategoriename gross,
+            // Anzahl gedaempft mit Tausenderpunkt ("Alle Sender  21.214").
             if (!formfaktor.mobil) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        selectedLabel,
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = OwnTVTheme.colors.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    Spacer(Modifier.width(14.dp))
+                    Text(
+                        formatCount(count),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = OwnTVTheme.colors.onSurfaceVariant,
+                        maxLines = 1,
+                        modifier = Modifier.padding(bottom = 4.dp),
+                    )
+                }
+            } else {
+                // Auf Handy/Tablet traegt die Kopfzeile des Mobil-Rahmens schon den Kategorienamen.
                 Text(
-                    stringResource(R.string.content_section_category, stringResource(R.string.common_nav_live_tv), selectedLabel),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = OwnTVTheme.colors.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+                    pluralStringResource(R.plurals.g4k_live_sender_anzahl, count, formatCount(count)),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = OwnTVTheme.colors.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(4.dp))
             }
-            Text(
-                pluralStringResource(R.plurals.content_count_channels, count, selectedLabel, count),
-                style = MaterialTheme.typography.titleMedium,
-                color = OwnTVTheme.colors.primary,
-                fontWeight = FontWeight.Bold,
-            )
             Spacer(Modifier.height(14.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 SearchBar(
                     query = searchQuery,
                     onQueryChange = vm::setSearchQuery,
-                    placeholder = stringResource(R.string.content_search_channels, selectedLabel),
+                    // German4K 3.0 (32), G2: In „<Kategorie>“ suchen
+                    placeholder = stringResource(R.string.g4k_live_suche, selectedLabel),
                     modifier = Modifier.weight(1f).onFocusChanged { if (it.hasFocus && previewEnabled) vm.stopPreview() },
                 )
                 Spacer(Modifier.size(10.dp))
@@ -581,6 +596,11 @@ fun LiveScreen(
                         tv.own.owntv.core.settings.SettingsRepository.SortMode.PLAYLIST,
                         tv.own.owntv.core.settings.SettingsRepository.SortMode.ALPHA,
                     ),
+                    // German4K 3.0 (32), G2: der Knopf hiess "Wiedergabeliste" und sah nicht nach
+                    // Sortieren aus. Jetzt "Sortieren: Nummer" bzw. "Sortieren: A–Z" — die
+                    // Playlist-Ordnung ist bei Sendern die Sendernummer.
+                    playlistLabel = stringResource(R.string.g4k_sort_nummer),
+                    chipFormatRes = R.string.content_epg_sort_button,
                 )
             }
             Spacer(Modifier.height(14.dp))
@@ -1178,7 +1198,9 @@ private fun LivePreviewPane(
     val previewLoading = showVideo && previewState == tv.own.owntv.player.LivePreviewEngine.State.LOADING
     val videoRes = previewHeight?.let { "${it}p" }
     if (channel == null) {
-        PreviewPane(hint = stringResource(R.string.content_focus_channel))
+        // German4K 3.0 (32), F2: kein Werbesatz ("Dein eigener IPTV-Player." brach als
+        // "IPTV-Playe/r." um) — ein dunkler 16:9-Bildschirm mit Hinweis, wo gleich die Vorschau laeuft.
+        German4kLiveVorschauLeer()
         return
     }
     Column(
@@ -1764,6 +1786,48 @@ private fun liveEpgShiftLabel(minutes: Int): String {
             sign,
             number.format(hours),
             number.format(remainder),
+        )
+    }
+}
+
+/** German4K 3.0 (32), F2: Platzhalter der Live-Vorschau, solange kein Sender markiert ist. */
+@Composable
+private fun German4kLiveVorschauLeer() {
+    val colors = OwnTVTheme.colors
+    Column(
+        modifier = Modifier.fillMaxSize().padding(20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color.Black.copy(alpha = 0.55f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            androidx.compose.foundation.Image(
+                imageVector = androidx.compose.material.icons.Icons.Rounded.LiveTv,
+                contentDescription = null,
+                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(colors.onSurfaceVariant.copy(alpha = 0.7f)),
+                modifier = Modifier.size(44.dp),
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+        Text(
+            stringResource(R.string.g4k_live_vorschau_titel),
+            style = MaterialTheme.typography.titleMedium,
+            color = colors.onSurface,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            stringResource(R.string.g4k_live_vorschau_text),
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
     }
 }

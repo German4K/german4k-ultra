@@ -284,6 +284,7 @@ class MainActivity : ComponentActivity() {
             val avatarId by viewModel.avatarId.collectAsStateWithLifecycle()
             val avatarPath by viewModel.avatarPath.collectAsStateWithLifecycle()
             val profileName by viewModel.profileName.collectAsStateWithLifecycle()
+            val profileIsKids by viewModel.profileIsKids.collectAsStateWithLifecycle() // German4K 3.0 (32)
             val sourceSummary by viewModel.sourceSummary.collectAsStateWithLifecycle()
             val playlists by viewModel.playlists.collectAsStateWithLifecycle()
             val activePlaylistId by viewModel.activePlaylistId.collectAsStateWithLifecycle()
@@ -501,6 +502,7 @@ class MainActivity : ComponentActivity() {
                                 onSetCustomAvatar = { file -> viewModel.setCustomAvatar(file) },
                                 onClearCustomAvatar = viewModel::clearCustomAvatar,
                                 profileName = profileName,
+                                profileIsKids = profileIsKids,
                                 sourceSummary = sourceSummary,
                                 playlists = playlists,
                                 activePlaylistId = activePlaylistId,

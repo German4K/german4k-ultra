@@ -288,6 +288,11 @@ class ShellViewModel(
         .flatMapLatest { pid -> if (pid < 0) flowOf("") else profileDao.observeById(pid).map { it?.name ?: "" } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
 
+    /** German4K 3.0 (32): Kinderprofil? Die Seitenleiste zeichnet dann den gruenen Kind-Kreis. */
+    val profileIsKids: StateFlow<Boolean> = settings.activeProfileId
+        .flatMapLatest { pid -> if (pid < 0) flowOf(false) else profileDao.observeById(pid).map { it?.isKids == true } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     /** The active (default) source's name for the sidebar; null means the profile has none. */
     val sourceSummary: StateFlow<String?> = settings.activeProfileId
         .flatMapLatest { pid -> if (pid < 0) flowOf(emptyList<tv.own.owntv.core.database.entity.SourceEntity>()) else sourceRepository.observeSources(pid) }

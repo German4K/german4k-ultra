@@ -45,6 +45,9 @@ fun SortChip(
     playlistLabel: String? = null,
     // German4K: YEAR = Erscheinungsjahr (Kundenwunsch Aleks959).
     modi: List<SortMode> = listOf(SortMode.PLAYLIST, SortMode.ALPHA, SortMode.RATING, SortMode.DATE_ADDED, SortMode.YEAR),
+    // German4K 3.0 (32): optionales Format fuer die Chip-Beschriftung, z. B. "Sortieren: %1$s"
+    // (Live-TV). Null = wie bisher nur der Modus.
+    chipFormatRes: Int? = null,
 ) {
     val colors = OwnTVTheme.colors
     val resolvedPlaylistLabel = playlistLabel ?: stringResource(R.string.settings_sort_playlist)
@@ -85,7 +88,7 @@ fun SortChip(
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                text = label(mode),
+                text = chipFormatRes?.let { stringResource(it, label(mode)) } ?: label(mode),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = if (focused) colors.primary else colors.onSurface,

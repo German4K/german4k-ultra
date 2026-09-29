@@ -37,6 +37,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -102,6 +104,21 @@ fun TopBar(
         label = "topBarHeight",
     )
     val verticalInset = if (hasAudioBar) 4.dp else 2.dp
+    // German4K 3.0 (32), Entscheidung Betreiber 29.09.2026 (V2): Auf dem Handy (kompakte Breite)
+    // passten Bereich, Suche, "Letzter Sender", Uhr und Quelle nie in eine Zeile — die Suche war
+    // links abgeschnitten, der Sender-Chip gekuerzt. Dort steht jetzt: Wortmarke links, rechts zwei
+    // Symbolknoepfe (Suche, Zuletzt gesehen). Keine Uhr (hat die Statusleiste), keine Quelle.
+    // Fernseher und Tablet bleiben unveraendert.
+    if (LocalFormfaktor.current.kompakt) {
+        German4kHandyKopfzeile(
+            onSearchClick = onSearchClick,
+            hatZuletzt = continueLabel != null,
+            onZuletztClick = onContinueClick,
+            audioBar = audioBar,
+            modifier = modifier.fillMaxWidth().height(barHeight).padding(start = 12.dp, end = 8.dp, top = verticalInset, bottom = verticalInset),
+        )
+        return
+    }
     Row(
         modifier = modifier
             .layout { measurable, constraints ->
@@ -155,6 +172,64 @@ fun TopBar(
                 )
             }
         }
+    }
+}
+
+/** German4K 3.0 (32), V2: die Kopfzeile auf dem Handy — Wortmarke, Suche, Zuletzt gesehen. */
+@Composable
+private fun German4kHandyKopfzeile(
+    onSearchClick: () -> Unit,
+    hatZuletzt: Boolean,
+    onZuletztClick: () -> Unit,
+    audioBar: (@Composable () -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        tv.own.owntv.ui.components.BrandLockup(markSize = 26, textSize = 20)
+        androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+        audioBar?.invoke()
+        // Ablauf-/Test-Hinweis bleibt: er erscheint nur in den letzten sieben Tagen und ist die
+        // einzige Stelle, an der der Kunde das sieht.
+        German4kExpiryChip()
+        German4kKopfSymbol(
+            icon = OwnTVIcon.SEARCH,
+            beschreibung = stringResource(R.string.common_search),
+            onClick = onSearchClick,
+        )
+        if (hatZuletzt) {
+            German4kKopfSymbol(
+                icon = OwnTVIcon.HISTORY,
+                beschreibung = stringResource(R.string.g4k_handy_zuletzt),
+                onClick = onZuletztClick,
+            )
+        }
+    }
+}
+
+@Composable
+private fun German4kKopfSymbol(icon: OwnTVIcon, beschreibung: String, onClick: () -> Unit) {
+    val colors = OwnTVTheme.colors
+    FocusableSurface(
+        onClick = onClick,
+        // OwnTVIcon zeichnet auf Canvas und kennt keine Beschreibung — die Vorlesehilfe haengt an
+        // der Flaeche, die man antippt.
+        modifier = Modifier
+            .size(44.dp)
+            .semantics { contentDescription = beschreibung },
+        shape = androidx.compose.foundation.shape.CircleShape,
+        focusedContainerColor = colors.primaryContainer,
+        unfocusedContainerColor = Color.Transparent,
+        contentAlignment = Alignment.Center,
+    ) { focused ->
+        OwnTVIcon(
+            icon = icon,
+            tint = if (focused) colors.onPrimaryContainer else colors.onSurface,
+            modifier = Modifier.size(22.dp),
+        )
     }
 }
 

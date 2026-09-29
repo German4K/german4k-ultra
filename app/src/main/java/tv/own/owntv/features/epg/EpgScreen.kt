@@ -69,6 +69,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.androidx.compose.koinViewModel
 import androidx.tv.material3.MaterialTheme
@@ -123,31 +125,6 @@ private fun epgMessageText(message: EpgMessage): String = when (message) {
     EpgMessage.AddPlaylist -> stringResource(R.string.content_epg_add_playlist)
     is EpgMessage.NoChannelsForQuery -> stringResource(R.string.content_epg_no_channels_query, message.query)
     EpgMessage.MismatchedIds -> stringResource(R.string.content_epg_mismatched_ids)
-}
-
-@Composable
-private fun epgStatsText(stats: EpgStats): String {
-    val catchup = if (stats.catchupChannels > 0) {
-        pluralStringResource(R.plurals.content_epg_catchup_count, stats.catchupChannels, stats.catchupChannels)
-    } else {
-        stringResource(R.string.content_epg_no_catchup_channels)
-    }
-    return if (stats.programmes > 0) {
-        stringResource(
-            R.string.content_epg_stats_loaded,
-            pluralStringResource(R.plurals.content_epg_stats_channels, stats.guideChannels, stats.guideChannels),
-            pluralStringResource(R.plurals.content_epg_stats_programmes, stats.programmes, stats.programmes),
-            catchup,
-        )
-    } else if (stats.catchupChannels > 0) {
-        pluralStringResource(
-            R.plurals.content_epg_stats_catchup_available,
-            stats.catchupChannels,
-            stats.catchupChannels,
-        )
-    } else {
-        stringResource(R.string.content_epg_stats_no_catchup)
-    }
 }
 
 @Composable
@@ -389,12 +366,22 @@ fun EpgScreen(
             .focusGroup()
             .padding(horizontal = 32.dp, vertical = 24.dp),
     ) {
-        // Header: back + title + date + refresh
+        // German4K 3.0 (32), Entscheidung Betreiber 29.09.2026 (N2): Kopf = "TV-Guide" + Datum
+        // gedaempft, dann "Jetzt" und der Kategorie-Filter. Sortieren und EPG-Zuordnung sind
+        // runde Symbolknoepfe mit Vorlesetext — als volle Pillen passten sie nicht mehr in die
+        // Zeile, und der abgeschnittene Sortierknopf stand als leerer Kreis oben rechts. Die
+        // technische Zeile "... geladen: 4297 Sender ... Sendungen ... Catch-up ..." ist weg.
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             FocusableSurface(onClick = onBack, modifier = Modifier.size(44.dp), shape = RoundedCornerShape(14.dp), contentAlignment = Alignment.Center, surface = GlassSurface.CARDS) { _ ->
                 OwnTVIcon(OwnTVIcon.BACK, tint = colors.onSurface, modifier = Modifier.size(20.dp))
             }
-            Text(stringResource(R.string.content_epg_title), style = MaterialTheme.typography.headlineLarge, color = colors.onSurface)
+            Text(
+                stringResource(R.string.content_epg_title),
+                style = MaterialTheme.typography.headlineLarge,
+                color = colors.onSurface,
+                maxLines = 1,
+                softWrap = false,
+            )
             val formatHeaderDate = rememberBestDateFormatter("EEEdMMM")
             if (state.now > 0) {
                 // The day being browsed: "now" on open; follows the cursor when D-padding left into
@@ -403,40 +390,42 @@ fun EpgScreen(
                 Text(
                     formatHeaderDate(headerDate),
                     style = MaterialTheme.typography.titleMedium, color = colors.onSurfaceVariant,
+                    maxLines = 1,
+                    softWrap = false,
                 )
             }
+            Spacer(Modifier.weight(1f))
             // Jump the timeline back to the current time (useful after browsing the catch-up archive).
             if (liveNow in state.windowStart..state.windowEnd) {
-                OwnTVButton(stringResource(R.string.content_epg_jump_now), onClick = jumpToNow, icon = OwnTVIcon.HISTORY, style = OwnTVButtonStyle.SECONDARY)
+                OwnTVButton(stringResource(R.string.g4k_epg_jetzt), onClick = jumpToNow, icon = OwnTVIcon.HISTORY, style = OwnTVButtonStyle.SECONDARY)
             }
-            Spacer(Modifier.weight(1f))
+            // Category filter (#8): narrow the guide to one group instead of all channels at once.
+            if (guideCategories.isNotEmpty()) {
+                val catLabel = categoryFilter?.let { key -> guideCategories.firstOrNull { it.key == key }?.name }
+                    ?: stringResource(R.string.content_epg_all_categories)
+                OwnTVButton(catLabel, onClick = { showCategoryPicker = true }, icon = OwnTVIcon.MENU, style = OwnTVButtonStyle.SECONDARY)
+            }
             // Guide sort: A–Z / Provider / Live TV (mirrors Live) / Catch-up (archive first; hidden when none).
             val sortLabel = when {
                 sortGuide == SettingsRepository.GuideSort.CATCHUP && state.catchupCount == 0 -> guideSortLabel(SettingsRepository.GuideSort.LIVE_TV)
                 sortGuide == SettingsRepository.GuideSort.FAVORITES && state.favoriteCount == 0 -> guideSortLabel(SettingsRepository.GuideSort.LIVE_TV)
                 else -> guideSortLabel(sortGuide)
             }
-            // Category filter (#8): narrow the guide to one group instead of all channels at once.
-            if (guideCategories.isNotEmpty()) {
-                val catLabel = categoryFilter?.let { key -> guideCategories.firstOrNull { it.key == key }?.name } ?: stringResource(R.string.content_epg_all)
-                OwnTVButton(stringResource(R.string.content_epg_category_button, catLabel), onClick = { showCategoryPicker = true }, icon = OwnTVIcon.MENU, style = OwnTVButtonStyle.SECONDARY)
-                Spacer(Modifier.width(12.dp))
-            }
-            OwnTVButton(stringResource(R.string.content_epg_sort_button, sortLabel), onClick = vm::cycleGuideSort, icon = OwnTVIcon.SORT, style = OwnTVButtonStyle.SECONDARY)
-            Spacer(Modifier.width(12.dp))
+            German4kGuideSymbolKnopf(
+                icon = OwnTVIcon.SORT,
+                beschreibung = stringResource(R.string.content_epg_sort_button, sortLabel),
+                onClick = vm::cycleGuideSort,
+            )
             // Smart-match: auto-link channels whose tvg-id doesn't match the EPG feed, by name (#13).
             if (matching) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OwnTVSpinner(sizeDp = 20)
-                    Text(stringResource(R.string.content_epg_matching), style = MaterialTheme.typography.labelLarge, color = colors.onSurfaceVariant)
-                }
+                Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { OwnTVSpinner(sizeDp = 20) }
             } else {
-                OwnTVButton(stringResource(R.string.content_epg_match_button), onClick = vm::autoMatchEpg, icon = OwnTVIcon.EPG, style = OwnTVButtonStyle.SECONDARY)
+                German4kGuideSymbolKnopf(
+                    icon = OwnTVIcon.EPG,
+                    beschreibung = stringResource(R.string.content_epg_match_button),
+                    onClick = vm::autoMatchEpg,
+                )
             }
-        }
-        state.stats?.let { stats ->
-            Spacer(Modifier.height(4.dp))
-            Text(epgStatsText(stats), style = MaterialTheme.typography.labelLarge, color = colors.primary)
         }
         // Outcome of the last auto-match run (auto-applied count / how many need review). Dismissible.
         matchSummary?.let { summary ->
@@ -1035,5 +1024,22 @@ private fun GuideInfoStrip(
                 style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, modifier = Modifier.weight(1f),
             )
         }
+    }
+}
+
+/** German4K 3.0 (32), N2: runder Symbolknopf im Kopf des TV-Guides, mit Vorlesetext. */
+@Composable
+private fun German4kGuideSymbolKnopf(icon: OwnTVIcon, beschreibung: String, onClick: () -> Unit) {
+    val colors = OwnTVTheme.colors
+    FocusableSurface(
+        onClick = onClick,
+        modifier = Modifier
+            .size(44.dp)
+            .semantics { contentDescription = beschreibung },
+        shape = RoundedCornerShape(14.dp),
+        contentAlignment = Alignment.Center,
+        surface = GlassSurface.CARDS,
+    ) { focused ->
+        OwnTVIcon(icon, tint = if (focused) colors.primary else colors.onSurface, modifier = Modifier.size(20.dp))
     }
 }

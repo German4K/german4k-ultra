@@ -61,7 +61,7 @@ import tv.own.owntv.core.nav.MainSection
 import tv.own.owntv.R
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.NavAccentBar
-import tv.own.owntv.ui.components.OwnTVAvatar
+import tv.own.owntv.ui.components.German4kProfilAvatar
 import tv.own.owntv.ui.components.NavDuotoneIcon
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.RailPanelFill
@@ -86,6 +86,8 @@ fun Sidebar(
     avatarPath: String = "",
     onPickAvatar: () -> Unit,
     profileName: String,
+    /** German4K 3.0 (32): Kinderprofil → gruener Kreis mit Kind-Symbol statt Anfangsbuchstabe. */
+    profileIsKids: Boolean = false,
     sourceSummary: String?,
     onSwitchProfile: () -> Unit,
     selectedItemFocusRequester: FocusRequester,
@@ -113,6 +115,8 @@ fun Sidebar(
     val focusSection = when {
         selected == MainSection.SEARCH -> MainSection.HOME
         selected == MainSection.SETTINGS || selected == MainSection.MORE -> MainSection.MORE
+        // German4K 3.0 (32): Downloads haengen am Fernseher hinter "Mehr" (A2).
+        selected == MainSection.DOWNLOADS -> MainSection.MORE
         selected in visibleSections -> selected
         else -> MainSection.browseOrder.firstOrNull { it in visibleSections } ?: MainSection.MORE
     }
@@ -137,14 +141,16 @@ fun Sidebar(
             .padding(start = 6.dp, top = topInset, end = 6.dp, bottom = 6.dp)
             .roundedPanel(fillColor = RailPanelFill, surface = GlassSurface.SIDEBAR)
             // Keep the plate aligned while lowering the logo slightly inside it.
-            .padding(top = 12.dp, bottom = 12.dp),
+            // German4K 3.0 (32): 8 statt 12 dp — sieben Eintraege plus Profil passen so auch bei
+            // 100 % Zoom (540 dp hoch) ohne Scrollen auf einen 1080p-Fernseher.
+            .padding(top = 8.dp, bottom = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // Phase 2 — brand mark pinned at the top of the rail. Non-focusable, so D-pad entry into the
         // panel still redirects to the selected nav item below (see onFocusChanged) — it can't trap
         // an "up" press from the first nav item either.
         AppLogo()
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(8.dp))
 
         // The one way back into a docked mini player from every screen (§8 tier 1). Sits directly under
         // the brand mark, above the browse block, and only exists while there is something to return to.
@@ -173,7 +179,10 @@ fun Sidebar(
             }
 
             Column(modifier = Modifier.fillMaxWidth()) {
-                MainSection.browseOrder.filter { it in visibleSections }.forEach { section ->
+                // German4K 3.0 (32), Entscheidung Betreiber 29.09.2026 (A2): Downloads verlassen die
+                // Seitenleiste und stehen unter "Mehr" (zusatzSections in OwnTVShell) — sonst passt
+                // "Mehr" auf einem 1080p-Fernseher nicht ohne Scrollen ins Bild.
+                MainSection.browseOrder.filter { it in visibleSections && it != MainSection.DOWNLOADS }.forEach { section ->
                     NavItem(
                         section = section,
                         active = section == selected,
@@ -184,16 +193,17 @@ fun Sidebar(
                             Modifier.focusRequester(selectedItemFocusRequester)
                         } else Modifier,
                     )
-                    // German4K 3.0 (31): 6 dp statt 4, damit der vergroesserte Fokusring die
-                    // Nachbarkachel nicht beruehrt.
-                    Spacer(Modifier.height(6.dp))
+                    // German4K 3.0 (32): 4 dp — die Kachel ist niedriger (46 dp), der Fokusring
+                    // (1,08) ragt nur knapp 2 dp hinaus und beruehrt die Nachbarkachel nicht.
+                    Spacer(Modifier.height(NavTileSpacing))
                 }
                 // More closes out the nav block (Plan Z — it used to be Settings, which is now the
                 // first row inside More). It stays lit while Settings itself is open, because that
                 // is where the user is: one level in from here.
                 NavItem(
                     section = MainSection.MORE,
-                    active = selected == MainSection.MORE || selected == MainSection.SETTINGS,
+                    active = selected == MainSection.MORE || selected == MainSection.SETTINGS ||
+                        selected == MainSection.DOWNLOADS, // German4K 3.0 (32): Downloads liegen hinter Mehr
                     expanded = expanded,
                     count = 0,
                     onClick = { onSelect(MainSection.MORE) },
@@ -209,7 +219,7 @@ fun Sidebar(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 8.dp)
+                .padding(vertical = 6.dp)
                 .height(1.dp)
                 .background(colors.outlineVariant),
         )
@@ -218,6 +228,7 @@ fun Sidebar(
             avatarId = avatarId,
             avatarPath = avatarPath,
             profileName = profileName,
+            profileIsKids = profileIsKids,
             sourceSummary = sourceSummary,
             onPickAvatar = onPickAvatar,
             onSwitchProfile = onSwitchProfile,
@@ -329,7 +340,7 @@ private fun AppLogo(modifier: Modifier = Modifier) {
         painter = androidx.compose.ui.res.painterResource(R.drawable.g4k_logo_rund),
         contentDescription = null,
         modifier = modifier
-            .size(56.dp)
+            .size(48.dp) // German4K 3.0 (32): 48 statt 56 dp, damit die Leiste ohne Scrollen passt
             .clip(CircleShape)
             .border(width = 2.dp, color = colors.primary, shape = CircleShape),
     )
@@ -341,6 +352,7 @@ private fun ProfileCard(
     avatarId: Int,
     avatarPath: String = "",
     profileName: String,
+    profileIsKids: Boolean = false,
     sourceSummary: String?,
     onPickAvatar: () -> Unit,
     onSwitchProfile: () -> Unit,
@@ -351,7 +363,7 @@ private fun ProfileCard(
     if (!expanded) {
         // Fixed nav: just the avatar — click opens the profile switcher ("who's watching"), long-press
         // changes the avatar picture. Pinned top-left, always in the same spot.
-        AvatarButton(avatarId = avatarId, avatarPath = avatarPath, sizeDp = 56, onClick = onSwitchProfile, onLongClick = onPickAvatar)
+        AvatarButton(avatarPath = avatarPath, name = profileName, isKids = profileIsKids, sizeDp = 48, onClick = onSwitchProfile, onLongClick = onPickAvatar)
         return
     }
 
@@ -371,7 +383,7 @@ private fun ProfileCard(
             modifier = Modifier.fillMaxWidth().padding(18.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            AvatarButton(avatarId = avatarId, avatarPath = avatarPath, sizeDp = 64, onClick = onPickAvatar)
+            AvatarButton(avatarPath = avatarPath, name = profileName, isKids = profileIsKids, sizeDp = 64, onClick = onPickAvatar)
             Spacer(Modifier.height(10.dp))
             Text(
                 profileName.ifBlank { stringResource(R.string.common_own_tv_user) },
@@ -424,7 +436,7 @@ private fun ProfileCard(
 }
 
 @Composable
-private fun AvatarButton(avatarId: Int, avatarPath: String, sizeDp: Int, onClick: () -> Unit, onLongClick: (() -> Unit)? = null) {
+private fun AvatarButton(avatarPath: String, name: String, isKids: Boolean, sizeDp: Int, onClick: () -> Unit, onLongClick: (() -> Unit)? = null) {
     FocusableSurface(
         onClick = onClick,
         onLongClick = onLongClick,
@@ -437,7 +449,9 @@ private fun AvatarButton(avatarId: Int, avatarPath: String, sizeDp: Int, onClick
         contentAlignment = Alignment.Center,
         surface = GlassSurface.SIDEBAR,
     ) { _ ->
-        OwnTVAvatar(avatarId = avatarId, imagePath = avatarPath, modifier = Modifier.size((sizeDp - 4).dp))
+        // German4K 3.0 (32), C2: Anfangsbuchstabe im lila Kreis (Kinderprofil: gruen + Kind-Symbol)
+        // statt des orangen Blitzes.
+        German4kProfilAvatar(name = name, isKids = isKids, imagePath = avatarPath, modifier = Modifier.size((sizeDp - 4).dp))
     }
 }
 
@@ -589,7 +603,9 @@ private fun NavItem(
 
 // German4K 3.0 (31): Masse der beschrifteten Navigationskachel (vorher 48 x 39 dp, nur Symbol).
 private val NavTileWidth = 72.dp
-private val NavTileHeight = 52.dp
+// German4K 3.0 (32): 46 dp hoch, 4 dp Abstand (vorher 52/6) — A2, Leiste ohne Scrollen.
+private val NavTileHeight = 46.dp
+private val NavTileSpacing = 4.dp
 private val NavFocusRingWidth = 2.5.dp
 private const val NavTileFocusScale = 1.08f
 

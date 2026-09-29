@@ -141,6 +141,8 @@ fun OwnTVShell(
     onSetCustomAvatar: (java.io.File) -> Unit = {},
     onClearCustomAvatar: () -> Unit = {},
     profileName: String,
+    /** German4K 3.0 (32): Kinderprofil → gruener Kind-Kreis in der Seitenleiste. */
+    profileIsKids: Boolean = false,
     sourceSummary: String?,
     playlists: List<tv.own.owntv.core.database.entity.SourceEntity> = emptyList(),
     activePlaylistId: Long = -1L,
@@ -728,6 +730,9 @@ fun OwnTVShell(
             // happened. Handled here as well so the answer is the same whichever handler fires; a
             // sub-screen of Settings still wins, because its handler is composed deeper than this.
             selectedSection == MainSection.SETTINGS -> onSelectSection(MainSection.MORE)
+            // German4K 3.0 (32), A2: Am Fernseher werden Downloads aus "Mehr" geoeffnet — Zurueck
+            // fuehrt dorthin zurueck, eine Ebene, wie bei den Einstellungen.
+            !formfaktor.mobil && selectedSection == MainSection.DOWNLOADS -> onSelectSection(MainSection.MORE)
             // German4K: Auf Handy/Tablet gibt es keine Seitenleiste, auf die Zurueck zurueckfallen
             // koennte. Zurueck fuehrt deshalb aus jedem Bereich nach Start, und auf Start fragt es
             // nach dem Beenden — das ist, was ein Android-Nutzer von der Zurueck-Taste erwartet.
@@ -985,7 +990,10 @@ fun OwnTVShell(
                             )
                         }
                     } else null,
-                    leadingExtension = Dimens.SidebarWidthCollapsed,
+                    // German4K 3.0 (32): Nur neben der Seitenleiste (Fernseher) in deren Breite hineinragen.
+                    // Auf Handy/Tablet gibt es keine Leiste — die Verschiebung schob die Zeile dort
+                    // links aus dem Bild (abgeschnittene Suche, fehlender Bereichs-Chip).
+                    leadingExtension = if (formfaktor.mobil) 0.dp else Dimens.SidebarWidthCollapsed,
                 )
                 Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(start = 0.dp, end = 6.dp, bottom = 6.dp)) {
                     when {
@@ -1007,7 +1015,12 @@ fun OwnTVShell(
                                 listOf(MainSection.SEARCH, MainSection.DOWNLOADS, MainSection.EPG)
                                     .filter { it == MainSection.SEARCH || it in visibleSections }
                                     .filter { !(formfaktor.kompakt && it == MainSection.EPG) }
-                            } else emptyList(),
+                            } else {
+                                // German4K 3.0 (32), A2: Downloads haben am Fernseher keinen Platz
+                                // mehr in der Seitenleiste (sieben Eintraege ohne Scrollen) — sie
+                                // haengen hier unter "Mehr", erreichbar bleiben sie.
+                                listOf(MainSection.DOWNLOADS).filter { it in visibleSections }
+                            },
                             onChildFocused = { focusedLayer = ShellLayer.CONTENT },
                             modifier = Modifier
                                 .fillMaxSize()
@@ -1275,6 +1288,7 @@ fun OwnTVShell(
                 avatarPath = avatarPath,
                 onPickAvatar = { showAvatarPicker = true },
                 profileName = profileName,
+                profileIsKids = profileIsKids,
                 sourceSummary = sourceSummary,
                 onSwitchProfile = onSwitchProfile,
                 selectedItemFocusRequester = sidebarFocus,

@@ -36,7 +36,6 @@ import androidx.tv.material3.Text
 import tv.own.owntv.R
 import tv.own.owntv.core.database.entity.ProfileEntity
 import tv.own.owntv.ui.components.FocusableSurface
-import tv.own.owntv.ui.components.OwnTVAvatar
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.theme.OwnTVTheme
 
@@ -115,7 +114,13 @@ private fun ProfileTile(profile: ProfileEntity, modifier: Modifier = Modifier, o
             contentAlignment = Alignment.Center,
         ) { _ ->
             Box(contentAlignment = Alignment.TopEnd) {
-                OwnTVAvatar(avatarId = profile.avatarId, imagePath = profile.avatarPath.orEmpty(), modifier = Modifier.size(104.dp))
+                // German4K 3.0 (32), C2: Anfangsbuchstabe im lila Kreis, Kinderprofil gruen mit Kind-Symbol.
+                tv.own.owntv.ui.components.German4kProfilAvatar(
+                    name = profile.name,
+                    isKids = profile.isKids,
+                    imagePath = profile.avatarPath.orEmpty(),
+                    modifier = Modifier.size(104.dp),
+                )
                 if (profile.pinHash != null) {
                     Box(Modifier.size(26.dp).clip(CircleShape).background(colors.surfaceContainerHighest), contentAlignment = Alignment.Center) {
                         OwnTVIcon(OwnTVIcon.SETTINGS, tint = colors.onSurface, modifier = Modifier.size(14.dp))
