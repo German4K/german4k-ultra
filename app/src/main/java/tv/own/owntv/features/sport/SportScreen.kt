@@ -64,6 +64,19 @@ import tv.own.owntv.ui.components.fokusMitWiederholung
 import tv.own.owntv.ui.theme.OwnTVTheme
 import java.time.Instant
 import java.time.format.DateTimeFormatter
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.platform.LocalConfiguration
+import tv.own.owntv.core.german4k.SportFusszeile
+import tv.own.owntv.core.german4k.SportMinute
+import tv.own.owntv.core.german4k.SportRegale
+import tv.own.owntv.core.german4k.SportSprache
+import tv.own.owntv.core.german4k.nachTagen
+import tv.own.owntv.core.german4k.spaeterStandardOffen
+import tv.own.owntv.core.german4k.sportFusszeile
+import tv.own.owntv.core.german4k.sportMinute
+import java.time.LocalDate
+import kotlinx.coroutines.delay
 
 /** Rot für den LIVE-Punkt — bewusst fest, nicht vom Akzent abhängig. */
 internal val SportLiveRot = Color(0xFFE53935)
@@ -170,7 +183,8 @@ fun SportScreen(
                 a == null -> Hinweis(stringResource(R.string.g4k_sport_laden))
                 !a.ok -> Hinweis(a.grund ?: stringResource(R.string.g4k_sport_aus))
                 regale.leer -> Hinweis(stringResource(R.string.g4k_sport_leer))
-                formfaktor.mobil -> MobilListe(regale.live + regale.heute + regale.spaeter + regale.beendet, onKlick = klick)
+                // German4K 3.0/32: Handy in Abschnitten mit Tagesköpfen statt einer flachen Liste.
+                formfaktor.mobil -> MobilListe(regale, onKlick = klick)
                 else -> TvRegale(regale = regale, ersterFokus = ersterFokus, onKlick = klick, onFocused = onChildFocused)
             }
         }
@@ -240,14 +254,21 @@ private fun chipLabel(c: SportChip): Int = when (c) {
     SportChip.INTERNATIONAL -> R.string.g4k_sport_chip_international
 }
 
+// German4K 3.0/32 (S2): Karten je Rasterzeile auf dem Fernseher.
+private const val TV_SPALTEN = 4
+
+/** Datum im Tageskopf, z. B. „Do., 01.10." — Wochentag in der Sprache der App. */
+private const val TAG_MUSTER = "EEE, dd.MM."
+
 @Composable
 private fun TvRegale(
-    regale: tv.own.owntv.core.german4k.SportRegale,
+    regale: SportRegale,
     ersterFokus: FocusRequester,
     onKlick: (German4kSpiel) -> Unit,
     onFocused: () -> Unit,
 ) {
-    var spaeterOffen by rememberSaveable { mutableStateOf(false) }
+    // German4K 3.0/32 (S2): „Morgen & später" ist offen, wenn heute höchstens acht Spiele laufen.
+    var spaeterOffen by rememberSaveable { mutableStateOf(spaeterStandardOffen(regale.heute.size)) }
     val liveRegal = regale.live + regale.beendet
     // Wer bekommt den Startfokus: die erste Karte des ersten sichtbaren Regals.
     val erstesRegal = when {
@@ -255,16 +276,24 @@ private fun TvRegale(
         regale.heute.isNotEmpty() -> 1
         else -> 2
     }
-    LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    val tage = remember(regale.spaeter) { nachTagen(regale.spaeter) }
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(bottom = 24.dp),
+    ) {
+        // „Jetzt live" bleibt vorn und bleibt eine Reihe.
         if (liveRegal.isNotEmpty()) item(key = "live") {
             Regal(stringResource(R.string.g4k_sport_regal_live), liveRegal, if (erstesRegal == 0) ersterFokus else null, onKlick, onFocused)
         }
-        if (regale.heute.isNotEmpty()) item(key = "heute") {
-            Regal(stringResource(R.string.g4k_sport_regal_heute), regale.heute, if (erstesRegal == 1) ersterFokus else null, onKlick, onFocused)
+        // German4K 3.0/32 (S2): „Heute" als Raster mit vier Karten je Zeile.
+        if (regale.heute.isNotEmpty()) {
+            item(key = "heute") { AbschnittTitel(stringResource(R.string.g4k_sport_regal_heute)) }
+            rasterZeilen(regale.heute, if (erstesRegal == 1) ersterFokus else null, onKlick, onFocused)
         }
-        if (regale.spaeter.isNotEmpty()) item(key = "spaeter") {
-            val offen = spaeterOffen || erstesRegal == 2
-            Column {
+        if (regale.spaeter.isNotEmpty()) {
+            item(key = "spaeter") {
+                val offen = spaeterOffen || erstesRegal == 2
                 FocusableSurface(
                     onClick = { spaeterOffen = !spaeterOffen },
                     shape = RoundedCornerShape(12.dp),
@@ -278,13 +307,60 @@ private fun TvRegale(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                     )
                 }
-                if (offen) {
-                    Spacer(Modifier.height(8.dp))
-                    KartenReihe(regale.spaeter, null, onKlick, onFocused)
-                }
+            }
+            // German4K 3.0/32 (S2): nach Tagen getrennt statt als ein Block.
+            if (spaeterOffen || erstesRegal == 2) tage.forEach { (tag, spiele) ->
+                item { TagTitel(tag) }
+                rasterZeilen(spiele, null, onKlick, onFocused)
             }
         }
     }
+}
+
+/** German4K 3.0/32 (S2): Spiele in Zeilen zu [TV_SPALTEN] Karten; D-Pad läuft über die 2D-Fokussuche. */
+private fun LazyListScope.rasterZeilen(
+    spiele: List<German4kSpiel>,
+    fokus: FocusRequester?,
+    onKlick: (German4kSpiel) -> Unit,
+    onFocused: () -> Unit,
+) {
+    val zeilen = spiele.chunked(TV_SPALTEN)
+    zeilen.forEachIndexed { zi, zeile ->
+        item {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                zeile.forEachIndexed { si, s ->
+                    val f = fokus?.takeIf { zi == 0 && si == 0 }
+                    SpielKarte(
+                        spiel = s,
+                        onClick = { onFocused(); onKlick(s) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(140.dp)
+                            .then(if (f != null) Modifier.focusRequester(f) else Modifier),
+                    )
+                }
+                // Letzte Zeile: gleiche Kartenbreite wie darüber.
+                repeat(TV_SPALTEN - zeile.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AbschnittTitel(titel: String) {
+    Text(titel, style = MaterialTheme.typography.titleMedium, color = OwnTVTheme.colors.onSurface, modifier = Modifier.padding(start = 4.dp, top = 4.dp))
+}
+
+/** German4K 3.0/32: Tageskopf „Morgen · Do., 01.10." bzw. nur das Datum für spätere Tage. */
+@Composable
+private fun TagTitel(tag: LocalDate) {
+    val locale = LocalConfiguration.current.locales[0]
+    val datum = remember(tag, locale) { DateTimeFormatter.ofPattern(TAG_MUSTER, locale).format(tag) }
+    val morgen = tag == LocalDate.now(SPORT_ZONE).plusDays(1)
+    AbschnittTitel(if (morgen) stringResource(R.string.g4k_sport_tag_morgen, datum) else datum)
 }
 
 @Composable
@@ -316,16 +392,26 @@ private fun KartenReihe(spiele: List<German4kSpiel>, fokus: FocusRequester?, onK
     }
 }
 
+/** German4K 3.0/32 (S2): Handy einspaltig — Jetzt live, Heute, je Tag ein Kopf, Beendet. */
 @Composable
-private fun MobilListe(spiele: List<German4kSpiel>, onKlick: (German4kSpiel) -> Unit) {
-    LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(spiele, key = { it.id }) { s ->
-            SpielKarte(spiel = s, onClick = { onKlick(s) }, modifier = Modifier.fillMaxWidth().height(120.dp))
+private fun MobilListe(regale: SportRegale, onKlick: (German4kSpiel) -> Unit) {
+    val tage = remember(regale.spaeter) { nachTagen(regale.spaeter) }
+    LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 16.dp)) {
+        fun abschnitt(spiele: List<German4kSpiel>, kopf: @Composable () -> Unit) {
+            if (spiele.isEmpty()) return
+            item { kopf() }
+            items(spiele, key = { it.id }) { s ->
+                SpielKarte(spiel = s, onClick = { onKlick(s) }, modifier = Modifier.fillMaxWidth().height(120.dp))
+            }
         }
+        abschnitt(regale.live) { AbschnittTitel(stringResource(R.string.g4k_sport_regal_live)) }
+        abschnitt(regale.heute) { AbschnittTitel(stringResource(R.string.g4k_sport_regal_heute)) }
+        tage.forEach { (tag, spiele) -> abschnitt(spiele) { TagTitel(tag) } }
+        abschnitt(regale.beendet) { AbschnittTitel(stringResource(R.string.g4k_sport_regal_beendet)) }
     }
 }
 
-/** Eine Spielkarte: Wettbewerb, Paarung, Anstoß oder LIVE, erste Senderzeile. */
+/** Eine Spielkarte: Wettbewerb, Paarung, Anstoß oder LIVE mit Minute, Sprache + Marke des ersten Senders. */
 @Composable
 internal fun SpielKarte(spiel: German4kSpiel, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val colors = OwnTVTheme.colors
@@ -353,10 +439,10 @@ internal fun SpielKarte(spiel: German4kSpiel, onClick: () -> Unit, modifier: Mod
                     )
                 }
                 Spacer(Modifier.weight(1f))
+                Spacer(Modifier.width(6.dp))
                 if (spiel.laeuft) {
-                    Box(Modifier.size(8.dp).clip(CircleShape).background(SportLiveRot))
-                    Spacer(Modifier.width(4.dp))
-                    Text(stringResource(R.string.g4k_sport_live), style = MaterialTheme.typography.labelMedium, color = SportLiveRot, fontWeight = FontWeight.Bold)
+                    // German4K 3.0/32 (R2): roter Chip „LIVE 34′" statt der großen Uhrzeit.
+                    LiveMinutenChip(spiel)
                 } else {
                     Text(uhrzeitBerlin(spiel.start), style = MaterialTheme.typography.titleLarge, color = colors.onSurface, fontWeight = FontWeight.Bold)
                 }
@@ -371,7 +457,7 @@ internal fun SpielKarte(spiel: German4kSpiel, onClick: () -> Unit, modifier: Mod
             )
             Spacer(Modifier.weight(1f))
             Text(
-                senderZeile(spiel),
+                fusszeileText(spiel),
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.onSurfaceVariant,
                 maxLines = 1,
@@ -381,15 +467,55 @@ internal fun SpielKarte(spiel: German4kSpiel, onClick: () -> Unit, modifier: Mod
     }
 }
 
-/** Erste Senderzeile nach der Kaskade: Sender → Rechte → Bereich. */
+/** German4K 3.0/32 (R2): LIVE-Chip mit grober Spielminute, zählt alle 30 s weiter. */
 @Composable
-internal fun senderZeile(spiel: German4kSpiel): String {
-    val erster = spiel.sender.firstOrNull()
-    return when {
-        erster != null && spiel.sender.size > 1 -> erster.name + " · " + stringResource(R.string.g4k_sport_sender_mehr, spiel.sender.size)
-        erster != null -> erster.name
-        spiel.rechte != null -> stringResource(R.string.g4k_sport_marke, spiel.rechte!!.sender)
-        spiel.bereich != null -> stringResource(R.string.g4k_sport_bereich, spiel.bereich!!.name)
-        else -> ""
+private fun LiveMinutenChip(spiel: German4kSpiel) {
+    val jetzt by produceState(Instant.now(), spiel.start) {
+        while (true) {
+            value = Instant.now()
+            delay(30_000)
+        }
     }
+    val minute = when (val m = sportMinute(spiel.start, jetzt)) {
+        is SportMinute.Minute -> stringResource(R.string.g4k_sport_minute, m.n)
+        SportMinute.Halbzeit -> stringResource(R.string.g4k_sport_halbzeit)
+        SportMinute.Nachspielzeit -> stringResource(R.string.g4k_sport_nachspielzeit)
+    }
+    Text(
+        stringResource(R.string.g4k_sport_live_minute, minute),
+        style = MaterialTheme.typography.labelLarge,
+        color = Color.White,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(SportLiveRot)
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    )
+}
+
+/** German4K 3.0/32: Wort zur Sprache einer Senderflagge. */
+internal fun spracheText(s: SportSprache): Int = when (s) {
+    SportSprache.DEUTSCH -> R.string.g4k_sport_sprache_de
+    SportSprache.ENGLISCH -> R.string.g4k_sport_sprache_en
+    SportSprache.SPANISCH -> R.string.g4k_sport_sprache_es
+    SportSprache.FRANZOESISCH -> R.string.g4k_sport_sprache_fr
+    SportSprache.ITALIENISCH -> R.string.g4k_sport_sprache_it
+    SportSprache.TUERKISCH -> R.string.g4k_sport_sprache_tr
+}
+
+/**
+ * German4K 3.0/32 (R2): Fußzeile der Karte — „🇩🇪 Deutsch auf DAZN · 10 weitere" statt des
+ * technischen Platznamens. Kaskade Sender → Rechte („Bei …") → Bereich („Im Bereich …").
+ */
+@Composable
+internal fun fusszeileText(spiel: German4kSpiel): String = when (val f = sportFusszeile(spiel)) {
+    is SportFusszeile.Sender -> {
+        val kern = f.sprache?.let { stringResource(R.string.g4k_sport_fuss_sprache_marke, stringResource(spracheText(it)), f.marke) } ?: f.marke
+        val vorne = listOfNotNull(f.flagge, kern).joinToString(" ")
+        if (f.weitere > 0) vorne + " · " + stringResource(R.string.g4k_sport_fuss_weitere, f.weitere) else vorne
+    }
+    is SportFusszeile.Rechte -> stringResource(R.string.g4k_sport_fuss_rechte, f.sender)
+    is SportFusszeile.Bereich -> stringResource(R.string.g4k_sport_fuss_bereich, f.name)
+    SportFusszeile.Keine -> ""
 }

@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -44,6 +45,8 @@ import tv.own.owntv.R
 import tv.own.owntv.core.database.entity.ChannelEntity
 import tv.own.owntv.core.german4k.German4kSpiel
 import tv.own.owntv.core.german4k.German4kSportSender
+import tv.own.owntv.core.german4k.senderAnzeige
+import tv.own.owntv.core.german4k.senderTeilen
 import tv.own.owntv.features.live.LiveViewModel
 import tv.own.owntv.features.mobil.German4kMobilKopfzeile
 import tv.own.owntv.player.ExoPreviewSurface
@@ -59,11 +62,23 @@ private sealed interface SpielZeile {
     data class Marke(val name: String, val kategorie: String?) : SpielZeile
     /** Keine Sender, keine Marke: der Bereich, in dem es laufen wird. */
     data class Bereich(val name: String) : SpielZeile
+    /** German4K 3.0/32 (T2): ausgeschaltete Sender, zu einer aufklappbaren Zeile zusammengefasst. */
+    data class Aufklapper(val laender: Int, val offen: Boolean) : SpielZeile
 }
 
 /** Kaskade (verbindlich): Sender → Rechte → Bereich. Keine fünfte Stufe. */
-private fun zeilenFuer(spiel: German4kSpiel): List<SpielZeile> = when {
-    spiel.sender.isNotEmpty() -> spiel.sender.map { SpielZeile.Sender(it) }
+// German4K 3.0/32 (T2): Sender, die im Paket aus sind, stehen hinter EINER Zeile am Ende.
+private fun zeilenFuer(spiel: German4kSpiel, ausOffen: Boolean): List<SpielZeile> = when {
+    spiel.sender.isNotEmpty() -> {
+        val t = senderTeilen(spiel.sender)
+        buildList {
+            t.an.forEach { add(SpielZeile.Sender(it)) }
+            if (t.aus.isNotEmpty()) {
+                add(SpielZeile.Aufklapper(t.ausLaender, ausOffen))
+                if (ausOffen) t.aus.forEach { add(SpielZeile.Sender(it)) }
+            }
+        }
+    }
     spiel.rechte != null -> listOf(SpielZeile.Marke(spiel.rechte!!.sender, spiel.rechte!!.kategorie))
     spiel.bereich != null -> listOf(SpielZeile.Bereich(spiel.bereich!!.name))
     else -> emptyList()
@@ -90,7 +105,8 @@ internal fun SportSpielScreen(
     val formfaktor = LocalFormfaktor.current
     val colors = OwnTVTheme.colors
     val scope = rememberCoroutineScope()
-    val zeilen = remember(spiel) { zeilenFuer(spiel) }
+    var ausOffen by remember(spiel.id) { mutableStateOf(false) }
+    val zeilen = remember(spiel, ausOffen) { zeilenFuer(spiel, ausOffen) }
     val mitVorschau = !formfaktor.mobil && previewEnabled
 
     BackHandler { onBack() }
@@ -137,14 +153,18 @@ internal fun SportSpielScreen(
                 }
                 is SpielZeile.Marke -> onOpenLiveTv(vm.kategorieId(z.kategorie))
                 is SpielZeile.Bereich -> onOpenLiveTv(vm.kategorieId(z.name))
+                is SpielZeile.Aufklapper -> ausOffen = !ausOffen
             }
         }
     }
 
     val liste: @Composable (Modifier) -> Unit = { m ->
         Column(m) {
-            Text(spiel.titel, style = MaterialTheme.typography.headlineSmall, color = colors.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(4.dp))
+            // German4K 3.0/32 (U2): auf dem Handy steht die Paarung schon in der Kopfzeile.
+            if (!formfaktor.mobil) {
+                Text(spiel.titel, style = MaterialTheme.typography.headlineSmall, color = colors.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(4.dp))
+            }
             val unter = listOfNotNull(spiel.wettbewerb, spiel.startDE.takeIf { it.isNotBlank() }).joinToString(" · ")
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (spiel.laeuft) {
@@ -213,28 +233,44 @@ private fun ZeileKarte(zeile: SpielZeile, kanalBekannt: Boolean, onClick: () -> 
         Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp)) {
             when (zeile) {
                 is SpielZeile.Sender -> {
+                    // German4K 3.0/32 (T2): große Flagge links, Titel = Name ohne Flagge,
+                    // darunter Sprache · Marke; rechts wie bisher Live/Gleich.
                     val s = zeile.sender
+                    val a = senderAnzeige(s)
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            listOfNotNull(s.kategorie, s.name, s.gruppeName).joinToString(" · "),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = if (grau) colors.onSurfaceVariant else colors.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
-                        )
+                        a.flagge?.let {
+                            Text(it, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.width(44.dp))
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                a.titel,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = if (grau) colors.onSurfaceVariant else colors.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            val sprache = a.sprache?.let { stringResource(spracheText(it)) } ?: s.gruppeName
+                            Unterzeile(listOfNotNull(sprache, a.marke.takeIf { it.isNotBlank() }).joinToString(" · "))
+                            when {
+                                aus -> Unterzeile(stringResource(R.string.g4k_sport_sender_aus, s.gruppeName ?: s.kategorie ?: s.name))
+                                !kanalBekannt -> Unterzeile(stringResource(R.string.g4k_sport_kein_kanal))
+                            }
+                        }
                         if (s.platz && s.platzZustand != null) {
                             Spacer(Modifier.width(8.dp))
                             PlatzAbzeichen(laeuft = s.platzZustand == German4kSpiel.ZUSTAND_LAEUFT)
                         }
                     }
-                    when {
-                        aus -> Unterzeile(stringResource(R.string.g4k_sport_sender_aus, s.gruppeName ?: s.kategorie ?: s.name))
-                        !kanalBekannt -> Unterzeile(stringResource(R.string.g4k_sport_kein_kanal))
-                    }
                 }
                 is SpielZeile.Marke -> Text(stringResource(R.string.g4k_sport_marke, zeile.name), style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
                 is SpielZeile.Bereich -> Text(stringResource(R.string.g4k_sport_bereich, zeile.name), style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
+                is SpielZeile.Aufklapper -> Text(
+                    (if (zeile.offen) "▾ " else "▸ ") + pluralStringResource(R.plurals.g4k_sport_aus_laender, zeile.laender, zeile.laender),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = colors.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
