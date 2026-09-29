@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -133,9 +134,12 @@ fun German4kBottomBar(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {
+                        // German4K 3.0 (31): ausgewaehlt = gefuelltes Rounded-Symbol in Akzentfarbe,
+                        // sonst Umriss in gedaempftem Ton — dazu die Pille von FocusableSurface.
                         NavDuotoneIcon(
                             section = section,
                             color = ton,
+                            selected = aktiv,
                             modifier = Modifier.size(24.dp),
                         )
                         Spacer(Modifier.height(4.dp))
@@ -143,7 +147,8 @@ fun German4kBottomBar(
                         // etwas kleiner, notfalls Auslassungspunkte statt Umbruch.
                         Text(
                             text = stringResource(section.labelRes),
-                            style = if (eintraege.size > 5) MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp) else MaterialTheme.typography.labelSmall,
+                            style = (if (eintraege.size > 5) MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp) else MaterialTheme.typography.labelSmall)
+                                .copy(fontWeight = if (aktiv) FontWeight.SemiBold else FontWeight.Normal),
                             color = ton,
                             maxLines = 1,
                             softWrap = false,

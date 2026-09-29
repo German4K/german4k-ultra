@@ -363,6 +363,8 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material.icons.core)
+    // German4K 3.0 (31): Navigationssymbole aus Material Symbols Rounded/Outlined; R8 wirft die ungenutzten raus.
+    implementation(libs.androidx.compose.material.icons.extended)
 
     // Compose for TV
     implementation(libs.androidx.tv.material)

@@ -3,6 +3,7 @@ package tv.own.owntv.features.shell.components
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -23,6 +24,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -39,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -50,13 +54,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.sp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import tv.own.owntv.core.nav.MainSection
 import tv.own.owntv.R
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.NavAccentBar
-import tv.own.owntv.ui.components.rememberNavLadderColors
 import tv.own.owntv.ui.components.OwnTVAvatar
 import tv.own.owntv.ui.components.NavDuotoneIcon
 import tv.own.owntv.ui.components.OwnTVIcon
@@ -180,7 +184,9 @@ fun Sidebar(
                             Modifier.focusRequester(selectedItemFocusRequester)
                         } else Modifier,
                     )
-                    Spacer(Modifier.height(4.dp))
+                    // German4K 3.0 (31): 6 dp statt 4, damit der vergroesserte Fokusring die
+                    // Nachbarkachel nicht beruehrt.
+                    Spacer(Modifier.height(6.dp))
                 }
                 // More closes out the nav block (Plan Z — it used to be Settings, which is now the
                 // first row inside More). It stays lit while Settings itself is open, because that
@@ -456,82 +462,136 @@ private fun NavItem(
     modifier: Modifier = Modifier,
 ) {
     val colors = OwnTVTheme.colors
-    // Approved compact beacon: the focus owner still spans the rail for reliable D-pad targeting,
-    // while the visible selection is a centered 48 dp tile with its own marker and soft halo.
-    val shape = RoundedCornerShape(13.dp)
+    // German4K 3.0 (31), Entscheidung Betreiber 29.09.2026: Material-Symbol + Beschriftung darunter,
+    // und "ausgewaehlt" und "Fokus" sind zwei getrennte Signale, die sich addieren:
+    //   Ruhe          — durchsichtig, Umriss-Symbol + Text gedaempft (onSurfaceVariant)
+    //   Fokus         — 2,5-dp-Ring in Weiss (helles Thema: onSurface), Kachel 1,08, Symbol + Text hell
+    //   ausgewaehlt   — gefuellte lila Kachel (primary -> primaryContainer), gefuelltes Symbol, weiss,
+    //                   Akzentstrich links
+    //   beides        — lila Kachel + derselbe Ring + 1,08 + weicher Lichthof in der Akzentfarbe
+    // Vorher unterschied nur die Randdeckkraft (.72 -> .95) die beiden Faelle — auf dem Sofa unsichtbar.
+    val shape = RoundedCornerShape(14.dp)
     FocusableSurface(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         selected = active,
         shape = shape,
+        // Die Vergroesserung macht die Kachel selbst (siehe tileScale) — die Zeile bleibt 1:1,
+        // sonst wuerde doppelt skaliert.
+        focusedScale = 1f,
         focusedContainerColor = Color.Transparent,
         unfocusedContainerColor = Color.Transparent,
         selectedContainerColor = Color.Transparent,
-        // The visible fill is rendered by the inner nav ladder, but the outer focus owner still
+        // The visible fill is rendered by the inner tile, but the outer focus owner still
         // needs to know this is glass so it does not create a scale/shadow layer while scrolling.
         surface = GlassSurface.SIDEBAR,
         showFocusBorder = false,
         renderSelectionContainer = false,
         contentAlignment = Alignment.Center,
     ) { focused ->
-        val ladder = rememberNavLadderColors(
-            selected = active,
-            focused = focused,
+        val tileScale by animateFloatAsState(
+            targetValue = if (focused) NavTileFocusScale else 1f,
+            animationSpec = tv.own.owntv.ui.theme.ownTvTween(170),
+            label = "navTileScale",
         )
+        val ringColor = if (colors.isDark) Color.White else colors.onSurface
+        val content = when {
+            active -> Color.White
+            focused -> ringColor
+            else -> colors.onSurfaceVariant
+        }
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             // A separate 3 dp marker stays readable after focus moves away, in solid and glass modes.
-            NavAccentBar(visible = ladder.showAccentBar, height = 22.dp)
+            NavAccentBar(visible = active, height = 26.dp)
             Box(
                 modifier = Modifier
-                    .width(48.dp)
-                    .height(39.dp)
-                    .then(
-                        if (active) Modifier.shadow(
-                            elevation = 6.dp,
-                            shape = shape,
-                            ambientColor = colors.primary.copy(alpha = 0.30f),
-                            spotColor = colors.primary.copy(alpha = 0.30f),
-                            clip = false,
-                        ) else Modifier
-                    )
-                    .clip(shape)
-                    // Material follows the active mode; compact geometry stays identical in both.
-                    .glass(surface = GlassSurface.SIDEBAR, baseFill = ladder.container, shape = shape)
-                    .then(
-                        if (active) Modifier.background(
-                            Brush.linearGradient(
-                                listOf(
-                                    colors.primary.copy(alpha = 0.64f),
-                                    colors.primaryContainer.copy(alpha = 0.76f),
-                                ),
-                            ),
-                            shape,
-                        ) else Modifier
-                    )
+                    .width(NavTileWidth)
+                    .height(NavTileHeight)
+                    .graphicsLayer {
+                        scaleX = tileScale
+                        scaleY = tileScale
+                    }
                     .then(
                         when {
-                            active -> Modifier.border(
-                                1.dp,
-                                colors.primary.copy(alpha = if (focused) 0.95f else 0.72f),
-                                shape,
+                            // Lichthof nur bei "ausgewaehlt + Fokus" — das ist der Unterschied, den
+                            // man aus drei Metern sieht, zusaetzlich zum Ring.
+                            active && focused -> Modifier.shadow(
+                                elevation = 16.dp,
+                                shape = shape,
+                                ambientColor = colors.primary.copy(alpha = 0.85f),
+                                spotColor = colors.primary.copy(alpha = 0.85f),
+                                clip = false,
                             )
-                            ladder.focusBorder != null -> Modifier.border(tv.own.owntv.ui.theme.LocalFocusBorderWidth.current, ladder.focusBorder, shape)
+                            active -> Modifier.shadow(
+                                elevation = 6.dp,
+                                shape = shape,
+                                ambientColor = colors.primary.copy(alpha = 0.30f),
+                                spotColor = colors.primary.copy(alpha = 0.30f),
+                                clip = false,
+                            )
                             else -> Modifier
                         }
-                    ),
+                    )
+                    .clip(shape)
+                    .then(
+                        when {
+                            active -> Modifier.background(
+                                Brush.linearGradient(
+                                    listOf(
+                                        colors.primary.copy(alpha = 0.92f),
+                                        if (colors.isDark) colors.primaryContainer.copy(alpha = 0.96f)
+                                        else colors.primary.copy(alpha = 0.78f),
+                                    ),
+                                ),
+                                shape,
+                            )
+                            focused -> Modifier.background(ringColor.copy(alpha = 0.10f), shape)
+                            else -> Modifier
+                        }
+                    )
+                    .then(if (focused) Modifier.border(NavFocusRingWidth, ringColor, shape) else Modifier),
                 contentAlignment = Alignment.Center,
             ) {
-                // Monochrome duotone nav icon — tints via the shared ladder (muted idle, white cursor,
-                // accent when active). No per-frame animation on the always-visible nav.
-                NavDuotoneIcon(
-                    section = section,
-                    color = if (active) colors.onPrimaryContainer else ladder.icon,
-                    modifier = Modifier.size(24.dp),
-                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                ) {
+                    NavDuotoneIcon(
+                        section = section,
+                        color = content,
+                        selected = active,
+                        modifier = Modifier.size(24.dp),
+                    )
+                    Spacer(Modifier.height(3.dp))
+                    // German4K: eine Zeile; lange deutsche Namen ("Programmuebersicht") werden erst
+                    // bis 9 sp verkleinert und erst dann mit Auslassungspunkten gekuerzt.
+                    BasicText(
+                        text = stringResource(section.labelRes),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 10.5.sp,
+                            lineHeight = 12.sp,
+                            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
+                            textAlign = TextAlign.Center,
+                            color = content,
+                        ),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                        autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = 10.5.sp, stepSize = 0.5.sp),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         }
     }
 }
+
+// German4K 3.0 (31): Masse der beschrifteten Navigationskachel (vorher 48 x 39 dp, nur Symbol).
+private val NavTileWidth = 72.dp
+private val NavTileHeight = 52.dp
+private val NavFocusRingWidth = 2.5.dp
+private const val NavTileFocusScale = 1.08f
 
 private val MainSection.navIcon: OwnTVIcon
     get() = when (this) {

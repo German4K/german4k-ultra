@@ -4397,7 +4397,14 @@ private fun Modifier.settingsScrollbar(state: androidx.compose.foundation.lazy.L
 
 /** The 34 dp rounded square every row and nav item leads with. Neutral, or accent when it matters. */
 @Composable
-internal fun SettingsIconTile(icon: OwnTVIcon, hot: Boolean, size: Dp = SettingsSkin.TileSize) {
+internal fun SettingsIconTile(
+    icon: OwnTVIcon,
+    hot: Boolean,
+    size: Dp = SettingsSkin.TileSize,
+    // German4K 3.0 (31): gesetzt, wenn die Zeile ein Navigationsziel ist — dann dasselbe
+    // Material-Symbol wie in der Leiste statt der eigenen Zeichnung.
+    iconVector: androidx.compose.ui.graphics.vector.ImageVector? = null,
+) {
     val colors = OwnTVTheme.colors
     Box(
         modifier = Modifier
@@ -4406,11 +4413,21 @@ internal fun SettingsIconTile(icon: OwnTVIcon, hot: Boolean, size: Dp = Settings
             .background(if (hot) SettingsSkin.tileHot else SettingsSkin.veil),
         contentAlignment = Alignment.Center,
     ) {
-        OwnTVIcon(
-            icon = icon,
-            tint = if (hot) colors.primary else colors.onSurfaceVariant,
-            modifier = Modifier.size(SettingsSkin.GlyphSize),
-        )
+        val tint = if (hot) colors.primary else colors.onSurfaceVariant
+        if (iconVector != null) {
+            androidx.compose.foundation.Image(
+                imageVector = iconVector,
+                contentDescription = null,
+                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(tint),
+                modifier = Modifier.size(SettingsSkin.GlyphSize),
+            )
+        } else {
+            OwnTVIcon(
+                icon = icon,
+                tint = tint,
+                modifier = Modifier.size(SettingsSkin.GlyphSize),
+            )
+        }
     }
 }
 
@@ -4460,6 +4477,8 @@ internal fun SpineItem(
     // zeigt) lassen die Plakette ganz weg — eine leere oder eine "0" waere eine Angabe, die es
     // nicht gibt. Standard true: fuer alle bisherigen Aufrufer aendert sich nichts.
     showBadge: Boolean = true,
+    // German4K 3.0 (31): Material-Symbol fuer Bereichs-Zeilen (siehe SettingsIconTile).
+    iconVector: androidx.compose.ui.graphics.vector.ImageVector? = null,
 ) {
     val colors = OwnTVTheme.colors
     val shape = SettingsSkin.RowShape
@@ -4502,7 +4521,7 @@ internal fun SpineItem(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            SettingsIconTile(icon, hot = hot)
+            SettingsIconTile(icon, hot = hot, iconVector = iconVector)
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = label,

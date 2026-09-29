@@ -58,6 +58,7 @@ import tv.own.owntv.core.nav.MainSection
 import tv.own.owntv.core.settings.SettingsRepository
 import tv.own.owntv.core.theme.GlassSurface
 import tv.own.owntv.features.mobil.german4kNavIcon
+import tv.own.owntv.ui.components.navVector
 import tv.own.owntv.features.settings.BackupScreen
 import tv.own.owntv.features.settings.LocalSyncScreen
 import tv.own.owntv.features.settings.SettingsViewModel
@@ -282,6 +283,7 @@ fun MoreScreen(
                         label = stringResource(section.labelRes),
                         summary = stringResource(R.string.g4k_mehr_bereich_summary),
                         icon = section.german4kNavIcon,
+                        iconVector = section.navVector(selected = false),
                         count = 0,
                         showBadge = false,
                         selected = false,

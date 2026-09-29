@@ -14,7 +14,8 @@ object Dimens {
     // Layer 1 — MD3 navigation panel. Expands to a drawer (labels) when focused,
     // collapses to an icon rail when focus moves into a submenu.
     val SidebarWidthExpanded = 272.dp
-    val SidebarWidthCollapsed = 88.dp
+    // German4K 3.0 (31): 88 -> 100 dp, damit unter jedem Symbol die Beschriftung Platz hat.
+    val SidebarWidthCollapsed = 100.dp
     val TopBarHeight = 48.dp
     /** The strip while the audio capsule is focused/activated — the capsule's tall rendering plus its inset. */
     val TopBarAudioExpandedHeight = 70.dp
