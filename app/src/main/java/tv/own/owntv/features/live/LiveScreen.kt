@@ -78,6 +78,7 @@ import tv.own.owntv.features.settings.rememberPanelShares
 import tv.own.owntv.features.shell.components.CategoryContextMenu
 import tv.own.owntv.features.shell.components.CategoryRail
 import tv.own.owntv.ui.LocalFormfaktor
+import tv.own.owntv.ui.components.German4kKategorieKopf
 import tv.own.owntv.ui.components.MoveOrderOverlay
 import tv.own.owntv.features.shell.components.RailCategory
 import tv.own.owntv.ui.components.chNavPaging
@@ -549,33 +550,7 @@ fun LiveScreen(
             // German4K 3.0 (32), Entscheidung Betreiber 29.09.2026 (G2): EINE Zeile statt
             // "Live-TV / Alle Sender" plus "Alle Sender (21214 Sender)" — Kategoriename gross,
             // Anzahl gedaempft mit Tausenderpunkt ("Alle Sender  21.214").
-            if (!formfaktor.mobil) {
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        selectedLabel,
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = OwnTVTheme.colors.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    Spacer(Modifier.width(14.dp))
-                    Text(
-                        formatCount(count),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = OwnTVTheme.colors.onSurfaceVariant,
-                        maxLines = 1,
-                        modifier = Modifier.padding(bottom = 4.dp),
-                    )
-                }
-            } else {
-                // Auf Handy/Tablet traegt die Kopfzeile des Mobil-Rahmens schon den Kategorienamen.
-                Text(
-                    pluralStringResource(R.plurals.g4k_live_sender_anzahl, count, formatCount(count)),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = OwnTVTheme.colors.onSurfaceVariant,
-                )
-            }
+            German4kKategorieKopf(selectedLabel, count, R.plurals.g4k_live_sender_anzahl)
             Spacer(Modifier.height(14.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {

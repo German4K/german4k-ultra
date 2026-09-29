@@ -58,6 +58,7 @@ import tv.own.owntv.core.nav.MainSection
 import tv.own.owntv.core.settings.SettingsRepository
 import tv.own.owntv.core.theme.GlassSurface
 import tv.own.owntv.features.mobil.german4kNavIcon
+import tv.own.owntv.ui.components.German4kSchalter
 import tv.own.owntv.ui.components.navVector
 import tv.own.owntv.features.settings.BackupScreen
 import tv.own.owntv.features.settings.LocalSyncScreen
@@ -822,7 +823,15 @@ private fun PaneValueRow(
             }
         }
         if (value != null) {
-            MonoText(value, 13.sp, if (hot) colors.primary else colors.onSurfaceVariant)
+            // German4K 3.0/32: Ein/Aus als Schalter wie in den Einstellungen (nur Anzeige, die Zeile
+            // ist hier nicht bedienbar).
+            val an = stringResource(R.string.common_on)
+            val aus = stringResource(R.string.common_off)
+            when (value) {
+                an -> German4kSchalter(an = true)
+                aus -> German4kSchalter(an = false)
+                else -> MonoText(value, 13.sp, if (hot) colors.primary else colors.onSurfaceVariant)
+            }
         }
     }
 }

@@ -75,6 +75,7 @@ import tv.own.owntv.core.database.entity.DownloadEntity
 import tv.own.owntv.core.database.entity.EpisodeEntity
 import tv.own.owntv.core.database.entity.SeriesEntity
 import tv.own.owntv.features.customize.MoveToCategoryDialog
+import tv.own.owntv.ui.components.German4kKategorieKopf
 import tv.own.owntv.ui.components.TextInputDialog
 import tv.own.owntv.core.model.DownloadStatus
 import tv.own.owntv.features.live.displayLabel
@@ -642,11 +643,8 @@ private fun SeriesGrid(
             // German4K: Auf Handy und Tablet traegt schon die Kopfzeile des Mobil-Rahmens den
             // Kategorienamen — diese Brotkrume wuerde ihn ein zweites Mal zeigen und frisst
             // ein Siebtel des Bildschirms. Die Zaehlerzeile darunter bleibt, sie sagt etwas Neues.
-            if (!formfaktor.mobil) {
-                Text(stringResource(R.string.content_section_category, stringResource(R.string.common_nav_series), selectedLabel), style = MaterialTheme.typography.headlineLarge, color = OwnTVTheme.colors.onSurface)
-                Spacer(Modifier.height(4.dp))
-            }
-            Text(pluralStringResource(R.plurals.content_count_series, count, selectedLabel, count), style = MaterialTheme.typography.titleMedium, color = OwnTVTheme.colors.primary, fontWeight = FontWeight.Bold)
+            // German4K 3.0/32: EINE Zeile wie Live-TV („Alle Serien  20.260"), Handy nur „20.260 Serien".
+            German4kKategorieKopf(selectedLabel, count, R.plurals.g4k_serien_anzahl)
             Spacer(Modifier.height(14.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 SearchBar(query = searchQuery, onQueryChange = vm::setSearchQuery, placeholder = stringResource(R.string.content_search_series, selectedLabel), modifier = Modifier.weight(1f))

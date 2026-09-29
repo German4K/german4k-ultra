@@ -43,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -424,21 +425,30 @@ internal fun SpielKarte(spiel: German4kSpiel, onClick: () -> Unit, modifier: Mod
     ) { _ ->
         Column(Modifier.fillMaxSize().padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                spiel.wettbewerb?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = colors.onSecondaryContainer,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .weight(1f, fill = false)
-                            .clip(RoundedCornerShape(7.dp))
-                            .background(colors.secondaryContainer)
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
-                    )
+                // German4K 3.0/32: Wettbewerb bekommt die ganze Restbreite (vorher teilte er sie mit einem
+                // zweiten Gewichts-Spacer und wurde zu „Nations …"), die Uhrzeit bleibt rechtsbündig.
+                // Passt der Name nicht, erst auf 11sp verkleinern, dann kürzen.
+                val wettbewerb = spiel.wettbewerb
+                if (wettbewerb != null) {
+                    var klein by remember(wettbewerb) { mutableStateOf(false) }
+                    val basis = MaterialTheme.typography.labelMedium
+                    Box(Modifier.weight(1f)) {
+                        Text(
+                            wettbewerb,
+                            style = if (klein) basis.copy(fontSize = 11.sp) else basis,
+                            color = colors.onSecondaryContainer,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            onTextLayout = { r -> if (!klein && r.hasVisualOverflow) klein = true },
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(7.dp))
+                                .background(colors.secondaryContainer)
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                        )
+                    }
+                } else {
+                    Spacer(Modifier.weight(1f))
                 }
-                Spacer(Modifier.weight(1f))
                 Spacer(Modifier.width(6.dp))
                 if (spiel.laeuft) {
                     // German4K 3.0/32 (R2): roter Chip „LIVE 34′" statt der großen Uhrzeit.

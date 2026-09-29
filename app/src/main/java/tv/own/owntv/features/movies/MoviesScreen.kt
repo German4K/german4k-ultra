@@ -72,6 +72,7 @@ import tv.own.owntv.core.database.entity.ContentOrderEntity
 import tv.own.owntv.core.database.entity.DownloadEntity
 import tv.own.owntv.core.database.entity.MovieEntity
 import tv.own.owntv.features.customize.MoveToCategoryDialog
+import tv.own.owntv.ui.components.German4kKategorieKopf
 import tv.own.owntv.ui.components.TextInputDialog
 import tv.own.owntv.core.model.DownloadStatus
 import tv.own.owntv.features.live.displayLabel
@@ -586,16 +587,8 @@ fun MoviesScreen(
             // German4K: Auf Handy und Tablet traegt schon die Kopfzeile des Mobil-Rahmens den
             // Kategorienamen — diese Brotkrume wuerde ihn ein zweites Mal zeigen und frisst
             // ein Siebtel des Bildschirms. Die Zaehlerzeile darunter bleibt, sie sagt etwas Neues.
-            if (!formfaktor.mobil) {
-                Text(stringResource(R.string.content_section_category, stringResource(R.string.common_nav_movies), selectedLabel), style = MaterialTheme.typography.headlineLarge, color = OwnTVTheme.colors.onSurface)
-                Spacer(Modifier.height(4.dp))
-            }
-            Text(
-                pluralStringResource(R.plurals.content_count_movies, count, selectedLabel, count),
-                style = MaterialTheme.typography.titleMedium,
-                color = OwnTVTheme.colors.primary,
-                fontWeight = FontWeight.Bold,
-            )
+            // German4K 3.0/32: EINE Zeile wie Live-TV („Alle Filme  72.691"), Handy nur „72.691 Filme".
+            German4kKategorieKopf(selectedLabel, count, R.plurals.g4k_filme_anzahl)
             Spacer(Modifier.height(14.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 SearchBar(
