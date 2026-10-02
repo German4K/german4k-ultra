@@ -420,7 +420,12 @@ class SettingsViewModel(
     val vodEnginePreference: StateFlow<tv.own.owntv.core.player.EnginePreference> = settings.vodEnginePreference
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.player.EnginePreference.MPV_FIRST)
     fun setVodEnginePreference(preference: tv.own.owntv.core.player.EnginePreference) {
-        viewModelScope.launch { settings.setVodEnginePreference(preference) }
+        viewModelScope.launch {
+            settings.setVodEnginePreference(preference)
+            // German4K: wer den Player umstellt, meint alle Filme — gespeicherte Wahl je Film verwerfen
+            // (Hicham069, 30.09.: „Nur ExoPlayer“ gewählt, der Film blieb per Pin auf mpv).
+            runCatching { vodEngineStore.clearAll() }
+        }
     }
 
     val liveEnginePreference: StateFlow<tv.own.owntv.core.player.EnginePreference> = settings.liveEnginePreference

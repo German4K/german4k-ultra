@@ -50,10 +50,11 @@ fun UpdateStatusToast(onDone: () -> Unit, onViewChangelog: () -> Unit, modifier:
 
     // Transient outcomes hide themselves; an available update keeps the card up.
     LaunchedEffect(state) {
-        when (state) {
+        when (val s0 = state) {
             UpdateManager.State.UpToDate -> { delay(2_000); manager.reset(); onDone() }
             is UpdateManager.State.Failed -> { delay(2_500); manager.reset(); onDone() }
-            is UpdateManager.State.Available -> runCatching { focus.requestFocus() }
+            // German4K: Pflicht-Update öffnet direkt den Dialog (ohne „Später"), statt nur den Toast zu zeigen.
+            is UpdateManager.State.Available -> if (s0.info.required) onViewChangelog() else runCatching { focus.requestFocus() }
             UpdateManager.State.Idle -> onDone()
             else -> Unit
         }
@@ -91,7 +92,7 @@ fun UpdateStatusToast(onDone: () -> Unit, onViewChangelog: () -> Unit, modifier:
                 Text(stringResource(R.string.g4k_update_quellen_button), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
             }
             is UpdateManager.State.Available -> {
-                BackHandler { onDone() } // Back = Later
+                BackHandler { if (!s.info.required) onDone() } // Back = Later — German4K: nicht bei Pflicht-Update
                 Text(stringResource(R.string.update_available), style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -103,7 +104,8 @@ fun UpdateStatusToast(onDone: () -> Unit, onViewChangelog: () -> Unit, modifier:
                     // "What's New" opens the full changelog dialog (same view the manual check uses);
                     // both update paths show the changelog before downloading.
                     OwnTVButton(stringResource(R.string.update_whats_new), onClick = onViewChangelog, modifier = Modifier.focusRequester(focus))
-                    OwnTVButton(stringResource(R.string.update_later), onClick = onDone, style = OwnTVButtonStyle.SECONDARY)
+                    // German4K: bei Pflicht-Update kein „Später" (der Dialog öffnet sich ohnehin sofort).
+                    if (!s.info.required) OwnTVButton(stringResource(R.string.update_later), onClick = onDone, style = OwnTVButtonStyle.SECONDARY)
                 }
             }
             is UpdateManager.State.Downloading -> Row(verticalAlignment = Alignment.CenterVertically) {

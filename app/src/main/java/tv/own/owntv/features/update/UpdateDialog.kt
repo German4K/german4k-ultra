@@ -69,7 +69,15 @@ fun UpdateDialog(onDismiss: () -> Unit, checkOnOpen: Boolean = false) {
             runCatching { focus.requestFocus() }
         }
     }
-    BackHandler { onDismiss() }
+    // German4K: Pflicht-Update (Panel `update.required`) — kein „Später", Zurück schließt nicht.
+    // Gilt nicht für Failed/UpToDate/NeedsInstallPermission: dort bleibt „Schließen", damit ein kaputter Link niemanden einsperrt.
+    val pflicht = when (val s = state) {
+        is UpdateManager.State.Available -> s.info.required
+        // German4K: „Installation erlauben" behält „Später" — wer die Erlaubnis nicht geben kann, säße sonst fest.
+        UpdateManager.State.Checking, UpdateManager.State.Idle, is UpdateManager.State.Downloading -> manager.isPflichtUpdate()
+        else -> false
+    }
+    BackHandler { if (!pflicht) onDismiss() }
 
     Box(
         modifier = Modifier.fillMaxSize().modalScrim().trapAllFocusExit().focusGroup(),
@@ -118,7 +126,8 @@ fun UpdateDialog(onDismiss: () -> Unit, checkOnOpen: Boolean = false) {
                     }
                     Spacer(Modifier.height(20.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OwnTVButton(stringResource(R.string.update_later), onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY)
+                        // German4K: bei Pflicht-Update kein „Später".
+                        if (!pflicht) OwnTVButton(stringResource(R.string.update_later), onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY)
                         Spacer(Modifier.weight(1f))
                         OwnTVButton(stringResource(R.string.update_now), onClick = { manager.downloadAndInstall() }, icon = OwnTVIcon.DOWNLOADS, modifier = Modifier.focusRequester(focus))
                     }
@@ -134,7 +143,8 @@ fun UpdateDialog(onDismiss: () -> Unit, checkOnOpen: Boolean = false) {
                     )
                     Spacer(Modifier.height(20.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OwnTVButton(stringResource(R.string.update_later), onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY)
+                        // German4K: bei Pflicht-Update kein „Später".
+                        if (!pflicht) OwnTVButton(stringResource(R.string.update_later), onClick = onDismiss, style = OwnTVButtonStyle.SECONDARY)
                         Spacer(Modifier.weight(1f))
                         if (intent != null) {
                             OwnTVButton(

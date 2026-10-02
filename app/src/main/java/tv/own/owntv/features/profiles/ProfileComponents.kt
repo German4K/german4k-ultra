@@ -146,6 +146,9 @@ internal fun ProfileEditorDialog(
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     val nameTaken = name.trim().isNotEmpty() && name.trim().lowercase() in takenNames
+    // German4K: Kunden legen statt eines zweiten Zugangs ein Profil mit ihrem Benutzernamen an (Marcel197,
+    // „MCK2212"). Nur beim Anlegen ein Hinweis auf „Quelle hinzufügen" — blockiert nichts.
+    val nameWieZugang = initial == null && looksLikeLoginName(name.trim())
 
     ProfileScrim(onDismiss) {
         Text(stringResource(if (initial == null) R.string.profiles_new else R.string.profiles_edit), style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
@@ -156,6 +159,14 @@ internal fun ProfileEditorDialog(
             Text(
                 stringResource(R.string.profiles_name_taken),
                 style = MaterialTheme.typography.bodyMedium, color = Color(0xFFEF4444),
+            )
+        }
+        // German4K: Hinweis „zweiter Zugang gehört unter Quelle hinzufügen".
+        if (nameWieZugang) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                stringResource(R.string.g4k_profil_name_wie_zugang),
+                style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
             )
         }
         Spacer(Modifier.height(16.dp))
@@ -208,6 +219,17 @@ internal fun ProfileEditorDialog(
             )
         }
     }
+}
+
+// German4K: Buchstaben+Ziffern ohne Leerzeichen, mindestens ein Buchstabe, endet auf ≥2 Ziffern (z. B. „MCK2212").
+// Bewusst ohne Regex-Literal (i18n-Inventar).
+internal fun looksLikeLoginName(name: String): Boolean {
+    fun asciiLetter(c: Char) = c in 'a'..'z' || c in 'A'..'Z'
+    fun asciiDigit(c: Char) = c in '0'..'9'
+    return name.length >= 3 &&
+        name.all { asciiLetter(it) || asciiDigit(it) } &&
+        name.any(::asciiLetter) &&
+        name.takeLast(2).all(::asciiDigit)
 }
 
 @Composable

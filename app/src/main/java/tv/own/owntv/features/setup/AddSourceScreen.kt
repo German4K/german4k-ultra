@@ -193,6 +193,8 @@ fun AddSourceScreen(
     var showManualDaysPicker by remember { mutableStateOf(false) }
     val firstFocus = remember { FocusRequester() }
     val startImportFocus = remember { FocusRequester() }
+    // German4K: Fernbedienung — nach dem Passwort (bzw. User-Agent) per „Fertig"/D-Pad-runter direkt auf „Verbindung testen".
+    val testConnectionFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
 
     // Profile-wide "hide new categories on sync" default (issue #87, Phase 4). Written straight to
@@ -464,7 +466,7 @@ fun AddSourceScreen(
                     Spacer(Modifier.height(14.dp))
                     OwnTVTextField(username, { username = it }, label = stringResource(R.string.setup_username), modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(14.dp))
-                    OwnTVTextField(password, { password = it }, label = if (editing) stringResource(R.string.setup_password_keep) else stringResource(R.string.setup_password), isPassword = true, modifier = Modifier.fillMaxWidth())
+                    OwnTVTextField(password, { password = it }, label = if (editing) stringResource(R.string.setup_password_keep) else stringResource(R.string.setup_password), isPassword = true, modifier = Modifier.fillMaxWidth(), nextFocus = if (canTest) testConnectionFocus else null) // German4K
                 }
                 SourceKind.M3U -> {
                     val pickedName = remember(m3uUrl) {
@@ -510,7 +512,7 @@ fun AddSourceScreen(
             // EPG is managed separately now (Settings → EPG Sources), so no EPG field here. For an
             // Xtream server the guide URL is still derived automatically; M3U EPG can be added there.
             Spacer(Modifier.height(14.dp))
-            OwnTVTextField(userAgent, { userAgent = it }, label = stringResource(R.string.setup_user_agent_optional), placeholder = stringResource(R.string.setup_user_agent_example), modifier = Modifier.fillMaxWidth())
+            OwnTVTextField(userAgent, { userAgent = it }, label = stringResource(R.string.setup_user_agent_optional), placeholder = stringResource(R.string.setup_user_agent_example), modifier = Modifier.fillMaxWidth(), nextFocus = if (canTest) testConnectionFocus else null) // German4K
 
             Spacer(Modifier.height(10.dp))
             OwnTVButton(
@@ -518,7 +520,7 @@ fun AddSourceScreen(
                 onClick = { if (sourceTest == null) runSourceTest() },
                 style = OwnTVButtonStyle.SECONDARY,
                 enabled = canTest,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().focusRequester(testConnectionFocus), // German4K: Ziel für nextFocus
             )
 
             Spacer(Modifier.height(16.dp))

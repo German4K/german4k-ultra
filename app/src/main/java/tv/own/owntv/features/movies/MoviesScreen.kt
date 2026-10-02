@@ -125,6 +125,7 @@ import tv.own.owntv.core.theme.GlassSurface
 import tv.own.owntv.ui.theme.OwnTVTheme
 import tv.own.owntv.ui.format.localizedInteger
 import tv.own.owntv.core.live.LiveKey
+import tv.own.owntv.core.live.serialize
 
 @Composable
 fun MoviesScreen(
@@ -328,8 +329,9 @@ fun MoviesScreen(
     // "Remember last item per category": ON → each category keeps its own scroll position (per-category
     // grid + list states, so view-mode toggles also keep their offsets). OFF → reset the shared grid/list
     // states to the top whenever the category changes (fixes the cross-category scroll-leak bug).
-    val perCategoryGrid = remember { mutableStateMapOf<LiveKey, LazyGridState>() }
-    val perCategoryList = remember { mutableStateMapOf<LiveKey, LazyListState>() }
+    // German4K: saveable, sonst gehen die Stände beim Drehen verloren (Helfer am Dateiende).
+    val perCategoryGrid = rememberRasterJeKategorie()
+    val perCategoryList = rememberListeJeKategorie()
     // NOTE: plain constructors, not remember*State() — these are created lazily inside getOrPut, so a
     // @Composable/rememberSaveable call here would register slots conditionally and corrupt the slot table.
     val effectiveGridState = if (rememberMovies) perCategoryGrid.getOrPut(selectedKey) { LazyGridState() } else gridState
@@ -1463,3 +1465,33 @@ private fun MovieListRow(
 
 /** German4K 3.0/32 (I2): Spalten des Filmrasters am Fernseher. */
 private const val TV_RASTER_SPALTEN = 6
+
+// German4K: Scrollstand je Kategorie ueberlebt das Drehen — vorher plain `remember`, die Activity
+// wird beim Drehen neu gebaut und alle Stände lagen wieder oben. Gespeichert wird je Kategorie
+// (LiveKey.serialize) Index + Versatz; Filme und Serien nutzen beide diese zwei Helfer.
+@Composable
+internal fun rememberRasterJeKategorie(): androidx.compose.runtime.snapshots.SnapshotStateMap<LiveKey, LazyGridState> =
+    rememberSaveable(
+        saver = androidx.compose.runtime.saveable.listSaver<androidx.compose.runtime.snapshots.SnapshotStateMap<LiveKey, LazyGridState>, Any>(
+            save = { m -> m.flatMap { (k, s) -> listOf(k.serialize(), s.firstVisibleItemIndex, s.firstVisibleItemScrollOffset) } },
+            restore = { l ->
+                mutableStateMapOf<LiveKey, LazyGridState>().apply {
+                    l.chunked(3).forEach { (k, i, o) -> tv.own.owntv.core.live.parseLiveKey(k as String)?.let { put(it, LazyGridState(i as Int, o as Int)) } }
+                }
+            },
+        ),
+    ) { mutableStateMapOf() }
+
+// German4K: wie oben, fuer die Listenansicht.
+@Composable
+internal fun rememberListeJeKategorie(): androidx.compose.runtime.snapshots.SnapshotStateMap<LiveKey, LazyListState> =
+    rememberSaveable(
+        saver = androidx.compose.runtime.saveable.listSaver<androidx.compose.runtime.snapshots.SnapshotStateMap<LiveKey, LazyListState>, Any>(
+            save = { m -> m.flatMap { (k, s) -> listOf(k.serialize(), s.firstVisibleItemIndex, s.firstVisibleItemScrollOffset) } },
+            restore = { l ->
+                mutableStateMapOf<LiveKey, LazyListState>().apply {
+                    l.chunked(3).forEach { (k, i, o) -> tv.own.owntv.core.live.parseLiveKey(k as String)?.let { put(it, LazyListState(i as Int, o as Int)) } }
+                }
+            },
+        ),
+    ) { mutableStateMapOf() }

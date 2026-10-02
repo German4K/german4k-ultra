@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxSize
@@ -885,8 +887,10 @@ fun OwnTVShell(
                 // 14 und aelter ist der Abstand 0, dort aendert die Zeile also nichts.
                 .then(
                     if (formfaktor.mobil) {
+                        // German4K: Kamera-Aussparung dazu — quer liegt sie links und schnitt den Bereichs-Chip ab.
                         Modifier.windowInsetsPadding(
-                            WindowInsets.systemBars.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+                            WindowInsets.systemBars.union(WindowInsets.displayCutout)
+                                .only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
                         )
                     } else {
                         Modifier

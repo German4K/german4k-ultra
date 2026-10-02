@@ -83,6 +83,9 @@ fun OwnTVTextField(
     surface: GlassSurface? = GlassSurface.CARDS,
     /** Corner radius of the field; a pill reads better where the field sits inline in a header. */
     corner: androidx.compose.ui.unit.Dp = 12.dp,
+    // German4K: Ziel nach „Fertig" auf der Tastatur und für D-Pad-runter (z. B. „Verbindung testen" nach dem
+    // Passwort). null = wie bisher: Fokus bleibt auf dem Feld, D-Pad sucht geometrisch.
+    nextFocus: FocusRequester? = null,
 ) {
     val colors = OwnTVTheme.colors
     val formfaktor = LocalFormfaktor.current
@@ -161,6 +164,8 @@ fun OwnTVTextField(
                     .weight(1f)
                     .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
                     .focusRequester(pillFocus)
+                    // German4K: D-Pad-runter springt gezielt auf [nextFocus].
+                    .focusProperties { if (nextFocus != null) down = nextFocus }
                     .clickable(interactionSource = interaction, indication = null) { editing = true },
             ) {
                 BasicTextField(
@@ -176,7 +181,10 @@ fun OwnTVTextField(
                         // Handy/Tablet verschluckt BasicTextField dabei den Tipp, bevor er die
                         // umgebende Flaeche erreicht: kein Tastaturfeld, keine Eingabe. Dort ist das
                         // Feld deshalb von Anfang an tippbar.
-                        .focusProperties { canFocus = editing || formfaktor.mobil }
+                        .focusProperties {
+                            canFocus = editing || formfaktor.mobil
+                            if (nextFocus != null) down = nextFocus // German4K: auch während der Eingabe
+                        }
                         .onFocusChanged {
                             if (it.isFocused) editing = true else if (editing) editing = false
                         }
@@ -199,7 +207,9 @@ fun OwnTVTextField(
                     keyboardActions = KeyboardActions(onDone = {
                         editing = false
                         keyboard?.hide()
-                        runCatching { pillFocus.requestFocus() }
+                        // German4K: mit [nextFocus] weiter zum nächsten Ziel statt zurück aufs Feld.
+                        runCatching { (nextFocus ?: pillFocus).requestFocus() }
+                            .onFailure { runCatching { pillFocus.requestFocus() } }
                     }),
                     visualTransformation = if (isPassword && !showPassword) PasswordVisualTransformation() else VisualTransformation.None,
                     decorationBox = { inner ->

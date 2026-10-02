@@ -36,7 +36,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -394,8 +393,9 @@ private fun SeriesGrid(
     // "Remember last item per category": ON → each category keeps its own scroll position (per-category
     // grid + list states). OFF → reset the shared grid/list states to the top on category change
     // (fixes the cross-category scroll-leak bug).
-    val perCategoryGrid = remember { mutableStateMapOf<LiveKey, androidx.compose.foundation.lazy.grid.LazyGridState>() }
-    val perCategoryList = remember { mutableStateMapOf<LiveKey, androidx.compose.foundation.lazy.LazyListState>() }
+    // German4K: saveable, sonst gehen die Stände beim Drehen verloren (Helfer in MoviesScreen.kt).
+    val perCategoryGrid = tv.own.owntv.features.movies.rememberRasterJeKategorie()
+    val perCategoryList = tv.own.owntv.features.movies.rememberListeJeKategorie()
     // NOTE: plain constructors, not remember*State() — these are created lazily inside getOrPut, so a
     // @Composable/rememberSaveable call here would register slots conditionally and corrupt the slot table.
     val effectiveGridState = if (rememberSeries) perCategoryGrid.getOrPut(selectedKey) { androidx.compose.foundation.lazy.grid.LazyGridState() } else gridState
