@@ -224,7 +224,7 @@ internal fun videoQuickBinding(key: String, vm: SettingsViewModel): VideoQuickBi
         }
         "vp_vod_engine" -> {
             val engine by vm.vodEnginePreference.collectAsStateWithLifecycle()
-            link(engineLabel(engine), engine != EnginePreference.MPV_FIRST)
+            link(engineLabel(engine), engine != EnginePreference.EXO_FIRST)
         }
         "vp_reset_pins" -> {
             val pins by vm.vodEnginePinCount.collectAsStateWithLifecycle()
@@ -832,7 +832,7 @@ fun VideoPlayerSettingsScreen(
             icon = OwnTVIcon.PLAY, title = stringResource(R.string.settings_movies_series_player),
             desc = stringResource(R.string.settings_movies_player_description),
             chip = engineLabel(vodEngine), chevron = true,
-            primaryChip = vodEngine != EnginePreference.MPV_FIRST,
+            primaryChip = vodEngine != EnginePreference.EXO_FIRST,
             modifier = Modifier.focusRequester(dialogRowFocus.getValue(Dialog.VOD_ENGINE)),
             onClick = { savedScroll = scrollState.value; dialog = Dialog.VOD_ENGINE },
         )
@@ -1149,7 +1149,7 @@ fun VideoPlayerSettingsScreen(
         )
         Dialog.VOD_ENGINE -> PickerDialog(
             title = stringResource(R.string.settings_movies_series_player),
-            options = engineOptions(default = EnginePreference.MPV_FIRST),
+            options = engineOptions(default = EnginePreference.EXO_FIRST), // German4K 3.1: Filme & Serien starten auf ExoPlayer
             selected = vodEngine.name,
             onSelect = { vm.setVodEnginePreference(EnginePreference.valueOf(it)); dialog = Dialog.NONE },
             onDismiss = { dialog = Dialog.NONE },

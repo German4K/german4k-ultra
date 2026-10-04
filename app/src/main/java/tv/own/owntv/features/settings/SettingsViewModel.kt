@@ -418,7 +418,7 @@ class SettingsViewModel(
     fun setHwDecoding(enabled: Boolean) { viewModelScope.launch { settings.setHwDecoding(enabled) } }
 
     val vodEnginePreference: StateFlow<tv.own.owntv.core.player.EnginePreference> = settings.vodEnginePreference
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.player.EnginePreference.MPV_FIRST)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.player.EnginePreference.EXO_FIRST)
     fun setVodEnginePreference(preference: tv.own.owntv.core.player.EnginePreference) {
         viewModelScope.launch {
             settings.setVodEnginePreference(preference)

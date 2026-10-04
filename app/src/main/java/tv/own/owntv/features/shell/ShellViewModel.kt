@@ -60,6 +60,7 @@ class ShellViewModel(
     private val weatherRepository: WeatherRepository,
     private val navVisibility: NavVisibility,
     private val profiles: tv.own.owntv.core.profile.ProfileManager,
+    private val vodEngineStore: tv.own.owntv.core.player.VodEngineStore,
 ) : ViewModel() {
 
     companion object {
@@ -80,6 +81,8 @@ class ShellViewModel(
         viewModelScope.launch { runCatching { epgMigration.run() } }
         // One-time: migrate the legacy binary refresh-on-startup set → per-source STARTUP entries.
         viewModelScope.launch { runCatching { settings.migrateLegacyRefreshFlags() } }
+        // German4K 3.1: Filme & Serien einmalig auf „ExoPlayer, dann mpv"; gemerkte Wahlen je Film verwerfen.
+        viewModelScope.launch { runCatching { if (settings.migrateVodEngine31()) vodEngineStore.clearAll() } }
         // v4.1.6: one-time safety reset. Later user changes to AFR are never overwritten.
         viewModelScope.launch { runCatching { settings.migrateAutoFrameRate416() } }
         // v4.2.0: one-time safety reset for devices below Android 12, where the app cannot tell a
