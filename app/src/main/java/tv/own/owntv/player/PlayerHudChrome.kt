@@ -345,6 +345,8 @@ internal fun BottomBar(
     player: PlaybackEngine, isLive: Boolean, position: Long, duration: Long,
     volume: Int, audioCount: Int, subCount: Int, zoomMode: ZoomMode, speedLabel: String,
     onScrubLive: ((Int) -> Unit)?, timeshiftOffsetSec: Int?, onGoToLive: (() -> Unit)?, onOpenJumpBack: (() -> Unit)?,
+    /** German4K 3.1: „Folge von vorn" auf einem virtuellen 24/7-Sender; null blendet den Knopf aus. */
+    onFromStart: (() -> Unit)? = null,
     liveProgrammes: List<LiveProgramme> = emptyList(),
     compatMode: Boolean?, onToggleCompatMode: (() -> Unit)?,
     vodOnExo: Boolean?, onToggleVodEngine: (() -> Unit)?,
@@ -437,6 +439,10 @@ internal fun BottomBar(
                         PlayerControl.CATCH_UP -> if (onOpenJumpBack != null) {
                             CtrlButton(OwnTVIcon.CATCHUP, label = stringResource(R.string.player_tool_catchup)) { onOpenJumpBack() }
                         }
+                        // German4K 3.1: virtueller 24/7-Sender — die laufende Folge von vorn, ohne Serveraufruf.
+                        PlayerControl.FROM_START -> if (onFromStart != null) {
+                            CtrlButton(OwnTVIcon.SKIP_PREVIOUS, label = stringResource(R.string.g4k_virtuell_von_vorn)) { onFromStart() }
+                        }
                         // Belongs to the tools cluster; `clusterFor` never hands them to this loop.
                         PlayerControl.BRIGHTNESS, PlayerControl.CHANNEL_LIST, PlayerControl.ENGINE,
                         PlayerControl.ASPECT, PlayerControl.MINI_PLAYER, PlayerControl.AUDIO_ONLY,
@@ -516,7 +522,7 @@ internal fun BottomBar(
                         // Belongs to the media cluster; `clusterFor` never hands them to this loop.
                         PlayerControl.GO_LIVE, PlayerControl.VOLUME, PlayerControl.BRIGHTNESS,
                         PlayerControl.SPEED, PlayerControl.SUBTITLES, PlayerControl.AUDIO,
-                        PlayerControl.FAVOURITE, PlayerControl.CATCH_UP, PlayerControl.CHANNEL_LIST,
+                        PlayerControl.FAVOURITE, PlayerControl.CATCH_UP, PlayerControl.FROM_START, PlayerControl.CHANNEL_LIST,
                         -> Unit
                     }
                 }
