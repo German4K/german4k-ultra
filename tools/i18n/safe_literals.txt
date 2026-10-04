@@ -469,6 +469,7 @@
 1	empty	app/src/main/java/tv/own/owntv/features/setup/German4kOverlays.kt	\0
 3	protocol	app/src/main/java/tv/own/owntv/features/setup/German4kOverlays.kt	abgelaufen
 1	protocol	app/src/main/java/tv/own/owntv/features/setup/German4kOverlays.kt	info
+1	protocol	app/src/main/java/tv/own/owntv/features/setup/German4kOverlays.kt	stoerung_abgelaufen
 2	json	app/src/main/java/tv/own/owntv/features/setup/German4kOverlays.kt	test
 1	technical	app/src/main/java/tv/own/owntv/features/setup/German4kOverlays.kt	uhr:${java.time.LocalDate.now()}
 2	protocol	app/src/main/java/tv/own/owntv/features/setup/German4kOverlays.kt	verlaengern

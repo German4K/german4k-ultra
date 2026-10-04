@@ -167,6 +167,10 @@ private fun StoerungDialog(lage: German4kStoerung.Lage, onClose: () -> Unit) {
     var laeuft by remember { mutableStateOf(false) }
     var meldung by remember { mutableStateOf<String?>(null) }
     val belegt = lage.klasse == German4kHealth.Klasse.LEITUNG_BELEGT
+    // German4K 3.1: „abgelaufen" — der Text verspricht „Erneut prüfen", also gibt es den Knopf auch: frisch
+    // beim Panel fragen und alle Kataloge neu holen (nach einer Verlängerung tragen sie die alten Adressen).
+    val abgelaufen = lage.klasse == German4kHealth.Klasse.ABGELAUFEN
+    val provisioner: German4kProvisioner = koinInject()
 
     Box(
         Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.78f)).focusGroup(),
@@ -210,11 +214,22 @@ private fun StoerungDialog(lage: German4kStoerung.Lage, onClose: () -> Unit) {
                         modifier = Modifier.focusRequester(focus),
                     )
                 }
+                if (abgelaufen) {
+                    OwnTVButton(
+                        stringResource(R.string.g4k_stoerung_erneut),
+                        onClick = {
+                            provisioner.provision(force = true)
+                            scope.launch { runCatching { provisioner.resyncManaged("stoerung_abgelaufen") } }
+                            onClose()
+                        },
+                        modifier = Modifier.focusRequester(focus),
+                    )
+                }
                 OwnTVButton(
                     stringResource(R.string.g4k_stoerung_pruefen),
                     onClick = { onClose(); German4kSupport.oeffnen() },
-                    style = if (belegt && meldung == null) OwnTVButtonStyle.SECONDARY else OwnTVButtonStyle.PRIMARY,
-                    modifier = if (belegt && meldung == null) Modifier else Modifier.focusRequester(focus),
+                    style = if ((belegt && meldung == null) || abgelaufen) OwnTVButtonStyle.SECONDARY else OwnTVButtonStyle.PRIMARY,
+                    modifier = if ((belegt && meldung == null) || abgelaufen) Modifier else Modifier.focusRequester(focus),
                 )
                 OwnTVButton(stringResource(R.string.g4k_stoerung_zu), onClick = onClose, style = OwnTVButtonStyle.SECONDARY)
             }

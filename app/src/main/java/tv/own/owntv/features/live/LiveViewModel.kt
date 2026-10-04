@@ -1800,7 +1800,7 @@ class LiveViewModel(
                 engine = previewEngine,
                 stillOurs = { isStill(channel) },
                 handOver = { reason -> advanceLadder(channel, reason) },
-                onOpened = { ladderOpened() },
+                onOpened = { ladderOpened(); tuneGelungen() },
                 postponeDeadline = { ladder.postponeDeadline(it) },
                 log = { engineLog(it) },
             ).watch(channel.name)
@@ -1916,6 +1916,14 @@ class LiveViewModel(
     }
 
     /** The channel produced a picture — the opening budget has been met, so stand the alarm down. */
+    /** German4K 3.1: Bild ist da → eine stehende „abgelaufen"/„Leitung belegt"-Meldung ist überholt. Nicht in
+     *  [ladderOpened]: das läuft auch beim Abbauen (stopPreview) und nähme dem Kunden den Dialog weg. */
+    private fun tuneGelungen() {
+        tv.own.owntv.core.german4k.German4kStoerung.schliessenWenn(
+            tv.own.owntv.core.german4k.German4kHealth.Klasse.ABGELAUFEN, tv.own.owntv.core.german4k.German4kHealth.Klasse.LEITUNG_BELEGT,
+        )
+    }
+
     private fun ladderOpened() {
         ladderDeadlineJob?.cancel()
         ladderDeadlineJob = null
@@ -2152,7 +2160,7 @@ class LiveViewModel(
             if (!isStillOnMpv(channel)) return@launch
             val reason = when {
                 failure == null -> "mpv never opened it (${MPV_OPEN_TIMEOUT_MS / 1000}s, no picture and no error)"
-                failure.first -> { engineLog("'${channel.name}' opened on mpv"); ladderOpened(); return@launch }
+                failure.first -> { engineLog("'${channel.name}' opened on mpv"); ladderOpened(); tuneGelungen(); return@launch }
                 else -> "mpv couldn't play it: ${failure.second}"
             }
             advanceLadder(channel, reason)
