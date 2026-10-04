@@ -124,6 +124,8 @@ class EpgViewModel(
     private val externalPlayerLauncher: tv.own.owntv.core.player.ExternalPlayerLauncher,
     private val customCategoryDao: tv.own.owntv.core.database.dao.CustomCategoryDao,
     private val recordings: tv.own.owntv.core.recording.RecordingManager,
+    /** German4K 3.1: Sendepläne virtueller 24/7-Sender — überschreiben im Raster die gespeicherten Zeilen. */
+    private val virtuell: tv.own.owntv.core.german4k.German4kVirtuellRepository,
 ) : ViewModel() {
 
     // --- Recording, from the guide (Plan D, Feature A) ------------------------------------------
@@ -355,9 +357,25 @@ class EpgViewModel(
     private fun shiftFor(channel: ChannelEntity): Int =
         tv.own.owntv.core.epg.EpgShift.minutesFor(custom.value, channel, epgOffset.value)
 
+    /**
+     * German4K 3.1: Für einen virtuellen Sender ist der Sendeplan vom Server das Programm (er ist aktueller
+     * als die Nacht-EPG). Null, wenn kein Plan bekannt ist — dann gilt das gespeicherte Raster.
+     * ⚠️ Im Raster erscheint der Sender nur, wenn die Server-EPG (Ebene 8) Zeilen für `g4k.v.*` liefert:
+     * die Senderliste kommt aus `channelsWithGuide`, das Sender ohne gespeicherte Zeilen auslässt.
+     */
+    private fun virtuellZeilen(channel: ChannelEntity, key: String): List<EpgProgrammeEntity>? {
+        if (!key.startsWith(tv.own.owntv.core.german4k.VIRTUELL_EPG_PRAEFIX)) return null
+        val plan = virtuell.plaene.value[key] ?: return null
+        val uhr = channel.remoteId?.toLongOrNull()?.let { virtuell.gecacht(it)?.uhr } ?: tv.own.owntv.core.german4k.VirtuellUhr(0)
+        val s = _state.value
+        return tv.own.owntv.core.german4k.VirtuellPlan.alsProgramme(plan, key, channel.sourceId, uhr, s.windowStart, s.windowEnd)
+            .takeIf { it.isNotEmpty() }
+    }
+
     /** Synchronous cache peek — lets a re-composed row render instantly without a loading flash. */
     fun cachedProgrammes(channel: ChannelEntity): List<EpgProgrammeEntity>? {
         val key = channel.epgChannelId?.trim()?.lowercase() ?: return null
+        virtuellZeilen(channel, key)?.let { return it }
         val shift = shiftFor(channel)
         return if (shift == 0) rowCache[key] else shiftedRowCache["$key|$shift"]
     }
@@ -365,6 +383,7 @@ class EpgViewModel(
     /** Lazily loads one row's programmes (indexed query + cache) as the row scrolls into view. */
     suspend fun programmesFor(channel: ChannelEntity): List<EpgProgrammeEntity> {
         val key = channel.epgChannelId?.trim()?.lowercase() ?: return emptyList()
+        virtuellZeilen(channel, key)?.let { return it }
         val s = _state.value
         val shift = shiftFor(channel)
         val cacheKey = if (shift == 0) key else "$key|$shift"
@@ -385,6 +404,8 @@ class EpgViewModel(
         guideReader.window(from, to)
 
     init {
+        // German4K 3.1: neuer Sendeplan → sichtbare Zeilen neu lesen.
+        viewModelScope.launch { virtuell.plaene.collect { if (it.isNotEmpty()) _cacheRevision.value++ } }
         // Re-filter the grid as the user types (DB-level, so it searches ALL guide channels, not
         // just the visible rows). drop(1): the screen triggers the initial load itself.
         _query
@@ -764,6 +785,8 @@ class EpgViewModel(
     // with the ExoPlayer ladder, the pending-tune anchor and the bounded rebuild.
 
     fun load() {
+        // German4K 3.1: Pläne aller virtuellen Sender für das Raster (6 h), still im Hintergrund.
+        if (tv.own.owntv.core.german4k.German4kFeatures.visible(tv.own.owntv.core.german4k.VIRTUELL_FEATURE)) viewModelScope.launch { virtuell.alle(fensterH = 6) }
         viewModelScope.launch {
             // Show the spinner only on the FIRST load. The EpgViewModel is shared, so on re-entry the guide
             // is already populated — keep the existing list on screen and refresh it silently, so opening the

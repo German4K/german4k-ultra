@@ -164,7 +164,6 @@
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	tune '${channel.name}' -> $reason [${preference.name}]
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	tuneByNumber($number) failed
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	user chose compatibility mode
-1	protocol	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	virtuell
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	virtuell '${channel.name}' ziel=${e.zielId} ab ${stand.positionMs / 1000}s
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveZapList.kt	LiveZapList
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveZapList.kt	direct tune: zap rebuild failed

@@ -1529,7 +1529,7 @@ class LiveViewModel(
         // Störung (kein Plan, Fehler, Schalter aus) fällt hier durch auf den normalen Weg darunter (Weg A).
         virtuellBeenden()
         if (tv.own.owntv.core.german4k.VirtuellWeg.darf(
-                channel.istVirtuellSender(), tv.own.owntv.core.german4k.German4kFeatures.visible("virtuell"),
+                channel.istVirtuellSender(), tv.own.owntv.core.german4k.German4kFeatures.visible(tv.own.owntv.core.german4k.VIRTUELL_FEATURE),
                 virtuellGesperrtBis[channel.id] ?: 0L, System.currentTimeMillis(),
             ) && spieleVirtuell(channel)
         ) return
