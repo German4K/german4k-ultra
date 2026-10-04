@@ -219,9 +219,11 @@ private fun StoerungDialog(lage: German4kStoerung.Lage, onClose: () -> Unit) {
                 if (abgelaufen) {
                     OwnTVButton(
                         stringResource(R.string.g4k_stoerung_erneut),
+                        // Nur frisch fragen: erkennt das Panel die Verlängerung, holt der Provisioner selbst alle
+                        // Kataloge neu. Ein zusätzlicher Sync hier lief mit den alten Daten los und hätte den
+                        // richtigen (KEEP) verdrängt.
                         onClick = {
                             provisioner.provision(force = true)
-                            scope.launch { runCatching { provisioner.resyncManaged("stoerung_abgelaufen") } }
                             onClose()
                         },
                         modifier = Modifier.focusRequester(focus),

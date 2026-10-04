@@ -1136,7 +1136,13 @@ class LiveViewModel(
                 when {
                     _virtuell.value != null -> virtuellWeiter(abNull = false)
                     // Weg A: dieselbe Adresse neu — der Server liefert den nächsten Titel laut Plan.
-                    wegA != null -> _previewChannel.value?.takeIf { it.id == wegA }?.let { ch -> viewModelScope.launch { spieleVirtuellWegA(ch) } }
+                    wegA != null -> _previewChannel.value?.takeIf { it.id == wegA }?.let { ch ->
+                        // Bremse: endet die Datei dreimal in Folge nach wenigen Sekunden (leere/kaputte Antwort),
+                        // nicht endlos neu laden — dann bleibt der Player beim Ende stehen.
+                        wegAKurzEnden = if (System.currentTimeMillis() - wegAStartMs < WEG_A_MIN_LAUF_MS) wegAKurzEnden + 1 else 0
+                        if (wegAKurzEnden < 3) viewModelScope.launch { spieleVirtuellWegA(ch) }
+                        else engineLog("'${ch.name}' virtuell Weg A: Datei endet sofort — kein weiterer Versuch")
+                    }
                 }
             }
         }
@@ -2350,6 +2356,8 @@ class LiveViewModel(
     private val virtuellZaehler = tv.own.owntv.core.german4k.VirtuellFehlerZaehler(grenze = 3)
     /** Sender → Gerätezeit, bis zu der Weg B ausgesetzt ist (nach drei Fehlern oder einer Ablehnung). */
     private val virtuellGesperrtBis = HashMap<Long, Long>()
+    private var wegAStartMs = 0L
+    private var wegAKurzEnden = 0
 
     private fun ChannelEntity.istVirtuellSender(): Boolean =
         epgChannelId?.startsWith(tv.own.owntv.core.german4k.VIRTUELL_EPG_PRAEFIX) == true
@@ -2366,7 +2374,9 @@ class LiveViewModel(
         val ua = withContext(Dispatchers.IO) { sourceDao.getById(channel.sourceId)?.userAgent }
         engineLog("'${channel.name}' virtuell ohne Plan → Datei von vorn (Weg A)")
         clearLiveOnExo()
+        if (_virtuellWegA.value != channel.id) wegAKurzEnden = 0
         _virtuellWegA.value = channel.id
+        wegAStartMs = System.currentTimeMillis()
         player.play(
             channel.streamUrl, title = channel.name, logoUrl = channel.displayLogoUrl, isLive = false,
             userAgent = ua, httpHeaders = channel.httpHeaders, contentKey = "g4k.va:${channel.id}", chained = true,
@@ -2790,6 +2800,8 @@ class LiveViewModel(
         const val VIRTUELL_ABFRAGE_MS = 3_500L
         /** German4K 3.1: nach drei Fehlern / Ablehnung spielt der Sender so lange normal. */
         const val VIRTUELL_SPERRE_MS = 5 * 60_000L
+        /** German4K 3.1: kürzer als das gilt eine Weg-A-Datei als „sofort zu Ende“ (Bremse gegen Endlosschleife). */
+        const val WEG_A_MIN_LAUF_MS = 10_000L
         /** Stale-failure window after a German4K host switch (see [hostSwitchAtMs]). */
         const val HOST_SWITCH_GRACE_MS = 2_000L
         const val ENGINE_TAG = "LiveEngine"
