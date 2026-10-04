@@ -160,6 +160,10 @@ fun HomeScreen(
     // German4K 3.0/32 (D2): Fußball-Reihe; der Spielplan wird geholt, solange die Startseite offen ist.
     val g4kFussball by vm.fussball.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.fussballAuffrischen() }
+    // German4K 3.1: „Jetzt im TV" (Wunsch Rabe330).
+    val g4kJetztImTv by vm.jetztImTv.collectAsStateWithLifecycle()
+    LaunchedEffect(vm) { vm.jetztImTvAuffrischen() }
+    val g4kJetztImTvFocus = remember { FocusRequester() }
     val g4kFussballFocus = remember { FocusRequester() }
     val g4kNeuFilmeFocus = remember { FocusRequester() }
     val g4kLiveWeiterFocus = remember { FocusRequester() }
@@ -200,7 +204,7 @@ fun HomeScreen(
     val orderedRows = state.config.visibleOrder
     val heroVisible = HomeRow.HERO in orderedRows
     // German4K 3.0/32 (D2): die beiden eigenen Reihen zählen als Inhalt wie jede andere.
-    val g4kExtras = g4kFussball.isNotEmpty() || state.neueFilme.isNotEmpty()
+    val g4kExtras = g4kFussball.isNotEmpty() || state.neueFilme.isNotEmpty() || g4kJetztImTv.isNotEmpty()
     val hasNonHeroContent = orderedRows.any { it != HomeRow.HERO && rowHasData(it, state) } || g4kExtras
     val showHeroFallback = heroVisible && !rowHasData(HomeRow.HERO, state) && !hasNonHeroContent
     val renderRows = orderedRows.filter { rowCanRender(it, state, showHeroFallback) }
@@ -211,6 +215,7 @@ fun HomeScreen(
     // Filme" → übrige Reihen. Ohne Weiterschauen steht „Neu bei Filme" am Ende.
     val slots: List<Any> = buildList {
         if (g4kFussball.isNotEmpty()) add(G4kSlot.FUSSBALL)
+        if (g4kJetztImTv.isNotEmpty()) add(G4kSlot.JETZT_IM_TV)
         renderRows.forEach { row ->
             add(row)
             if (row == HomeRow.HERO && state.neueFilme.isNotEmpty()) add(G4kSlot.NEU_FILME)
@@ -222,6 +227,7 @@ fun HomeScreen(
             firstRowFocusRequester
         } else when (row) {
             G4kSlot.FUSSBALL -> g4kFussballFocus
+            G4kSlot.JETZT_IM_TV -> g4kJetztImTvFocus
             G4kSlot.NEU_FILME -> g4kNeuFilmeFocus
             HomeRow.TRENDING -> trendingPrimaryFocus
             HomeRow.HERO -> when {
@@ -410,6 +416,13 @@ fun HomeScreen(
                 G4kSlot.FUSSBALL -> German4kFussballReihe(
                     spiele = g4kFussball,
                     onKlick = onOpenSportSpiel,
+                    onFocus = onNonHeroFocused,
+                    firstItemFocusRequester = firstItemFocusRequester,
+                )
+                G4kSlot.JETZT_IM_TV -> German4kJetztImTvReihe(
+                    eintraege = g4kJetztImTv,
+                    // CH± bleibt in der Reihe: die Karten sind die Zap-Liste.
+                    onPlay = { e -> onPlayChannel(e.channel.id, g4kJetztImTv.map { it.channel }) },
                     onFocus = onNonHeroFocused,
                     firstItemFocusRequester = firstItemFocusRequester,
                 )
@@ -644,7 +657,7 @@ fun HomeScreen(
 }
 
 /** German4K 3.0/32 (D2): Startseiten-Reihen, die nicht in core's [HomeRow] stehen. */
-private enum class G4kSlot { FUSSBALL, NEU_FILME }
+private enum class G4kSlot { FUSSBALL, JETZT_IM_TV, NEU_FILME }
 
 private fun rowHasData(row: HomeRow, state: HomeUiState): Boolean = when (row) {
     HomeRow.TRENDING -> state.trendingItems.size >= TrendingDao.MIN_ELIGIBLE_ITEMS

@@ -130,6 +130,9 @@ class HomeViewModel(
     private val guide: tv.own.owntv.core.live.GuideReader,
     private val customize: tv.own.owntv.core.customize.CustomizationStore,
     private val sport: tv.own.owntv.core.german4k.German4kSportRepository,
+    // German4K 3.1: „Jetzt im TV" — Sendepläne virtueller Sender und streamId → Kanal.
+    private val virtuell: tv.own.owntv.core.german4k.German4kVirtuellRepository,
+    private val kanalSuche: tv.own.owntv.core.german4k.SportChannelResolver,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -458,6 +461,35 @@ class HomeViewModel(
         }
     }
 
+    private val _jetztImTv = MutableStateFlow<List<tv.own.owntv.core.german4k.JetztImTvEintrag>>(emptyList())
+    /** German4K 3.1: „Jetzt im TV" (Wunsch Rabe330) — virtuelle Sender + echte Sender mit laufender Sendung. */
+    val jetztImTv: StateFlow<List<tv.own.owntv.core.german4k.JetztImTvEintrag>> = _jetztImTv.asStateFlow()
+
+    /** Solange die Startseite offen ist: jede Minute neu zusammenstellen. */
+    suspend fun jetztImTvAuffrischen() {
+        while (true) {
+            runCatching { jetztImTvBauen() }
+            delay(JETZT_IM_TV_INTERVALL_MS)
+        }
+    }
+
+    private suspend fun jetztImTvBauen() {
+        val pid = currentProfileId() ?: return
+        val jetzt = System.currentTimeMillis()
+        val virt = if (tv.own.owntv.core.german4k.German4kFeatures.visible(tv.own.owntv.core.german4k.VIRTUELL_FEATURE)) {
+            when (val e = virtuell.alle(fensterH = 1)) {
+                is tv.own.owntv.core.german4k.German4kVirtuellRepository.Ergebnis.Ok -> e.antwort.sender.mapNotNull { s ->
+                    val ch = kanalSuche.aufloesen(listOf(s.streamId)) ?: return@mapNotNull null
+                    tv.own.owntv.core.german4k.VirtuellPlan.stand(s, e.uhr, jetzt)?.let { ch to it }
+                }
+                else -> emptyList()
+            }
+        } else emptyList()
+        val st = _uiState.value
+        val echt = (st.favoriteLive + st.liveWeiter.map { it.channel }).distinctBy { it.id }
+        _jetztImTv.value = tv.own.owntv.core.german4k.JetztImTv.zusammenstellen(virt, echt, liveJetztFuer(pid, echt), jetzt)
+    }
+
     private suspend fun currentProfileId(): Long? {
         val preferred = settings.activeProfileId.first()
         return if (preferred >= 0) profileDao.resolveExistingProfileId(preferred) else null
@@ -468,5 +500,7 @@ class HomeViewModel(
         const val LIVE_JETZT_FENSTER_MS = 3 * 60 * 60_000L
         const val FUSSBALL_MAX = 8
         const val FUSSBALL_INTERVALL_MS = 5 * 60_000L
+        /** German4K 3.1: „Jetzt im TV" wird jede Minute neu zusammengestellt. */
+        const val JETZT_IM_TV_INTERVALL_MS = 60_000L
     }
 }

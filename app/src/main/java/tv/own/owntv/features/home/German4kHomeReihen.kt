@@ -163,8 +163,9 @@ internal fun German4kLiveWeiterReihe(
             itemsIndexed(items, key = { _, it -> it.channel.id }) { index, item ->
                 val prog = jetzt[item.channel.id]?.takeIf { nowMs < it.stopMs }
                 LiveKarte(
-                    item = item,
-                    prog = prog,
+                    name = item.channel.name,
+                    logoUrl = item.channel.logoUrl,
+                    progTitel = prog?.title,
                     zeit = prog?.let { stringResource(R.string.g4k_zeitspanne, formatTime(it.startMs), formatTime(it.stopMs)) },
                     fortschritt = prog?.let { p ->
                         val dauer = (p.stopMs - p.startMs).coerceAtLeast(1L)
@@ -181,10 +182,52 @@ internal fun German4kLiveWeiterReihe(
     }
 }
 
+/**
+ * German4K 3.1: „Jetzt im TV" — virtuelle 24/7-Sender und echte Sender mit laufender Sendung, ein Klick
+ * spielt. Dieselbe Karte wie „Weiterschauen".
+ */
+@Composable
+internal fun German4kJetztImTvReihe(
+    eintraege: List<tv.own.owntv.core.german4k.JetztImTvEintrag>,
+    onPlay: (tv.own.owntv.core.german4k.JetztImTvEintrag) -> Unit,
+    onFocus: () -> Unit,
+    firstItemFocusRequester: FocusRequester?,
+) {
+    val mobil = LocalFormfaktor.current.mobil
+    val formatTime = rememberSystemTimeFormatter()
+    var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) { while (true) { delay(30_000); nowMs = System.currentTimeMillis() } }
+    Column(Modifier.fillMaxWidth()) {
+        ReihenTitel(stringResource(R.string.g4k_jetzt_im_tv))
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(horizontal = Dimens.HomeRowPaddingH, vertical = 4.dp),
+            modifier = Modifier.focusGroup(),
+        ) {
+            itemsIndexed(eintraege, key = { _, it -> it.channel.id }) { index, e ->
+                val dauer = (e.stopMs - e.startMs).coerceAtLeast(1L)
+                LiveKarte(
+                    name = e.channel.name,
+                    logoUrl = e.channel.logoUrl,
+                    progTitel = e.titel,
+                    zeit = stringResource(R.string.g4k_zeitspanne, formatTime(e.startMs), formatTime(e.stopMs)),
+                    fortschritt = ((nowMs - e.startMs).toFloat() / dauer).coerceIn(0f, 1f),
+                    onClick = { onPlay(e) },
+                    modifier = Modifier
+                        .width(if (mobil) 240.dp else 280.dp)
+                        .ersteKarte(index, firstItemFocusRequester)
+                        .onFocusChanged { if (it.hasFocus) onFocus() },
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun LiveKarte(
-    item: HeroItem.LiveHero,
-    prog: EpgProgrammeEntity?,
+    name: String,
+    logoUrl: String?,
+    progTitel: String?,
     zeit: String?,
     fortschritt: Float?,
     onClick: () -> Unit,
@@ -216,7 +259,7 @@ private fun LiveKarte(
                         Modifier.fillMaxHeight().aspectRatio(1f).background(LiveKachelLogo),
                         contentAlignment = Alignment.Center,
                     ) {
-                        val logo = item.channel.logoUrl
+                        val logo = logoUrl
                         if (!logo.isNullOrBlank()) {
                             AsyncImage(
                                 model = logo,
@@ -230,7 +273,7 @@ private fun LiveKarte(
                     }
                     Box(Modifier.weight(1f).fillMaxHeight().padding(10.dp), contentAlignment = Alignment.CenterStart) {
                         Text(
-                            item.channel.name,
+                            name,
                             style = MaterialTheme.typography.titleSmall,
                             color = Color.White,
                             fontWeight = FontWeight.SemiBold,
@@ -254,7 +297,7 @@ private fun LiveKarte(
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                prog?.title ?: item.channel.name,
+                progTitel ?: name,
                 style = MaterialTheme.typography.titleSmall,
                 color = if (focused) colors.primary else colors.onSurface,
                 maxLines = 1,
