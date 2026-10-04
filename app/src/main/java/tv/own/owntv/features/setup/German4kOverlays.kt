@@ -103,7 +103,9 @@ fun German4kOverlays() {
     }
     // Uhrzeit: der Programmführer sieht bei falscher Gerätezeit verschoben aus, und niemand sucht
     // den Fehler in der Uhr des Fernsehers. Einmal am Tag, und nur wenn es wirklich weit daneben ist.
-    val uhrId = remember(a.serverTime) { uhrHinweisId(a) }
+    // German4K 3.1: nur mit frischer Antwort — eine gespeicherte trägt eine alte server_time.
+    val frisch = (state as? German4kProvisioner.State.Ready)?.fromCache == false
+    val uhrId = remember(a.serverTime, frisch) { uhrHinweisId(a, frisch) }
     var uhrGesehen by remember(uhrId) { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(uhrId) { uhrGesehen = if (uhrId == null) true else provisioner.hinweisSchonGesehen(uhrId) }
     if (uhrId != null && uhrGesehen == false && hidden != uhrId) {
@@ -270,12 +272,8 @@ private fun stoerungText(k: German4kHealth.Klasse): String = stringResource(
 )
 
 /** Hint id for a device clock that is more than five minutes away from ours, or null when it is fine. */
-private fun uhrHinweisId(a: German4kPanelAnswer): String? {
-    if (a.serverTime.isBlank()) return null
-    val server = runCatching { java.time.Instant.parse(a.serverTime).toEpochMilli() }.getOrNull() ?: return null
-    val abweichung = kotlin.math.abs(System.currentTimeMillis() - server) / 1000
-    return if (abweichung >= 300) "uhr:${java.time.LocalDate.now()}" else null
-}
+private fun uhrHinweisId(a: German4kPanelAnswer, frisch: Boolean): String? =
+    if (tv.own.owntv.core.german4k.German4kUhr.falsch(a.serverTime, frisch)) "uhr:${java.time.LocalDate.now()}" else null
 
 @Composable
 private fun UhrHinweis(onOk: () -> Unit) {

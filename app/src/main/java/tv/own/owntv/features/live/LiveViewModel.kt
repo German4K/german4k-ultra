@@ -1130,7 +1130,16 @@ class LiveViewModel(
         }
         viewModelScope.launch { player.archiveEnded.collect { continueAfterCatchup() } }
         // German4K 3.1: Titel eines virtuellen Senders zu Ende → nächster Plan-Eintrag.
-        viewModelScope.launch { player.chainedEnded.collect { if (_virtuell.value != null) virtuellWeiter(abNull = false) } }
+        viewModelScope.launch {
+            player.chainedEnded.collect {
+                val wegA = _virtuellWegA.value
+                when {
+                    _virtuell.value != null -> virtuellWeiter(abNull = false)
+                    // Weg A: dieselbe Adresse neu — der Server liefert den nächsten Titel laut Plan.
+                    wegA != null -> _previewChannel.value?.takeIf { it.id == wegA }?.let { ch -> viewModelScope.launch { spieleVirtuellWegA(ch) } }
+                }
+            }
+        }
         // German4K 3.1: Fehler eines Plan-Titels → still überspringen, nach drei in Folge normaler Sender.
         // Entprellt, damit ein Engine-Wechsel (mpv → Exo) den Fehler noch selbst wegräumen kann. Läuft NIE
         // über abandonTune: ein 403 auf eine Folge hieße dort „Zugang abgelaufen".
@@ -1533,6 +1542,10 @@ class LiveViewModel(
                 virtuellGesperrtBis[channel.id] ?: 0L, System.currentTimeMillis(),
             ) && spieleVirtuell(channel)
         ) return
+        // German4K 3.1: ohne Plan (Weg A) liefert der Server für einen virtuellen Sender per 302 die laufende
+        // Folge als MKV/MP4 — nie TS. Der Live-Weg (TS-/HLS-Annahme) bliebe schwarz; also wie einen Film
+        // abspielen und am Dateiende dieselbe Adresse neu fragen (der Server nennt dann den nächsten Titel).
+        if (channel.istVirtuellSender()) { spieleVirtuellWegA(channel); return }
         // Three inputs, in descending authority: what the user pinned for THIS channel, the engine
         // setting, and what the app has learned about the panel.
         // The setting itself resolves per-item pin → per-playlist → global: a playlist override replaces
@@ -2325,7 +2338,10 @@ class LiveViewModel(
     private val _virtuell = MutableStateFlow<tv.own.owntv.core.german4k.VirtuellStand?>(null)
     /** Was gerade auf dem eingestellten virtuellen Sender läuft; null, wenn kein Plan-Titel spielt. */
     val virtuellJetzt: StateFlow<tv.own.owntv.core.german4k.VirtuellStand?> = _virtuell.asStateFlow()
-    val virtuellActive: StateFlow<Boolean> = _virtuell.map { it != null }
+    /** German4K 3.1: virtueller Sender ohne Plan (Weg A) — Kanal-id, solange dessen Datei läuft. */
+    private val _virtuellWegA = MutableStateFlow<Long?>(null)
+    /** Ein virtueller Sender spielt eine Datei (Weg B mit Plan oder Weg A ohne) — keine Live-Kante im HUD. */
+    val virtuellActive: StateFlow<Boolean> = combine(_virtuell, _virtuellWegA) { b, a -> b != null || a != null }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     private val _virtuellHinweis = MutableSharedFlow<String>(extraBufferCapacity = 1)
     /** Ein Satz für den Kunden (Ablehnung des Servers oder „läuft gerade normal"). */
@@ -2342,6 +2358,21 @@ class LiveViewModel(
         virtuellJob?.cancel()
         virtuellJob = null
         _virtuell.value = null
+        _virtuellWegA.value = null
+    }
+
+    /** Weg A in der App: die Live-Adresse als Datei spielen (Endung egal, der Player erkennt den Container). */
+    private suspend fun spieleVirtuellWegA(channel: ChannelEntity) {
+        val ua = withContext(Dispatchers.IO) { sourceDao.getById(channel.sourceId)?.userAgent }
+        engineLog("'${channel.name}' virtuell ohne Plan → Datei von vorn (Weg A)")
+        clearLiveOnExo()
+        _virtuellWegA.value = channel.id
+        player.play(
+            channel.streamUrl, title = channel.name, logoUrl = channel.displayLogoUrl, isLive = false,
+            userAgent = ua, httpHeaders = channel.httpHeaders, contentKey = "g4k.va:${channel.id}", chained = true,
+        )
+        epgRefresh.value++
+        recordLiveHistory(channel)
     }
 
     private fun virtuellSperren(ch: ChannelEntity) {

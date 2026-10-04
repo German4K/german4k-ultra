@@ -129,6 +129,7 @@
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	'${channel.name}' ignoring stale failure right after host switch ($reason)
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	'${channel.name}' opened on mpv
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	'${channel.name}' virtuell abgelehnt: ${a.grund}
+1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	'${channel.name}' virtuell ohne Plan → Datei von vorn (Weg A)
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	'${channel.name}' virtuell: kein Plan → normal
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	'${channel.name}' — giving up: $detail
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	'${channel.name}' — no fallback left ($detail)
@@ -149,6 +150,7 @@
 3	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	exoplayer
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	exoplayer (drm)
 1	protocol	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	g4k.v:${e.zielId}
+1	protocol	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	g4k.va:${channel.id}
 1	technical	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	host switch — $reason
 4	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	mpv
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	mpv (panel refuses segments)
