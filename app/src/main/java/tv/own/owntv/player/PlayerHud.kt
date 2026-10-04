@@ -175,6 +175,8 @@ fun PlayerHud(
     // computed against the moment the user asked, not the moment the HUD was composed.
     jumpBackOptions: (() -> List<Int>)? = null,
     onJumpBack: ((Int) -> Unit)? = null,
+    /** German4K 3.1: „Folge von vorn" — nur gesetzt, solange ein virtueller 24/7-Sender einen Plan-Titel spielt. */
+    onFromStart: (() -> Unit)? = null,
     // Archive depth of the current channel, for the exact-time picker's day/HH:MM bounds.
     jumpBackWindowSec: (() -> Int)? = null,
     // Read as a lambda, not a value: the offset ticks once a second, and taking it as a plain Int?
@@ -682,6 +684,7 @@ fun PlayerHud(
                     onScrubLive = onScrubLive, timeshiftOffsetSec = timeshiftOffset, onGoToLive = onGoToLive,
                     liveProgrammes = liveProgrammes,
                     onOpenJumpBack = if (onJumpBack != null) { { dialog = HudDialog.JUMP_BACK } } else null,
+                    onFromStart = onFromStart,
                     compatMode = compatMode, onToggleCompatMode = toggleCompat,
                     vodOnExo = vodOnExo, onToggleVodEngine = toggleVod,
                     onInfo = { showInfo = !showInfo }, infoOn = showInfo,

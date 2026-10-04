@@ -265,6 +265,8 @@ fun OwnTVShell(
     // A catch-up archive programme is playing (Guide "Watch from start" or the Live TV catch-up picker)
     // rather than the live stream — the HUD swaps live-only controls for the VOD ones.
     val catchupActive by liveVm.catchupActive.collectAsStateWithLifecycle()
+    // German4K 3.1: ein virtueller 24/7-Sender spielt gerade einen Plan-Titel (VOD-Datei, Sender bleibt eingestellt).
+    val virtuellActive by liveVm.virtuellActive.collectAsStateWithLifecycle()
     val vodExoActive by player.exoActiveState.collectAsStateWithLifecycle()
     // Publish the active engine to the system (audio focus + MediaSession), and detach when the player
     // is closed — an inactive session must not keep answering the TV's transport keys or the Assistant.
@@ -1496,6 +1498,10 @@ fun OwnTVShell(
                 // position on the other engine) rather than Live TV's compatibility toggle, which would
                 // re-tune the live stream and jump the user to the current programme.
                 val isTunedLive = isLiveChannel && !catchupActive
+                // German4K 3.1: Auf einem virtuellen Sender bleibt alles Sender-Hafte (CH±, Liste, Kopf,
+                // Favorit, EPG-Karte), aber es gibt keine Live-Kante: kein Rücklauf, keine Aufnahme, kein
+                // Mehrfachbild, kein Kompatibilitätsschalter. Die Zeitleiste ist die der Datei.
+                val echtLive = isTunedLive && !virtuellActive
                 PlayerHud(
                     player = if (liveOnExo) liveVm.previewEngine else mpvEngine, // HUD drives the active engine
                     onBack = exitPlayer,
@@ -1509,7 +1515,7 @@ fun OwnTVShell(
                     onOpenChannelList = if (isTunedLive && liveCanZap) { { showChannelList = true } } else null,
                     // Live channels only, and only once Multiview is switched on: the channel on screen
                     // becomes tile 1 and the grid takes over. Everything it needs is already tuned.
-                    onMultiview = if (multiviewEnabled && isTunedLive && previewChannel != null) {
+                    onMultiview = if (multiviewEnabled && echtLive && previewChannel != null) {
                         { multiview = openMultiview(previewChannel, emptyList()) }
                     } else {
                         null
@@ -1519,40 +1525,41 @@ fun OwnTVShell(
                     // The engine does not come into it. Recording fetches the channel itself rather
                     // than copying the open stream, so it works the same whichever engine is playing.
                     onRecordThis = previewChannel
-                        ?.takeIf { recordWatchingEnabled && isTunedLive }
+                        ?.takeIf { recordWatchingEnabled && echtLive }
                         ?.let { channel -> { liveVm.togglePlayerRecording(channel) } },
                     recordingThis = playerRecording != null,
                     onOpenHistoryList = if (isTunedLive) { { showHistoryList = true } } else null,
-                    onRewindLive = if (isTunedLive && canRewindLive) liveVm::rewindLive else null,
-                    onForwardLive = if (isTunedLive) liveVm::forwardLive else null,
-                    onGoToLive = if (isTunedLive) liveVm::goToLive else null,
-                    onScrubLive = if (isTunedLive && canRewindLive) liveVm::scrubLive else null,
+                    onRewindLive = if (echtLive && canRewindLive) liveVm::rewindLive else null,
+                    onForwardLive = if (echtLive) liveVm::forwardLive else null,
+                    onGoToLive = if (echtLive) liveVm::goToLive else null,
+                    onScrubLive = if (echtLive && canRewindLive) liveVm::scrubLive else null,
                     // Only collected where there is a timeline to draw them on.
-                    liveProgrammes = if (isTunedLive && canRewindLive) timelineProgrammes else emptyList(),
-                    jumpBackOptions = if (isTunedLive && canRewindLive) liveVm::currentJumpOptions else null,
-                    onJumpBack = if (isTunedLive && canRewindLive) liveVm::jumpBackTo else null,
-                    jumpBackWindowSec = if (isTunedLive && canRewindLive) liveVm::currentCatchupWindowSec else null,
+                    liveProgrammes = if (echtLive && canRewindLive) timelineProgrammes else emptyList(),
+                    jumpBackOptions = if (echtLive && canRewindLive) liveVm::currentJumpOptions else null,
+                    onJumpBack = if (echtLive && canRewindLive) liveVm::jumpBackTo else null,
+                    onFromStart = if (isTunedLive && virtuellActive) liveVm::virtuellVonVorn else null,
+                    jumpBackWindowSec = if (echtLive && canRewindLive) liveVm::currentCatchupWindowSec else null,
                     // Non-null only while an archive is on screen, so movies, episodes and live TV get
                     // the single real clock and catch-up gets the pair.
                     watchingWallMs = { watchingWallState.value },
                     // German4K 3.0/32 (Q2): Kopf mit Logo + Sendername bei beiden Motoren.
                     liveKanal = previewChannel?.takeIf { isTunedLive }?.let { tv.own.owntv.player.LiveKopf(it.name, it.logoUrl) },
-                    timeshiftOffsetSec = if (isTunedLive) { { timeshiftOffsetState.value } } else null,
+                    timeshiftOffsetSec = if (echtLive) { { timeshiftOffsetState.value } } else null,
                     onTuneToNumber = if (directTuneEnabled && isTunedLive && isLiveStream && !timeshifted && previewChannel != null) liveVm::tuneByNumber else null,
                     directTuneContextKey = previewChannel?.id ?: 0L,
                     // Show the ACTUAL running engine (mpv when pinned OR auto-fallen-back), not just the pin —
                     // otherwise an auto-fallback to mpv still read "EXO". true = on mpv (pill shows MPV, teal).
-                    compatMode = if (isTunedLive) !liveOnExo else null,
+                    compatMode = if (echtLive) !liveOnExo else null,
                     // Hidden while rewound into the archive (same `!timeshifted` rule direct
                     // tune follows above): switching engine restarts the channel at the live edge, which
                     // threw the user out of the rewind with the HUD still counting "behind live".
                     // Also hidden for a protected channel (#115): only ExoPlayer can license it, so the
                     // toggle's other position is not a compatibility choice but a guaranteed failure.
-                    onToggleCompatMode = if (isTunedLive && !timeshifted && previewChannel?.drmConfig == null) liveVm::toggleForceMpv else null,
+                    onToggleCompatMode = if (echtLive && !timeshifted && previewChannel?.drmConfig == null) liveVm::toggleForceMpv else null,
                     // VOD engine toggle (movies/series only — live and catch-up channels keep their own
                     // engine handling above): flip the current item between mpv and ExoPlayer.
-                    vodOnExo = if (!isLiveStream && !isTunedLive) vodExoActive else null,
-                    onToggleVodEngine = if (!isLiveStream && !isTunedLive) player::toggleVodEngine else null,
+                    vodOnExo = if (!isLiveStream && (!isTunedLive || virtuellActive)) vodExoActive else null,
+                    onToggleVodEngine = if (!isLiveStream && (!isTunedLive || virtuellActive)) player::toggleVodEngine else null,
                     // ADD SUBTITLES entry: movies/episodes only, and only when the play path set an
                     // item context (subtitle plan §4). Opens the OpenSubtitles search overlay below.
                     onSearchSubtitles = if (!isLiveStream && !isLiveChannel && subtitleContext != null) {
@@ -1629,6 +1636,10 @@ fun OwnTVShell(
                 val catchupUnavailable = stringResource(R.string.content_epg_catchup_unavailable)
                 LaunchedEffect(liveVm) {
                     liveVm.catchupUnavailable.collect { localSubToast.show(catchupUnavailable) }
+                }
+                // German4K 3.1: virtueller Sender — Ablehnung des Servers oder „läuft gerade normal".
+                LaunchedEffect(liveVm) {
+                    liveVm.virtuellHinweis.collect { localSubToast.show(it) }
                 }
                 // Left — the playing channel's own provider category.
                 if (showChannelList && isLiveChannel) {
