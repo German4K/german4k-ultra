@@ -123,13 +123,19 @@
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	$reason — gave up after ${ladderBudgetMs.value / 1000}s
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	${if (onMpv) "mpv" else "exoplayer"} (pinned)
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	${if (onMpv) "mpv" else "exoplayer"} (setting)
+1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	'${ch.name}' virtuell weiter (${if (abNull) "Fehler" else "Ende"}) → ziel=${ziel.zielId}
+1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	'${ch.name}' virtuell: drei Fehler in Folge → normaler Sender
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	'${channel.name}' falling back to $label ($reason)
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	'${channel.name}' ignoring stale failure right after host switch ($reason)
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	'${channel.name}' opened on mpv
+1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	'${channel.name}' virtuell abgelehnt: ${a.grund}
+1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	'${channel.name}' virtuell: kein Plan → normal
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	'${channel.name}' — giving up: $detail
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	'${channel.name}' — no fallback left ($detail)
 2	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	'${channel.name}': $detail
+1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	Ende
 1	technical	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	ExoPlayer
+1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	Fehler
 1	technical	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	LIVE
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	LiveEngine
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	OwnTVHome
@@ -142,6 +148,7 @@
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	ensurePlaying history record failed channelId=${channel.id} profile=$pid
 3	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	exoplayer
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	exoplayer (drm)
+1	protocol	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	g4k.v:${e.zielId}
 1	technical	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	host switch — $reason
 4	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	mpv
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	mpv (panel refuses segments)
@@ -157,6 +164,8 @@
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	tune '${channel.name}' -> $reason [${preference.name}]
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	tuneByNumber($number) failed
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	user chose compatibility mode
+1	protocol	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	virtuell
+1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	virtuell '${channel.name}' ziel=${e.zielId} ab ${stand.positionMs / 1000}s
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveZapList.kt	LiveZapList
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveZapList.kt	direct tune: zap rebuild failed
 1	regex	app/src/main/java/tv/own/owntv/features/mobil/German4kFolgentitel.kt	^[Ss]\\d{1,3}[Ee]\\d{1,4}

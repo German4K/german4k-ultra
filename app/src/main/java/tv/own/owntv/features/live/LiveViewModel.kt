@@ -132,6 +132,8 @@ class LiveViewModel(
     private val epgRepository: tv.own.owntv.core.repository.EpgRepository,
     private val externalPlayerLauncher: tv.own.owntv.core.player.ExternalPlayerLauncher,
     private val recordings: tv.own.owntv.core.recording.RecordingManager,
+    /** German4K 3.1: Sendepläne virtueller 24/7-Sender (Weg B). */
+    private val virtuell: tv.own.owntv.core.german4k.German4kVirtuellRepository,
 ) : ViewModel() {
 
     // --- "Record what I'm watching" (Plan D, D3 mode b) -----------------------------------------
@@ -418,7 +420,14 @@ class LiveViewModel(
     val nowNext: StateFlow<EpgNowNext?> = combine(_previewChannel, epgRefresh) { ch, tick -> ch to tick }
         .debounce(350)
         .distinctUntilChanged { a, b -> a.first?.id == b.first?.id && a.second == b.second }
-        .mapLatest { (ch, _) -> ch?.let { epgReader.nowNext(it, custom.value, epgOffset.value) } }
+        .mapLatest { (ch, _) ->
+            // German4K 3.1: auf einem virtuellen Sender ist der Plan das Programm (Fortschritt, „danach").
+            val v = _virtuell.value
+            if (ch != null && v != null && v.sender.streamId == ch.remoteId?.toLongOrNull()) {
+                tv.own.owntv.core.german4k.VirtuellPlan.stand(v.sender, v.uhr, System.currentTimeMillis(), v.geholtServerMs)
+                    ?.let { tv.own.owntv.core.german4k.VirtuellPlan.nowNext(it) }
+            } else ch?.let { epgReader.nowNext(it, custom.value, epgOffset.value) }
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /**
@@ -1120,6 +1129,15 @@ class LiveViewModel(
             }
         }
         viewModelScope.launch { player.archiveEnded.collect { continueAfterCatchup() } }
+        // German4K 3.1: Titel eines virtuellen Senders zu Ende → nächster Plan-Eintrag.
+        viewModelScope.launch { player.chainedEnded.collect { if (_virtuell.value != null) virtuellWeiter(abNull = false) } }
+        // German4K 3.1: Fehler eines Plan-Titels → still überspringen, nach drei in Folge normaler Sender.
+        // Entprellt, damit ein Engine-Wechsel (mpv → Exo) den Fehler noch selbst wegräumen kann. Läuft NIE
+        // über abandonTune: ein 403 auf eine Folge hieße dort „Zugang abgelaufen".
+        viewModelScope.launch {
+            player.error.debounce(1_500).filterNotNull().collect { if (_virtuell.value != null) virtuellFehler() }
+        }
+        viewModelScope.launch { player.isPlaying.collect { if (it && _virtuell.value != null) virtuellZaehler.erfolg() } }
     }
 
     /** Called when anything OTHER than a promoted live channel takes over full-screen (a movie/episode,
@@ -1153,6 +1171,7 @@ class LiveViewModel(
     private var wartendeVorschau: ChannelEntity? = null
 
     fun onFullscreenExitedReleasingMpv() {
+        virtuellBeenden()
         onFullscreenExited()
         if (!player.hasActiveStream) { player.stop(); return }
         mpvFreigabe?.cancel()
@@ -1506,6 +1525,14 @@ class LiveViewModel(
         _previewChannel.value = channel
         clearTimeshift() // normal live = not timeshifted
         _catchupActive.value = false // tuning live ends any archive playback the HUD was showing
+        // German4K 3.1: virtueller 24/7-Sender → Sendeplan holen und mittendrin einsteigen (Weg B). Jede
+        // Störung (kein Plan, Fehler, Schalter aus) fällt hier durch auf den normalen Weg darunter (Weg A).
+        virtuellBeenden()
+        if (tv.own.owntv.core.german4k.VirtuellWeg.darf(
+                channel.istVirtuellSender(), tv.own.owntv.core.german4k.German4kFeatures.visible("virtuell"),
+                virtuellGesperrtBis[channel.id] ?: 0L, System.currentTimeMillis(),
+            ) && spieleVirtuell(channel)
+        ) return
         // Three inputs, in descending authority: what the user pinned for THIS channel, the engine
         // setting, and what the app has learned about the panel.
         // The setting itself resolves per-item pin → per-playlist → global: a playlist override replaces
@@ -2233,6 +2260,7 @@ class LiveViewModel(
             Log.i(ENGINE_TAG, "catch-up '${ch.name}' prog='${programme.title}' -> ${tv.own.owntv.core.network.HttpClient.redactUrl(url)}")
             _previewChannel.value = ch
             clearTimeshift()                 // a fixed programme replaces any live rewind in progress
+            virtuellBeenden()
             _catchupActive.value = true      // HUD: VOD engine toggle, not the live compatibility toggle
             playingCatchupProgramme = programme // …and the anchor auto-play continues from
             clearLiveOnExo() // catch-up is a VOD-style archive on mpv, not the live ExoPlayer channel
@@ -2280,6 +2308,184 @@ class LiveViewModel(
         }
     }
 
+    // ---- German4K 3.1: virtuelle 24/7-Sender (Weg B) ----------------------------------------------------
+    // Vertrag: docs/superpowers/specs/2026-10-04-virtuelle-24-7-sender.md §3 (Website-Repo). Der Titel läuft
+    // als VOD-Item (isLive=false, NICHT isArchive) auf dem Hauptplayer; der Sender bleibt für CH±, Liste,
+    // Favorit und EPG-Karte der eingestellte Sender. Catch-up, Rücklauf und Weg B schließen sich aus.
+    // Die Vorschau im Listenfenster bleibt Weg A (Vorschau-Engine, Live-URL = laufender Titel von vorn).
+
+    private val _virtuell = MutableStateFlow<tv.own.owntv.core.german4k.VirtuellStand?>(null)
+    /** Was gerade auf dem eingestellten virtuellen Sender läuft; null, wenn kein Plan-Titel spielt. */
+    val virtuellJetzt: StateFlow<tv.own.owntv.core.german4k.VirtuellStand?> = _virtuell.asStateFlow()
+    val virtuellActive: StateFlow<Boolean> = _virtuell.map { it != null }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    private val _virtuellHinweis = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    /** Ein Satz für den Kunden (Ablehnung des Servers oder „läuft gerade normal"). */
+    val virtuellHinweis: SharedFlow<String> = _virtuellHinweis.asSharedFlow()
+    private var virtuellJob: Job? = null
+    private val virtuellZaehler = tv.own.owntv.core.german4k.VirtuellFehlerZaehler(grenze = 3)
+    /** Sender → Gerätezeit, bis zu der Weg B ausgesetzt ist (nach drei Fehlern oder einer Ablehnung). */
+    private val virtuellGesperrtBis = HashMap<Long, Long>()
+
+    private fun ChannelEntity.istVirtuellSender(): Boolean =
+        epgChannelId?.startsWith(tv.own.owntv.core.german4k.VIRTUELL_EPG_PRAEFIX) == true
+
+    private fun virtuellBeenden() {
+        virtuellJob?.cancel()
+        virtuellJob = null
+        _virtuell.value = null
+    }
+
+    private fun virtuellSperren(ch: ChannelEntity) {
+        virtuellGesperrtBis[ch.id] = System.currentTimeMillis() + VIRTUELL_SPERRE_MS
+    }
+
+    /** true = Weg B läuft (oder der Kunde hat schon weitergeschaltet); false = normal weiter (Weg A). */
+    private suspend fun spieleVirtuell(channel: ChannelEntity): Boolean {
+        val streamId = channel.remoteId?.toLongOrNull() ?: return false
+        val erg = kotlinx.coroutines.withTimeoutOrNull(VIRTUELL_ABFRAGE_MS) { virtuell.plan(streamId) }
+        // Weitergeschaltet, während wir gefragt haben: nichts starten, der neue Sender tunt selbst.
+        if (_previewChannel.value?.id != channel.id) return true
+        return when (val a = tv.own.owntv.core.german4k.VirtuellWeg.ausgang(erg, streamId, System.currentTimeMillis())) {
+            tv.own.owntv.core.german4k.VirtuellWeg.Ausgang.WegA -> {
+                engineLog("'${channel.name}' virtuell: kein Plan → normal")
+                false
+            }
+            is tv.own.owntv.core.german4k.VirtuellWeg.Ausgang.Hinweis -> {
+                engineLog("'${channel.name}' virtuell abgelehnt: ${a.grund}")
+                virtuellSperren(channel)
+                _virtuellHinweis.tryEmit(a.grund)
+                false
+            }
+            is tv.own.owntv.core.german4k.VirtuellWeg.Ausgang.Spielen -> {
+                virtuellZaehler.erfolg()
+                starteEintrag(channel, a.stand)
+                starteVirtuellTakt(channel)
+                true
+            }
+        }
+    }
+
+    private suspend fun starteEintrag(channel: ChannelEntity, stand: tv.own.owntv.core.german4k.VirtuellStand) {
+        val ua = withContext(Dispatchers.IO) { sourceDao.getById(channel.sourceId)?.userAgent }
+        val e = stand.eintrag
+        Log.i(ENGINE_TAG, "virtuell '${channel.name}' ziel=${e.zielId} ab ${stand.positionMs / 1000}s")
+        clearLiveOnExo()
+        _virtuell.value = stand
+        player.play(
+            e.url, title = channel.name, subtitle = virtuellUntertitel(stand), logoUrl = channel.displayLogoUrl,
+            isLive = false, startPositionMs = stand.positionMs.coerceAtLeast(0), userAgent = ua,
+            httpHeaders = channel.httpHeaders, contentKey = "g4k.v:${e.zielId}",
+            seasonNumber = e.staffel, episodeNumber = e.folge, chained = true,
+        )
+        epgRefresh.value++
+        recordLiveHistory(channel)
+    }
+
+    private fun virtuellUntertitel(stand: tv.own.owntv.core.german4k.VirtuellStand): String =
+        tv.own.owntv.core.german4k.VirtuellPlan.untertitel(
+            stand, stand.uhr.serverJetzt(),
+            kopf = { e ->
+                if (e.staffel != null && e.folge != null) appContext.getString(tv.own.owntv.R.string.home_season_episode, e.staffel, e.folge)
+                else e.titel
+            },
+            fmt = { kopf, rest, danach ->
+                if (danach != null) appContext.getString(tv.own.owntv.R.string.g4k_virtuell_untertitel, kopf, rest, danach)
+                else appContext.getString(tv.own.owntv.R.string.g4k_virtuell_untertitel_kurz, kopf, rest)
+            },
+        )
+
+    /** Minütlich: Restzeit nachziehen, EPG-Karte auffrischen, Plan nachladen, bevor das Fenster ausläuft. */
+    private fun starteVirtuellTakt(channel: ChannelEntity) {
+        virtuellJob?.cancel()
+        virtuellJob = viewModelScope.launch {
+            while (true) {
+                val v = _virtuell.value ?: return@launch
+                delay(60_000L - v.uhr.serverJetzt() % 60_000L)
+                val aktuell = _virtuell.value ?: return@launch
+                val t = aktuell.uhr.serverJetzt()
+                if (tv.own.owntv.core.german4k.VirtuellPlan.brauchtNeu(aktuell.sender.plan, t, aktuell.geholtServerMs)) {
+                    val id = aktuell.sender.streamId
+                    virtuell.invalidiere(id)
+                    when (val erg = virtuell.plan(id)) {
+                        is tv.own.owntv.core.german4k.German4kVirtuellRepository.Ergebnis.Ok -> {
+                            val neu = erg.antwort.sender.firstOrNull { it.streamId == id }
+                            if (neu != null) {
+                                val tn = erg.uhr.serverJetzt()
+                                val ab = neu.plan.indexOfFirst { it.zielId == aktuell.eintrag.zielId && it.start == aktuell.eintrag.start }
+                                _virtuell.value = aktuell.copy(
+                                    sender = neu, uhr = erg.uhr, geholtServerMs = tn,
+                                    naechster = if (ab >= 0) neu.plan.getOrNull(ab + 1)
+                                    else tv.own.owntv.core.german4k.VirtuellPlan.naechsterNach(neu.plan, aktuell.eintrag, tn),
+                                )
+                            }
+                        }
+                        is tv.own.owntv.core.german4k.German4kVirtuellRepository.Ergebnis.Abgelehnt -> {
+                            virtuellSperren(channel)
+                            if (erg.grund.isNotBlank()) _virtuellHinweis.tryEmit(erg.grund)
+                            virtuellBeenden(); ensurePlaying(channel); return@launch
+                        }
+                        // Netz weg: der alte Plan läuft weiter, nächste Minute neu versuchen.
+                        tv.own.owntv.core.german4k.German4kVirtuellRepository.Ergebnis.Transport -> Unit
+                    }
+                }
+                _virtuell.value?.let { player.updateSubtitle(virtuellUntertitel(it)) }
+                epgRefresh.value++
+            }
+        }
+    }
+
+    /** Nächster Plan-Eintrag ab 0 (Titelende oder Fehler). Ohne Folgetitel: Plan neu holen, sonst normal. */
+    private fun virtuellWeiter(abNull: Boolean) {
+        val v = _virtuell.value ?: return
+        val ch = _previewChannel.value ?: return
+        viewModelScope.launch {
+            var sender = v.sender
+            var uhr = v.uhr
+            var geholt = v.geholtServerMs
+            var next = tv.own.owntv.core.german4k.VirtuellPlan.naechsterNach(sender.plan, v.eintrag, uhr.serverJetzt())
+            if (next == null) {
+                virtuell.invalidiere(sender.streamId)
+                val erg = virtuell.plan(sender.streamId) as? tv.own.owntv.core.german4k.German4kVirtuellRepository.Ergebnis.Ok
+                val neu = erg?.antwort?.sender?.firstOrNull { it.streamId == v.sender.streamId }
+                if (erg != null && neu != null) {
+                    sender = neu; uhr = erg.uhr; geholt = uhr.serverJetzt()
+                    next = tv.own.owntv.core.german4k.VirtuellPlan.naechsterNach(sender.plan, v.eintrag, geholt)
+                }
+            }
+            if (_previewChannel.value?.id != ch.id || _virtuell.value == null) return@launch
+            val ziel = next
+            if (ziel == null) { virtuellBeenden(); ensurePlaying(ch); return@launch }
+            val i = sender.plan.indexOf(ziel)
+            val stand = tv.own.owntv.core.german4k.VirtuellStand(
+                sender = sender, eintrag = ziel, positionMs = 0L,
+                naechster = sender.plan.getOrNull(i + 1),
+                restMs = ziel.ende.toEpochMilli() - uhr.serverJetzt(), uhr = uhr, geholtServerMs = geholt,
+            )
+            engineLog("'${ch.name}' virtuell weiter (${if (abNull) "Fehler" else "Ende"}) → ziel=${ziel.zielId}")
+            starteEintrag(ch, stand)
+        }
+    }
+
+    private fun virtuellFehler() {
+        val ch = _previewChannel.value ?: return
+        if (virtuellZaehler.fehler()) {
+            engineLog("'${ch.name}' virtuell: drei Fehler in Folge → normaler Sender")
+            virtuellZaehler.erfolg()
+            virtuellSperren(ch)
+            _virtuellHinweis.tryEmit(appContext.getString(tv.own.owntv.R.string.g4k_virtuell_normal))
+            virtuellBeenden()
+            ensurePlaying(ch)
+        } else {
+            virtuellWeiter(abNull = true)
+        }
+    }
+
+    /** Knopf „Folge von vorn": dieselbe Datei bei 0, kein Serveraufruf (Vertrag §3.4). */
+    fun virtuellVonVorn() {
+        if (_virtuell.value != null) player.seekTo(0)
+    }
+
     // ---- Live rewind / timeshift: the view model's half ---------------------------------------------
     // The state machine is [LiveTimeshift] (declared near the top, beside the other extracted helpers).
     // What is left here is what only this view model can do: turn an offset into an archive URL and put
@@ -2325,6 +2531,7 @@ class LiveViewModel(
         val ch = _previewChannel.value ?: return
         if (!ch.catchup) return
         _catchupActive.value = false // a live rewind, not a fixed programme: the HUD keeps its live chrome
+        virtuellBeenden()
         timeshift.beginAt(ch, offsetSec)
     }
 
@@ -2337,6 +2544,7 @@ class LiveViewModel(
         zapList.armFor(ch)
         _previewChannel.value = ch
         _catchupActive.value = false
+        virtuellBeenden()
         timeshift.beginAt(ch, offsetSec)
         recordLiveHistory(ch, immediate = true)
     }
@@ -2405,6 +2613,7 @@ class LiveViewModel(
     }
 
     fun stopPreview() {
+        virtuellBeenden()
         setStalkerReconnect(null) // tearing down — no reconnect re-resolve should fire
         ladderOpened() // nothing is tuning any more; the opening alarm must not fire on a torn-down channel
         previewEngine.stop()
@@ -2420,8 +2629,20 @@ class LiveViewModel(
      * guide simply has no entry here, and the row shows no second line. Returns only channels that
      * actually have something airing right now.
      */
-    suspend fun nowPlayingFor(channels: List<ChannelEntity>): Map<Long, String> =
-        epgReader.nowPlayingFor(channels, custom.value, epgOffset.value)
+    suspend fun nowPlayingFor(channels: List<ChannelEntity>): Map<Long, String> {
+        val ausGuide = epgReader.nowPlayingFor(channels, custom.value, epgOffset.value)
+        // German4K 3.1: virtuelle Sender ohne Guide-Zeile bekommen den Titel aus dem zuletzt geholten Plan
+        // (nur Cache, kein Netz — die Liste fragt bei jedem Scrollen).
+        val plaene = virtuell.plaene.value
+        if (plaene.isEmpty()) return ausGuide
+        val jetzt = System.currentTimeMillis()
+        val dazu = channels.filter { it.istVirtuellSender() && it.id !in ausGuide }.mapNotNull { ch ->
+            val plan = plaene[ch.epgChannelId?.lowercase()] ?: return@mapNotNull null
+            val uhr = ch.remoteId?.toLongOrNull()?.let { virtuell.gecacht(it)?.uhr } ?: tv.own.owntv.core.german4k.VirtuellUhr(0)
+            tv.own.owntv.core.german4k.VirtuellPlan.eintragBei(plan, uhr.serverJetzt(jetzt))?.let { ch.id to it.titel }
+        }
+        return if (dazu.isEmpty()) ausGuide else ausGuide + dazu
+    }
 
     private suspend fun currentProfileId(): Long? {
         val preferred = settings.activeProfileId.first()
@@ -2526,6 +2747,10 @@ class LiveViewModel(
         liveCountFlow(key, c.profileId, c.sourceIds, hiddenCats, channelDao, customCategoryDao)
 
     private companion object {
+        /** German4K 3.1: so lange darf die Plan-Abfrage beim Umschalten dauern, dann normal (Weg A). */
+        const val VIRTUELL_ABFRAGE_MS = 3_500L
+        /** German4K 3.1: nach drei Fehlern / Ablehnung spielt der Sender so lange normal. */
+        const val VIRTUELL_SPERRE_MS = 5 * 60_000L
         /** Stale-failure window after a German4K host switch (see [hostSwitchAtMs]). */
         const val HOST_SWITCH_GRACE_MS = 2_000L
         const val ENGINE_TAG = "LiveEngine"
