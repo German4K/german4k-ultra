@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,10 +32,14 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -53,6 +58,7 @@ import tv.own.owntv.core.german4k.German4kSupport
 import tv.own.owntv.ui.components.OwnTVButton
 import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.OwnTVIcon
+import tv.own.owntv.ui.components.fokusMitWiederholung
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 /**
@@ -130,8 +136,7 @@ fun German4kOverlays() {
 private fun DolbyHinweis(titel: String, onOk: () -> Unit) {
     val colors = OwnTVTheme.colors
     val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    BackHandler { onOk() }
+    G4kModal(onDismissRequest = onOk, focus = focus) {
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.78f)).focusGroup(), contentAlignment = Alignment.Center) {
         Column(
             modifier = Modifier.widthIn(max = 780.dp).clip(RoundedCornerShape(28.dp)).background(colors.surfaceContainer).padding(32.dp),
@@ -148,6 +153,7 @@ private fun DolbyHinweis(titel: String, onOk: () -> Unit) {
             OwnTVButton(stringResource(R.string.g4k_dolby_ok), onClick = onOk, modifier = Modifier.focusRequester(focus))
         }
     }
+    }
 }
 
 /**
@@ -163,8 +169,6 @@ private fun StoerungDialog(lage: German4kStoerung.Lage, onClose: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    BackHandler { onClose() }
 
     var laeuft by remember { mutableStateOf(false) }
     var meldung by remember { mutableStateOf<String?>(null) }
@@ -174,6 +178,7 @@ private fun StoerungDialog(lage: German4kStoerung.Lage, onClose: () -> Unit) {
     val abgelaufen = lage.klasse == German4kHealth.Klasse.ABGELAUFEN
     val provisioner: German4kProvisioner = koinInject()
 
+    G4kModal(onDismissRequest = onClose, focus = focus) {
     Box(
         Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.78f)).focusGroup(),
         contentAlignment = Alignment.Center,
@@ -239,6 +244,7 @@ private fun StoerungDialog(lage: German4kStoerung.Lage, onClose: () -> Unit) {
             }
         }
     }
+    }
 }
 
 @Composable
@@ -281,8 +287,7 @@ private fun uhrHinweisId(a: German4kPanelAnswer, frisch: Boolean): String? =
 private fun UhrHinweis(onOk: () -> Unit) {
     val colors = OwnTVTheme.colors
     val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    BackHandler { onOk() }
+    G4kModal(onDismissRequest = onOk, focus = focus) {
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.72f)).focusGroup(), contentAlignment = Alignment.Center) {
         Column(
             modifier = Modifier.widthIn(max = 720.dp).clip(RoundedCornerShape(28.dp)).background(colors.surfaceContainer).padding(32.dp),
@@ -295,14 +300,13 @@ private fun UhrHinweis(onOk: () -> Unit) {
             OwnTVButton(stringResource(R.string.g4k_hint_ok), onClick = onOk, modifier = Modifier.focusRequester(focus))
         }
     }
+    }
 }
 
 @Composable
 private fun HintDialog(a: German4kPanelAnswer, onOk: () -> Unit, onLater: () -> Unit) {
     val colors = OwnTVTheme.colors
     val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    BackHandler { onLater() }
     val renew = a.noteTyp == "verlaengern" || a.noteTyp == "abgelaufen"
     // Ein Testkunde kann nichts verlängern — sein QR führt zum Kauf, nicht auf die Verlängern-Seite.
     val test = a.noteTyp == "test"
@@ -312,6 +316,7 @@ private fun HintDialog(a: German4kPanelAnswer, onOk: () -> Unit, onLater: () -> 
         else -> ""
     }
     val qr = remember(qrUrl) { qrUrl.takeIf { it.isNotBlank() }?.let { CompanionLink.renderQr(it, 360) } }
+    G4kModal(onDismissRequest = onLater, focus = focus) {
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.72f)).focusGroup(), contentAlignment = Alignment.Center) {
         Column(
             modifier = Modifier.widthIn(max = 820.dp).clip(RoundedCornerShape(28.dp)).background(colors.surfaceContainer).padding(32.dp),
@@ -345,6 +350,7 @@ private fun HintDialog(a: German4kPanelAnswer, onOk: () -> Unit, onLater: () -> 
             }
         }
     }
+    }
 }
 
 @Composable
@@ -374,6 +380,34 @@ private fun LockOverlay(a: German4kPanelAnswer, onRetry: () -> Unit) {
                 OwnTVButton(stringResource(R.string.g4k_help_open), onClick = German4kSupport::oeffnen, style = OwnTVButtonStyle.SECONDARY)
             }
         }
+    }
+}
+
+/**
+ * German4K 3.1.1 (C): die Hinweise laufen in einem eigenen Dialog-Fenster (Muster [tv.own.owntv.ui.components.OwnTVPopup]).
+ * Als Box über der Shell konnte die Shell den Fokus wieder an sich ziehen — der Kunde sah den Hinweis, das
+ * Steuerkreuz bewegte aber die Kacheln dahinter, und „OK" war nicht erreichbar. Zurück = [onDismissRequest].
+ */
+@Composable
+private fun G4kModal(onDismissRequest: () -> Unit, focus: FocusRequester, content: @Composable () -> Unit) {
+    Dialog(
+        onDismissRequest = onDismissRequest,
+        properties = DialogProperties(
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        ),
+    ) {
+        // Die Boxen bringen ihre eigene Abdunklung mit; die des Fensters käme doppelt dazu.
+        val view = LocalView.current
+        SideEffect {
+            var parent = view.parent
+            while (parent != null && parent !is DialogWindowProvider) parent = parent.parent
+            (parent as? DialogWindowProvider)?.window?.setDimAmount(0f)
+        }
+        // Fokus erst, wenn das Dialogfenster steht: ab dem nächsten Frame, mit Wiederholung (German4kFokus.kt).
+        LaunchedEffect(Unit) { fokusMitWiederholung(focus) }
+        content()
     }
 }
 
