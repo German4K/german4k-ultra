@@ -58,7 +58,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemContentType
-import androidx.paging.compose.itemKey
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -674,7 +673,9 @@ private fun SeriesGrid(
                 ) {
                     items(
                         count = series.itemCount,
-                        key = series.itemKey { it.id },
+                        // German4K 3.1.1: Schlüssel = id@Index. Zwei gleiche ids in einer Seitenfolge (Paging-Nachladen,
+                        // Join-Dubletten) ließen LazyGrid mit „Key … was already used“ abstürzen.
+                        key = { i -> series.peek(i)?.let { "${it.id}@$i" } ?: "p$i" },
                         contentType = series.itemContentType { "series" },
                     ) { index ->
                         val s = series[index]
@@ -714,7 +715,9 @@ private fun SeriesGrid(
                 ) {
                     items(
                         count = series.itemCount,
-                        key = series.itemKey { it.id },
+                        // German4K 3.1.1: Schlüssel = id@Index. Zwei gleiche ids in einer Seitenfolge (Paging-Nachladen,
+                        // Join-Dubletten) ließen LazyGrid mit „Key … was already used“ abstürzen.
+                        key = { i -> series.peek(i)?.let { "${it.id}@$i" } ?: "p$i" },
                         contentType = series.itemContentType { "series" },
                     ) { index ->
                         val s = series[index]

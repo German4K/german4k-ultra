@@ -56,7 +56,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemContentType
-import androidx.paging.compose.itemKey
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -626,7 +625,9 @@ fun MoviesScreen(
                 ) {
                     items(
                         count = movies.itemCount,
-                        key = movies.itemKey { it.id },
+                        // German4K 3.1.1: Schlüssel = id@Index. Zwei gleiche ids in einer Seitenfolge (Paging-Nachladen,
+                        // Join-Dubletten) ließen LazyGrid mit „Key … was already used“ abstürzen.
+                        key = { i -> movies.peek(i)?.let { "${it.id}@$i" } ?: "p$i" },
                         contentType = movies.itemContentType { "movie" },
                     ) { index ->
                         val movie = movies[index]
@@ -669,7 +670,9 @@ fun MoviesScreen(
                 ) {
                     items(
                         count = movies.itemCount,
-                        key = movies.itemKey { it.id },
+                        // German4K 3.1.1: Schlüssel = id@Index. Zwei gleiche ids in einer Seitenfolge (Paging-Nachladen,
+                        // Join-Dubletten) ließen LazyGrid mit „Key … was already used“ abstürzen.
+                        key = { i -> movies.peek(i)?.let { "${it.id}@$i" } ?: "p$i" },
                         contentType = movies.itemContentType { "movie" },
                     ) { index ->
                         val movie = movies[index]

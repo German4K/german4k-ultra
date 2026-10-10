@@ -194,6 +194,7 @@
 1	log	app/src/main/java/tv/own/owntv/features/movies/MovieViewModel.kt	saveProgressNow progress save failed movieId=${m.id} profile=$pid
 1	log	app/src/main/java/tv/own/owntv/features/movies/MovieViewModel.kt	stalker VOD reconnect resolve failed movieId=${movie.id}
 2	log	app/src/main/java/tv/own/owntv/features/movies/MovieViewModel.kt	stalker resolve failed movieId=${movie.id}
+2	technical	app/src/main/java/tv/own/owntv/features/movies/MoviesScreen.kt	${it.id}@$i
 1	technical	app/src/main/java/tv/own/owntv/features/movies/MoviesScreen.kt	,
 1	preference-key	app/src/main/java/tv/own/owntv/features/movies/MoviesScreen.kt	delete_subtitles
 1	preference-key	app/src/main/java/tv/own/owntv/features/movies/MoviesScreen.kt	download
@@ -204,6 +205,7 @@
 1	preference-key	app/src/main/java/tv/own/owntv/features/movies/MoviesScreen.kt	move
 1	preference-key	app/src/main/java/tv/own/owntv/features/movies/MoviesScreen.kt	move_to_category
 2	technical	app/src/main/java/tv/own/owntv/features/movies/MoviesScreen.kt	movie
+2	technical	app/src/main/java/tv/own/owntv/features/movies/MoviesScreen.kt	p$i
 1	preference-key	app/src/main/java/tv/own/owntv/features/movies/MoviesScreen.kt	play_external
 1	preference-key	app/src/main/java/tv/own/owntv/features/movies/MoviesScreen.kt	play_trailer
 1	preference-key	app/src/main/java/tv/own/owntv/features/movies/MoviesScreen.kt	refetch_tmdb
@@ -225,6 +227,7 @@
 1	log	app/src/main/java/tv/own/owntv/features/search/SearchViewModel.kt	OwnTVHome
 1	log	app/src/main/java/tv/own/owntv/features/search/SearchViewModel.kt	record history failed profile=$pid type=$type itemId=$itemId
 1	log	app/src/main/java/tv/own/owntv/features/search/SearchViewModel.kt	stalker resolve failed movieId=${movie.id}
+2	technical	app/src/main/java/tv/own/owntv/features/series/SeriesScreen.kt	${it.id}@$i
 1	technical	app/src/main/java/tv/own/owntv/features/series/SeriesScreen.kt	,
 1	preference-key	app/src/main/java/tv/own/owntv/features/series/SeriesScreen.kt	delete_subtitles
 2	preference-key	app/src/main/java/tv/own/owntv/features/series/SeriesScreen.kt	download
@@ -233,6 +236,7 @@
 1	preference-key	app/src/main/java/tv/own/owntv/features/series/SeriesScreen.kt	mark_watched
 1	preference-key	app/src/main/java/tv/own/owntv/features/series/SeriesScreen.kt	move
 1	preference-key	app/src/main/java/tv/own/owntv/features/series/SeriesScreen.kt	move_to_category
+2	technical	app/src/main/java/tv/own/owntv/features/series/SeriesScreen.kt	p$i
 1	preference-key	app/src/main/java/tv/own/owntv/features/series/SeriesScreen.kt	play_external
 1	preference-key	app/src/main/java/tv/own/owntv/features/series/SeriesScreen.kt	play_trailer
 2	preference-key	app/src/main/java/tv/own/owntv/features/series/SeriesScreen.kt	refetch_tmdb
