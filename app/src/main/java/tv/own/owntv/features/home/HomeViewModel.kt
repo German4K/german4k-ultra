@@ -191,18 +191,22 @@ class HomeViewModel(
     ): ContinueTarget? = when (h.mediaType) {
         MediaType.MOVIE -> movieDao.getById(h.itemId)?.let { m ->
             if (!tv.own.owntv.core.content.AdultCategoryClassifier.allows(pid, m.categoryId, profileDao, categoryDao)) return@let null
+            // German4K 3.2 (F1): Erwachsenes nie auf der Startseite — auch nicht im Weiterschauen-Chip.
+            if (tv.own.owntv.core.content.AdultCategoryClassifier.inErwachsenRubrik(m.categoryId, categoryDao)) return@let null
             val pos = progressDao.get(pid, MediaType.MOVIE, m.id)?.positionMs ?: 0L
             ContinueTarget(ContinueKind.MOVIE, m.name, if (pos > 0) ContinueAction.RESUME else ContinueAction.PLAY, movieId = m.id, positionMs = pos)
         }
         MediaType.EPISODE -> seriesDao.getEpisodeById(h.itemId)?.let { ep ->
             seriesDao.getSeriesById(ep.seriesId)?.let { s ->
                 if (!tv.own.owntv.core.content.AdultCategoryClassifier.allows(pid, s.categoryId, profileDao, categoryDao)) return@let null
+                if (tv.own.owntv.core.content.AdultCategoryClassifier.inErwachsenRubrik(s.categoryId, categoryDao)) return@let null // German4K 3.2 (F1)
                 val pos = progressDao.get(pid, MediaType.EPISODE, ep.id)?.positionMs ?: 0L
                 ContinueTarget(ContinueKind.EPISODE, s.name, if (pos > 0) ContinueAction.RESUME else ContinueAction.NEXT_UP, seriesId = ep.seriesId, episodeId = ep.id, positionMs = pos)
             }
         }
         MediaType.LIVE -> channelDao.getById(h.itemId)?.let { c ->
             if (!tv.own.owntv.core.content.AdultCategoryClassifier.allows(pid, c.categoryId, profileDao, categoryDao)) return@let null
+            if (tv.own.owntv.core.content.AdultCategoryClassifier.inErwachsenRubrik(c.categoryId, categoryDao)) return@let null // German4K 3.2 (F1)
             ContinueTarget(ContinueKind.LIVE, c.name, ContinueAction.LAST_CHANNEL, channelId = c.id)
         }
         else -> null
@@ -480,6 +484,8 @@ class HomeViewModel(
             when (val e = virtuell.alle(fensterH = 1)) {
                 is tv.own.owntv.core.german4k.German4kVirtuellRepository.Ergebnis.Ok -> e.antwort.sender.mapNotNull { s ->
                     val ch = kanalSuche.aufloesen(listOf(s.streamId)) ?: return@mapNotNull null
+                    // German4K 3.2 (F1): nie ein Sender aus einer Erwachsenen-Rubrik auf der Startseite.
+                    if (tv.own.owntv.core.content.AdultCategoryClassifier.inErwachsenRubrik(ch.categoryId, categoryDao)) return@mapNotNull null
                     tv.own.owntv.core.german4k.VirtuellPlan.stand(s, e.uhr, jetzt)?.let { ch to it }
                 }
                 else -> emptyList()

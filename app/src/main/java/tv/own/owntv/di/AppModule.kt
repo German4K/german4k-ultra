@@ -16,6 +16,7 @@ import tv.own.owntv.core.home.HomeFeedReader
 import tv.own.owntv.core.live.GuideReader
 import tv.own.owntv.core.live.LiveEpgReader
 import tv.own.owntv.features.home.HomeViewModel
+import tv.own.owntv.features.home.German4kAngesagtViewModel
 import tv.own.owntv.features.live.LiveViewModel
 import tv.own.owntv.features.movies.MovieViewModel
 import tv.own.owntv.features.profiles.ProfileGateSessionViewModel
@@ -57,6 +58,8 @@ val appModule = module {
     singleOf(::SearchReader)
     singleOf(::HomeFeedReader)
     viewModelOf(::HomeViewModel)
+    // German4K 3.2: Angesagt & Top 10 (Startseite, Filme, Serien).
+    viewModelOf(::German4kAngesagtViewModel)
     // German4K 3.0: Bereich Fußball (Sport-Hub).
     viewModelOf(::SportViewModel)
     viewModelOf(::SetupViewModel)

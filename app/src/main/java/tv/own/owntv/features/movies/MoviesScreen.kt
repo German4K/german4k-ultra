@@ -312,6 +312,16 @@ fun MoviesScreen(
         vm.clearPendingDetails()
     }
 
+    // German4K 3.2 (N2): „🏆 Top 10 Filme bei German4K" und „🔥 Angesagt" als Kopf über dem Raster —
+    // nur in „Alle Filme" ohne Suche und nur im Raster (die Liste bleibt schlicht). Der Kopf ist das
+    // erste Element des Rasters ([g4kKopf] = 1), daher werden unten alle Raster-Indizes um ihn verschoben.
+    val g4kAngesagtVm: tv.own.owntv.features.home.German4kAngesagtViewModel = koinViewModel()
+    val g4kRegale by g4kAngesagtVm.regale.collectAsStateWithLifecycle()
+    LaunchedEffect(g4kAngesagtVm) { g4kAngesagtVm.neuLaden() }
+    val g4kKopfZeigen = lockedKey == null && selectedKey == LiveKey.All && searchQuery.isBlank() &&
+        viewMode == SettingsRepository.VodViewMode.GRID &&
+        (g4kRegale.filmeTop.isNotEmpty() || g4kRegale.filmeAngesagt.isNotEmpty())
+    val g4kKopf = if (g4kKopfZeigen) 1 else 0
     val gridState = rememberLazyGridState()
     val listState = rememberLazyListState()
     val selFocus = remember { FocusRequester() }
@@ -375,9 +385,9 @@ fun MoviesScreen(
     LaunchedEffect(effectiveGridState, effectiveListState, viewMode, movies) {
         val grid = viewMode != SettingsRepository.VodViewMode.LIST
         snapshotFlow {
-            val info = if (grid) effectiveGridState.layoutInfo.visibleItemsInfo.map { it.index }
+            val info = if (grid) effectiveGridState.layoutInfo.visibleItemsInfo.map { it.index - g4kKopf }
             else effectiveListState.layoutInfo.visibleItemsInfo.map { it.index }
-            info.filter { it < movies.itemCount }
+            info.filter { it >= 0 && it < movies.itemCount }
                 .mapNotNull { movies.peek(it) }
                 .filter { it.posterUrl.isNullOrBlank() }
         }.distinctUntilChanged().collect { vm.onPosterlessVisible(it) }
@@ -394,7 +404,7 @@ fun MoviesScreen(
             if (viewMode == SettingsRepository.VodViewMode.LIST) {
                 runCatching { effectiveListState.scrollToItem(idx) }
             } else {
-                runCatching { effectiveGridState.scrollToItem(idx) }
+                runCatching { effectiveGridState.scrollToItem(idx + g4kKopf) }
             }
             delay(60)
             runCatching { selFocus.requestFocus() }
@@ -417,7 +427,7 @@ fun MoviesScreen(
             // Item survived — re-focus it directly.
             runCatching {
                 if (viewMode == SettingsRepository.VodViewMode.LIST) effectiveListState.scrollToItem(idx)
-                else effectiveGridState.scrollToItem(idx)
+                else effectiveGridState.scrollToItem(idx + g4kKopf)
             }
             withFrameNanos { }
             runCatching { contextFocus.requestFocus() }
@@ -432,7 +442,7 @@ fun MoviesScreen(
                 val neighborIdx = items.indexOfFirst { it.id == neighbor.id }.coerceAtLeast(0)
                 runCatching {
                     if (viewMode == SettingsRepository.VodViewMode.LIST) effectiveListState.scrollToItem(neighborIdx)
-                    else effectiveGridState.scrollToItem(neighborIdx)
+                    else effectiveGridState.scrollToItem(neighborIdx + g4kKopf)
                 }
                 // selFocus is bound to selectedMovie; reuse the generic firstItemFocus path only if that
                 // fails. Here we re-purpose contextFocus by re-binding it: re-request after a frame so the
@@ -539,10 +549,10 @@ fun MoviesScreen(
                         if (sel != null) {
                             val idx = movies.itemSnapshotList.items.indexOfFirst { it.id == sel.id }
                             if (idx >= 0) idx
-                            else if (viewMode == SettingsRepository.VodViewMode.GRID) effectiveGridState.firstVisibleItemIndex
+                            else if (viewMode == SettingsRepository.VodViewMode.GRID) (effectiveGridState.firstVisibleItemIndex - g4kKopf).coerceAtLeast(0)
                             else effectiveListState.firstVisibleItemIndex
                         } else {
-                            if (viewMode == SettingsRepository.VodViewMode.GRID) effectiveGridState.firstVisibleItemIndex
+                            if (viewMode == SettingsRepository.VodViewMode.GRID) (effectiveGridState.firstVisibleItemIndex - g4kKopf).coerceAtLeast(0)
                             else effectiveListState.firstVisibleItemIndex
                         }
                     },
@@ -553,7 +563,7 @@ fun MoviesScreen(
                         scope.launch {
                             val item = movies.itemSnapshotList.items.getOrNull(idx)
                             if (viewMode == SettingsRepository.VodViewMode.GRID) {
-                                runCatching { effectiveGridState.scrollToItem(idx) }
+                                runCatching { effectiveGridState.scrollToItem(idx + g4kKopf) }
                             } else {
                                 runCatching { effectiveListState.scrollToItem(idx) }
                             }
@@ -668,6 +678,25 @@ fun MoviesScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    // German4K 3.2 (N2): Top 10 + Angesagt über die ganze Breite. Klick = Detailseite der
+                    // Standard-Fassung (vom Reader gewählt), mit Mess-Ereignis.
+                    if (g4kKopfZeigen) {
+                        item(
+                            key = G4K_KOPF_SCHLUESSEL,
+                            span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) },
+                            contentType = G4K_KOPF_SCHLUESSEL,
+                        ) {
+                            tv.own.owntv.features.home.German4kAngesagtKopf(
+                                serien = false,
+                                top = g4kRegale.filmeTop,
+                                angesagt = g4kRegale.filmeAngesagt,
+                                onKarte = { k, top10 ->
+                                    g4kAngesagtVm.klick(k, top10, wo = G4K_QUELLE_FILME)
+                                    scope.launch { vm.movieById(k.itemId)?.let { m -> oeffneFilmDirekt(m, m, -1) } }
+                                },
+                            )
+                        }
+                    }
                     items(
                         count = movies.itemCount,
                         // German4K 3.1.1: Schlüssel = id@Index. Zwei gleiche ids in einer Seitenfolge (Paging-Nachladen,
@@ -1498,3 +1527,7 @@ internal fun rememberListeJeKategorie(): androidx.compose.runtime.snapshots.Snap
             },
         ),
     ) { mutableStateMapOf() }
+
+// German4K 3.2 (N2): Schlüssel des Top-10/Angesagt-Kopfs im Raster und Quelle fürs Mess-Ereignis.
+private const val G4K_KOPF_SCHLUESSEL = "g4k-angesagt-kopf"
+private const val G4K_QUELLE_FILME = "filme"

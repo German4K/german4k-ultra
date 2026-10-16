@@ -589,6 +589,48 @@ class SeriesViewModel(
     /** German4K 3.0/32 (I2): die Zeile zu einer Kennung — für die bevorzugte Fassung einer Kachel. */
     suspend fun seriesById(seriesId: Long): SeriesEntity? = seriesDao.getSeriesById(seriesId)
 
+    // German4K 3.2: Sprungauftrag von der Startseite („🔥 Angesagt") — die Detailseite dieser Serie
+    // öffnen. Wie bei den Filmen ([tv.own.owntv.features.movies.MovieViewModel.openDetails]) verfällt
+    // der Auftrag, wenn der Bildschirm ihn nicht zeitnah abholt.
+    private val _pendingDetailsId = MutableStateFlow<Long?>(null)
+    val pendingDetailsId: StateFlow<Long?> = _pendingDetailsId.asStateFlow()
+    private var pendingDetailsGesetztMs = 0L
+
+    fun openDetails(seriesId: Long) {
+        _openedSeries.value = null
+        _pendingDetailsId.value = seriesId
+        pendingDetailsGesetztMs = System.currentTimeMillis()
+    }
+
+    fun pendingDetailsFrisch(): Boolean = System.currentTimeMillis() - pendingDetailsGesetztMs <= G4K_SPRUNG_FRIST_MS
+
+    fun clearPendingDetails() { _pendingDetailsId.value = null }
+
+    /** German4K 3.2: Was „Abspielen" auf der Detailseite startet — Folge, Staffel als Warteschlange, Startstelle. */
+    data class G4kStartFolge(val folge: EpisodeEntity, val staffel: List<EpisodeEntity>, val startMs: Long)
+
+    /**
+     * German4K 3.2 (Plan §2.4): „Abspielen" bei einer Serie = Weiterschauen, sonst S1E1 (und nach einer
+     * fertig gesehenen Folge die nächste). Die Regel steht im Core ([tv.own.owntv.core.german4k.German4kAngesagt.standardFolge]).
+     */
+    suspend fun g4kStartFolge(s: SeriesEntity): G4kStartFolge? {
+        val pid = currentProfileId() ?: return null
+        runCatching { seriesRepository.loadEpisodes(s) }
+        val folgen = seriesDao.episodesBySeriesOnce(s.id)
+        if (folgen.isEmpty()) return null
+        val zuletzt = progressDao.lastWatchedEpisodeId(pid, s.id)
+        val p = zuletzt?.let { progressDao.get(pid, MediaType.EPISODE, it) }
+        val fertig = p != null && p.durationMs > 0 && p.positionMs >= p.durationMs * 0.95
+        val id = tv.own.owntv.core.german4k.German4kAngesagt.standardFolge(
+            folgen.map { tv.own.owntv.core.german4k.German4kAngesagt.Folge(it.id, it.seasonNumber, it.episodeNumber) },
+            zuletzt,
+            fertig,
+        ) ?: return null
+        val folge = folgen.first { it.id == id }
+        val start = if (id == zuletzt && !fertig) p?.positionMs ?: 0L else 0L
+        return G4kStartFolge(folge, folgen.filter { it.seasonNumber == folge.seasonNumber }.sortedBy { it.episodeNumber }, start)
+    }
+
     val series: Flow<PagingData<SeriesEntity>> = combine(
         _selected, ctx, _search.map { it.trim() }.debounce(300).distinctUntilChanged(), sortMode, _listRefresh,
     ) { key, c, query, sort, _ -> Args(key, c, query, sort) }
@@ -1439,6 +1481,8 @@ class SeriesViewModel(
     }
 
     private companion object {
+        /** German4K 3.2: so lange gilt ein Sprungauftrag von der Startseite. */
+        const val G4K_SPRUNG_FRIST_MS = 10_000L
         const val TAG = "OwnTVHome"
 
         /**
