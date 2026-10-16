@@ -89,8 +89,10 @@ fun SearchScreen(
      *  play — kept only so the screen still works standalone in a preview/test host. */
     /** Required: every live tune in the app goes through the one shared path in LiveViewModel, so a
      *  channel gets the same Prefer HLS handling, ExoPlayer→mpv ladder, per-channel engine pin and
-     *  external-player routing however the user reached it. */
-    onPlayChannel: (ChannelEntity) -> Unit,
+     *  external-player routing however the user reached it.
+     *  German4K 3.2 (F4/N5): the second argument is the channel results, so Up/Down in fullscreen
+     *  steps through what was found. */
+    onPlayChannel: (ChannelEntity, List<ChannelEntity>) -> Unit,
     vm: SearchViewModel = koinViewModel(),
     returnToHomeOnBack: Boolean = false,
     onReturnToHome: () -> Unit = {},
@@ -172,7 +174,7 @@ fun SearchScreen(
                     // History + "recent search" bookkeeping stays here; playback goes to the one shared
                     // live path so a channel behaves the same however it was found.
                     vm.noteChannelPlayed(ch)
-                    onPlayChannel(ch)
+                    onPlayChannel(ch, shown.channels.map { it.channel })
                 },
                 onToggleFavorite = { vm.toggleFavoriteChannel(it) },
                 onPlayMovie = { vm.playMovie(it); if (!vm.externalPlayerOn.value) onFullscreen() },

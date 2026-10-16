@@ -174,6 +174,10 @@ fun EpgScreen(
 ) {
     val vm: EpgViewModel = koinViewModel()
     val state by vm.state.collectAsStateWithLifecycle()
+    // German4K 3.2 (N7): „⏰ Erinnern“ — gemerkte Sendungen (Schlüssel) für Knopf und ⏰ im Raster.
+    val g4kErinnerungen: tv.own.owntv.core.german4k.German4kErinnerungen = org.koin.compose.koinInject()
+    val g4kErinnertSchluessel by g4kErinnerungen.schluessel.collectAsStateWithLifecycle(initialValue = emptySet())
+    val g4kScope = androidx.compose.runtime.rememberCoroutineScope()
     val liveNow by produceState(initialValue = System.currentTimeMillis()) {
         while (true) {
             delay(30_000L)
@@ -526,6 +530,7 @@ fun EpgScreen(
                                 categoryColor = guideCategories.firstOrNull { it.categoryId == channel.categoryId }?.name?.let { ChannelGenre.dotFor(it) },
                                 providerName = providerNames[channel.sourceId],
                                 channelWidth = guideChannelWidth,
+                                erinnert = g4kErinnertSchluessel,
                             )
                         }
                     }
@@ -543,6 +548,8 @@ fun EpgScreen(
     }
 
     detail?.let { (channel, p) ->
+        val g4kErinnerbar by produceState(false, channel.id, p.startMs) { value = g4kErinnerungen.erinnerbar(channel, p.startMs) }
+        val g4kErinnert = tv.own.owntv.core.german4k.German4kErinnerungen.sendungSchluessel(channel, p.startMs) in g4kErinnertSchluessel
         // Recompute as the recordings change, so pressing Record swaps the button to Cancel without
         // closing the dialog.
         val recordingRows by vm.recordingRows.collectAsStateWithLifecycle()
@@ -578,6 +585,9 @@ fun EpgScreen(
             onStopSeries = { seriesRule?.let { vm.stopSeries(it) } },
             isFavorite = channel.id in favoriteIds,
             onToggleFavorite = { vm.toggleFavoriteChannel(channel) },
+            erinnernMoeglich = g4kErinnerbar,
+            erinnert = g4kErinnert,
+            onErinnern = { g4kScope.launch { g4kErinnerungen.sendungUmschalten(channel, p.title, p.startMs, p.stopMs) } },
             onWatch = { detail = null; vm.noteChannelTuned(channel); onPlayChannel(channel, state.channels) },
             onPlayCatchup = {
                 detail = null
@@ -817,8 +827,11 @@ private fun GuideChannelRow(
     categoryColor: Color?,
     providerName: String?,
     channelWidth: androidx.compose.ui.unit.Dp,
+    erinnert: Set<String> = emptySet(),
 ) {
     val colors = OwnTVTheme.colors
+    // German4K 3.2 (N7): welche Sendungen dieses Senders ein ⏰ tragen.
+    val g4kBeginne = remember(erinnert, channel.id) { tv.own.owntv.core.german4k.German4kErinnerungen.gemerkteBeginne(channel, erinnert) }
     // Cache peek as the initial value → rows render instantly from the batch-loaded cache, no flash, no
     // per-row query. Re-key on cacheRevision so a row re-reads the cache when the background catch-up
     // lookback (pass 2) merges in.
@@ -913,6 +926,7 @@ private fun GuideChannelRow(
                     highlightTime = if (stripFocused && inCellMode) cursorTime else null,
                     catchupIds = catchupIds,
                     hScroll = hScroll,
+                    erinnertBeginne = g4kBeginne,
                 )
             }
         }

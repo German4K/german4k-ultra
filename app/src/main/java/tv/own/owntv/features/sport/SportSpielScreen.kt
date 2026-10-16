@@ -96,7 +96,8 @@ internal fun SportSpielScreen(
     spiel: German4kSpiel,
     vm: SportViewModel,
     liveVm: LiveViewModel,
-    onPlayChannel: (ChannelEntity) -> Unit,
+    /** German4K 3.2 (F4/N5): zweites Argument = die Sender dieses Spiels als Zapp-Liste. */
+    onPlayChannel: (ChannelEntity, List<ChannelEntity>) -> Unit,
     onOpenLiveTv: (Long?) -> Unit,
     onBack: () -> Unit,
     previewEnabled: Boolean,
@@ -149,7 +150,12 @@ internal fun SportSpielScreen(
                 is SpielZeile.Sender -> {
                     if (z.sender.an == false) return@launch
                     val ch = vm.kanalFuer(spiel.id, z.sender)
-                    if (ch != null) { abspielen.value = true; onPlayChannel(ch) } else onOpenLiveTv(null)
+                    if (ch != null) {
+                        abspielen.value = true
+                        // Hoch/Runter im Vollbild wechselt zwischen den Sendern dieses Spiels.
+                        val liste = spiel.sender.mapNotNull { aufgeloest[it.name] }
+                        onPlayChannel(ch, if (liste.any { it.id == ch.id }) liste else listOf(ch) + liste)
+                    } else onOpenLiveTv(null)
                 }
                 is SpielZeile.Marke -> onOpenLiveTv(vm.kategorieId(z.kategorie))
                 is SpielZeile.Bereich -> onOpenLiveTv(vm.kategorieId(z.name))
@@ -172,6 +178,19 @@ internal fun SportSpielScreen(
                     Spacer(Modifier.width(8.dp))
                 }
                 Text(unter, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            // German4K 3.2 (N7): „⏰ Erinnern“ für ein Spiel, das noch kommt (10 min vor Anpfiff, Sender wird
+            // erst dann über den Sport-Hub bestimmt).
+            val erinnern = LocalSportErinnern.current
+            if (!spiel.laeuft && !spiel.beendet) {
+                Spacer(Modifier.height(10.dp))
+                tv.own.owntv.ui.components.OwnTVButton(
+                    stringResource(if (erinnern.erinnert(spiel)) R.string.g4k_erinnern_knopf_gesetzt else R.string.g4k_erinnern_knopf),
+                    onClick = { erinnern.umschalten(spiel) },
+                    style = tv.own.owntv.ui.components.OwnTVButtonStyle.SECONDARY,
+                    selected = erinnern.erinnert(spiel),
+                    compact = true,
+                )
             }
             Spacer(Modifier.height(14.dp))
             if (zeilen.isEmpty()) {

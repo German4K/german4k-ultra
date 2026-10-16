@@ -264,4 +264,48 @@ class LiveZapListTest {
         h.releaseWindow = false
         h.stop()
     }
+
+    // ---- German4K 3.2 (F4/N5) ------------------------------------------------------------------
+
+    @Test
+    fun `a stand-in variant keeps stepping through the favourites it replaced`() {
+        // Kai932: Favorit ist UHD, das Gerät kann kein 4K → die App spielt die FHD-Fassung (id 99).
+        val h = Harness()
+        h.zap.armFromBrowse(list, title = null, key = LiveKey.Favorites, categoryId = null)
+        h.playing = 99L
+        assertNull(h.zap.next(1)) // ohne Stellvertreter: tot (der alte Fehler)
+        h.zap.merkeErsatz(originalId = 3L, ersatzId = 99L)
+        assertEquals(4L, h.zap.next(1)?.id)
+        assertEquals(2L, h.zap.next(-1)?.id)
+        // Kette UHD → FHD → HD zeigt weiter auf den Listeneintrag.
+        h.zap.merkeErsatz(originalId = 99L, ersatzId = 100L)
+        h.playing = 100L
+        assertEquals(4L, h.zap.next(1)?.id)
+        h.stop()
+    }
+
+    @Test
+    fun `starting from the guide or search arms that list, not the category`() {
+        val kategorie = (10L..12L).map { channel(it) }
+        val h = Harness(category = kategorie)
+        val guide = listOf(channel(5), channel(2), channel(9))
+        h.zap.armFromOrigin(channel(2), guide, title = null)
+        assertEquals(guide, h.zap.channels.value)
+        h.playing = 2L
+        assertEquals(9L, h.zap.next(1)?.id)
+        assertEquals(5L, h.zap.next(-1)?.id)
+        h.stop()
+    }
+
+    @Test
+    fun `an origin without the channel or with one entry falls back to the category`() {
+        val kategorie = (10L..12L).map { channel(it) }
+        val h = Harness(category = kategorie)
+        h.zap.armFromOrigin(channel(11), listOf(channel(11)), title = null)
+        h.await("category armed") { h.zap.channels.value == kategorie }
+        h.zap.armFromOrigin(channel(12), listOf(channel(1), channel(2)), title = null)
+        h.await("category still armed") { h.zap.channels.value == kategorie }
+        assertTrue(h.zap.canZap.value)
+        h.stop()
+    }
 }

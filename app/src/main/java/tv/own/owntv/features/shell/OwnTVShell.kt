@@ -670,6 +670,17 @@ fun OwnTVShell(
         runCatching { sidebarFocus.requestFocus() }
     }
 
+    // German4K 3.2 (N7): „Umschalten“ aus einem Erinnerungs-Hinweis — wie eine Launcher-Kachel, nur ohne
+    // Umweg über eine Adresse: Sender im Vollbild, auch wenn gerade ein Film oder eine Folge läuft.
+    val g4kUmschalten by tv.own.owntv.features.setup.German4kUmschalten.ziel.collectAsStateWithLifecycle()
+    LaunchedEffect(g4kUmschalten) {
+        val ch = g4kUmschalten ?: return@LaunchedEffect
+        tv.own.owntv.features.setup.German4kUmschalten.erledigt()
+        onSelectSection(MainSection.LIVE_TV)
+        liveVm.watchFullscreen(ch, emptyList())
+        openFullscreen(MainSection.LIVE_TV)
+    }
+
     LaunchedEffect(pendingDeepLink, activeProfileId) {
         val deepLink = pendingDeepLink ?: return@LaunchedEffect
         val pid = activeProfileId ?: return@LaunchedEffect
@@ -1122,9 +1133,10 @@ fun OwnTVShell(
                             // A channel found in Search tunes through the same LiveViewModel path as one
                             // opened from Live TV or the Guide (F05) — Prefer HLS, the ExoPlayer→mpv
                             // ladder, compatibility-mode pins, the external-player toggle, and CH+/- zap.
-                            onPlayChannel = { ch ->
+                            onPlayChannel = { ch, gefunden ->
                                 restoreFocus = false
-                                liveVm.watchFromGuide(ch)
+                                // German4K 3.2 (F4/N5): Hoch/Runter folgt den Suchtreffern.
+                                liveVm.watchFromList(ch, gefunden)
                                 zapSource = MainSection.LIVE_TV
                                 homeVm.stopPreview()
                                 if (playerMode != PlayerMode.MINI && !liveVm.externalPlayerOn.value) playerMode = PlayerMode.FULLSCREEN
@@ -1144,9 +1156,10 @@ fun OwnTVShell(
                         // Kategorie/Bereich öffnen springt in Live TV auf den passenden Ordner.
                         selectedSection == MainSection.SPORT -> tv.own.owntv.features.sport.SportScreen(
                             liveVm = liveVm,
-                            onPlayChannel = { ch ->
+                            onPlayChannel = { ch, senderDesSpiels ->
                                 restoreFocus = false
-                                liveVm.watchFromGuide(ch)
+                                // German4K 3.2 (F4/N5): Hoch/Runter zwischen den Sendern des Spiels.
+                                liveVm.watchFromList(ch, senderDesSpiels)
                                 zapSource = MainSection.LIVE_TV
                                 homeVm.stopPreview()
                                 if (playerMode != PlayerMode.MINI && !liveVm.externalPlayerOn.value) playerMode = PlayerMode.FULLSCREEN
@@ -1221,9 +1234,11 @@ fun OwnTVShell(
                                 else runCatching { sidebarFocus.requestFocus() }
                             },
                             onFullscreen = { openFullscreen() },
-                            onPlayChannel = { ch, _ ->
+                            onPlayChannel = { ch, zeilen ->
                                 restoreFocus = false
-                                liveVm.watchFromGuide(ch)
+                                // German4K 3.2 (F4/N5): Hoch/Runter folgt den Zeilen des Programmführers
+                                // (auch „nur Favoriten“), nicht der Anbieter-Kategorie des Senders.
+                                liveVm.watchFromList(ch, zeilen)
                                 zapSource = MainSection.LIVE_TV
                                 homeVm.stopPreview()
                                 // Live TV set to play externally → the channel went to another app;

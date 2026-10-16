@@ -151,6 +151,40 @@ class LiveZapList(
 
     fun contains(channelId: Long): Boolean = list.any { it.id == channelId }
 
+    // ---- German4K 3.2 (F4/N5) ----------------------------------------------------------------------
+
+    /**
+     * Stand-in → the list entry it replaced. German4K plays a different variant of the same channel
+     * when the one in the list cannot work on this device (UHD without a 4K decoder → FHD) or fails
+     * (another quality tier). That variant is a different row with a different id, so it is NOT in the
+     * Favorites list the user started from — and CH±/Up/Down went dead (Kai932, 15.10.2026: “im
+     * Vollbild aus den Favoriten heraus kein Hoch/Runter”). Remembering which entry it stands for lets
+     * the step continue from that entry's place in the list.
+     */
+    private val stellvertreter = HashMap<Long, Long>()
+
+    /** [ersatzId] plays in place of the list entry [originalId]. */
+    fun merkeErsatz(originalId: Long, ersatzId: Long) {
+        if (originalId == ersatzId) return
+        // A chain (UHD → FHD → HD) still points at the entry that is really in the list.
+        stellvertreter[ersatzId] = stellvertreter[originalId] ?: originalId
+    }
+
+    /**
+     * Arm the list the channel was started from — the Guide's rows, search results, the channels of a
+     * match in the Sport hub — so Up/Down in fullscreen follows THAT list (German4K 3.2, F4/N5). An
+     * origin that does not contain the channel, or has nothing to step to, falls back to the channel's
+     * own category, exactly as before.
+     */
+    fun armFromOrigin(channel: ChannelEntity, origin: List<ChannelEntity>, title: String?) {
+        val brauchbar = origin.distinctBy { it.id }
+        if (brauchbar.size > 1 && brauchbar.any { it.id == channel.id }) {
+            armFromBrowse(brauchbar, title = title, key = null, categoryId = null)
+        } else {
+            armFor(channel)
+        }
+    }
+
     // ---- Stepping ----------------------------------------------------------------------------------
 
     /**
@@ -164,7 +198,11 @@ class LiveZapList(
      */
     fun next(delta: Int): ChannelEntity? {
         val currentId = playingChannelId()
-        val i = if (currentId != null) list.indexOfFirst { it.id == currentId } else -1
+        var i = if (currentId != null) list.indexOfFirst { it.id == currentId } else -1
+        // German4K 3.2 (F4/N5): a stand-in variant steps from the place of the entry it replaced.
+        if (i < 0 && currentId != null) {
+            stellvertreter[currentId]?.let { original -> i = list.indexOfFirst { it.id == original } }
+        }
         if (i >= 0) {
             val nextIdx = wrappedZapIndex(i, delta, list.size) ?: return null
             return list[nextIdx]

@@ -71,6 +71,15 @@ fun German4kOverlays() {
     val provisioner: German4kProvisioner = koinInject()
     val answer by provisioner.answer.collectAsStateWithLifecycle()
     val state by provisioner.state.collectAsStateWithLifecycle()
+    // German4K 3.2 (N7): „⏰ Erinnern“ — zuerst, denn er ist an eine Uhrzeit gebunden und erscheint auch
+    // während der Wiedergabe (eigenes Dialogfenster, Muster wie die Hinweise unten).
+    German4kErinnerungsHinweis()
+    German4kBenachrichtigungsErlaubnis()
+    val erinnerungen by German4kSupport.erinnerungenSichtbar.collectAsStateWithLifecycle()
+    if (erinnerungen) {
+        German4kErinnerungenScreen(onBack = German4kSupport::erinnerungenSchliessen)
+        return
+    }
     val hilfe by German4kSupport.sichtbar.collectAsStateWithLifecycle()
     if (hilfe) {
         German4kSupportScreen(onBack = German4kSupport::schliessen)
@@ -389,7 +398,7 @@ private fun LockOverlay(a: German4kPanelAnswer, onRetry: () -> Unit) {
  * Steuerkreuz bewegte aber die Kacheln dahinter, und „OK" war nicht erreichbar. Zurück = [onDismissRequest].
  */
 @Composable
-private fun G4kModal(onDismissRequest: () -> Unit, focus: FocusRequester, content: @Composable () -> Unit) {
+internal fun G4kModal(onDismissRequest: () -> Unit, focus: FocusRequester, content: @Composable () -> Unit) {
     Dialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(

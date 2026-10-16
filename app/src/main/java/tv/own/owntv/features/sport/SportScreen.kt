@@ -79,6 +79,17 @@ import tv.own.owntv.core.german4k.sportMinute
 import java.time.LocalDate
 import kotlinx.coroutines.delay
 
+/**
+ * German4K 3.2 (N7): „⏰ Erinnern“ für die Karten, ohne jede Zwischen-Composable umzubauen. [schluessel] =
+ * gemerkte Spiele/Konferenzen, [umschalten] merkt bzw. vergisst (OK lange drücken auf einer Karte).
+ */
+internal class SportErinnern(val schluessel: Set<String>, val umschalten: (German4kSpiel) -> Unit) {
+    fun erinnert(spiel: German4kSpiel): Boolean =
+        tv.own.owntv.core.german4k.German4kErinnern.spielSchluessel(spiel.id) in schluessel
+}
+
+internal val LocalSportErinnern = androidx.compose.runtime.staticCompositionLocalOf { SportErinnern(emptySet()) {} }
+
 /** Rot für den LIVE-Punkt — bewusst fest, nicht vom Akzent abhängig. */
 internal val SportLiveRot = Color(0xFFE53935)
 
@@ -97,7 +108,7 @@ internal fun uhrzeitBerlin(zeit: Instant): String = UHRZEIT.format(zeit.atZone(S
 @Composable
 fun SportScreen(
     liveVm: LiveViewModel,
-    onPlayChannel: (ChannelEntity) -> Unit,
+    onPlayChannel: (ChannelEntity, List<ChannelEntity>) -> Unit,
     onOpenLiveTv: (Long?) -> Unit,
     onBack: () -> Unit,
     onChildFocused: () -> Unit,
@@ -113,6 +124,24 @@ fun SportScreen(
     val chip by vm.chip.collectAsStateWithLifecycle()
     val regale by vm.regale.collectAsStateWithLifecycle()
     val offenesSpiel by vm.offenesSpiel.collectAsStateWithLifecycle()
+    // German4K 3.2 (N7): gemerkte Spiele + Rückmeldung als kleiner Hinweis unten.
+    val erinnertSchluessel by vm.erinnert.collectAsStateWithLifecycle()
+    val toast = tv.own.owntv.ui.components.rememberInAppToast()
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val sportErinnern = remember(erinnertSchluessel) {
+        SportErinnern(erinnertSchluessel) { s ->
+            scope.launch {
+                val r = vm.erinnernUmschalten(s)
+                toast.show(
+                    when (r) {
+                        true -> ctx.getString(R.string.g4k_erinnern_gesetzt, tv.own.owntv.core.german4k.German4kErinnern.VORLAUF_SPIEL_MIN)
+                        false -> ctx.getString(R.string.g4k_erinnern_geloescht)
+                        null -> ctx.getString(R.string.g4k_erinnern_geht_nicht)
+                    },
+                )
+            }
+        }
+    }
 
     DisposableEffect(Unit) {
         vm.starte()
@@ -133,6 +162,7 @@ fun SportScreen(
 
     val spiel = offenesSpiel
     if (spiel != null) {
+        androidx.compose.runtime.CompositionLocalProvider(LocalSportErinnern provides sportErinnern) {
         SportSpielScreen(
             spiel = spiel,
             vm = vm,
@@ -143,14 +173,16 @@ fun SportScreen(
             previewEnabled = previewEnabled,
             modifier = modifier,
         )
+        }
         return
     }
     BackHandler(enabled = !formfaktor.mobil) { onBack() }
 
     val klick: (German4kSpiel) -> Unit = { s ->
+        if (s.istKonferenz) vm.konferenzKlick(s)
         scope.launch {
             when (val k = vm.klick(s)) {
-                is SportKlick.Spielen -> onPlayChannel(k.channel)
+                is SportKlick.Spielen -> onPlayChannel(k.channel, emptyList())
                 is SportKlick.Oeffnen -> vm.oeffne(k.spiel)
             }
         }
@@ -178,6 +210,12 @@ fun SportScreen(
             }
             Spacer(Modifier.height(10.dp))
             ChipZeile(chip = chip, onChip = { vm.chip.value = it }, onFocused = onChildFocused)
+            // German4K 3.2 (N7): wie man sich an ein Spiel erinnern lässt — auf dem Fernseher gibt es keinen
+            // zweiten Knopf auf der Karte, also lange OK.
+            if (!formfaktor.mobil) {
+                Spacer(Modifier.height(6.dp))
+                Text(stringResource(R.string.g4k_erinnern_lang_druecken), style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
+            }
             Spacer(Modifier.height(12.dp))
             val a = antwort
             when {
@@ -191,6 +229,9 @@ fun SportScreen(
         }
     }
 
+    val mitErinnern: @Composable () -> Unit = {
+        androidx.compose.runtime.CompositionLocalProvider(LocalSportErinnern provides sportErinnern) { inhalt() }
+    }
     if (formfaktor.mobil) {
         German4kMobilRahmen(
             kategorien = emptyList(),
@@ -200,10 +241,14 @@ fun SportScreen(
             onKategorieOffen = {},
             titel = stringResource(R.string.g4k_nav_fussball),
             modifier = modifier,
-            inhalt = inhalt,
+            inhalt = mitErinnern,
         )
+        tv.own.owntv.ui.components.InAppToast(toast)
     } else {
-        Box(modifier.fillMaxSize().focusGroup()) { inhalt() }
+        Box(modifier.fillMaxSize().focusGroup()) {
+            mitErinnern()
+            tv.own.owntv.ui.components.InAppToast(toast)
+        }
     }
 }
 
@@ -272,7 +317,9 @@ private fun TvRegale(
     var spaeterOffen by rememberSaveable { mutableStateOf(spaeterStandardOffen(regale.heute.size)) }
     val liveRegal = regale.live + regale.beendet
     // Wer bekommt den Startfokus: die erste Karte des ersten sichtbaren Regals.
+    // German4K 3.2 (N4): die Konferenz-Karte steht ganz oben und bekommt ihn zuerst (-1).
     val erstesRegal = when {
+        regale.konferenzen.isNotEmpty() -> -1
         liveRegal.isNotEmpty() -> 0
         regale.heute.isNotEmpty() -> 1
         else -> 2
@@ -283,6 +330,30 @@ private fun TvRegale(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(bottom = 24.dp),
     ) {
+        // German4K 3.2 (N4): Konferenz-Karten ganz oben, die Einzelspiele bleiben darunter wie bisher.
+        regale.konferenzen.forEachIndexed { i, k ->
+            item(key = "konferenz-${k.id}") {
+                val erinnern = LocalSportErinnern.current
+                Row(Modifier.fillMaxWidth().focusGroup(), verticalAlignment = Alignment.CenterVertically) {
+                    KonferenzKarte(
+                        spiel = k,
+                        onClick = { onFocused(); onKlick(k) },
+                        modifier = Modifier.weight(1f).height(150.dp)
+                            .then(if (i == 0 && erstesRegal == -1) Modifier.focusRequester(ersterFokus) else Modifier),
+                    )
+                    // German4K 3.2 (N7): eigener Knopf neben der Karte — rechts vom Fokus erreichbar.
+                    if (!k.laeuft) {
+                        Spacer(Modifier.width(12.dp))
+                        tv.own.owntv.ui.components.OwnTVButton(
+                            stringResource(if (erinnern.erinnert(k)) R.string.g4k_erinnern_knopf_gesetzt else R.string.g4k_erinnern_knopf),
+                            onClick = { erinnern.umschalten(k) },
+                            style = tv.own.owntv.ui.components.OwnTVButtonStyle.SECONDARY,
+                            selected = erinnern.erinnert(k),
+                        )
+                    }
+                }
+            }
+        }
         // „Jetzt live" bleibt vorn und bleibt eine Reihe.
         if (liveRegal.isNotEmpty()) item(key = "live") {
             Regal(stringResource(R.string.g4k_sport_regal_live), liveRegal, if (erstesRegal == 0) ersterFokus else null, onKlick, onFocused)
@@ -405,6 +476,23 @@ private fun MobilListe(regale: SportRegale, onKlick: (German4kSpiel) -> Unit) {
                 SpielKarte(spiel = s, onClick = { onKlick(s) }, modifier = Modifier.fillMaxWidth().height(120.dp))
             }
         }
+        // German4K 3.2 (N4): Konferenzen zuerst.
+        items(regale.konferenzen, key = { "konferenz-${it.id}" }) { k ->
+            val erinnern = LocalSportErinnern.current
+            Column {
+                KonferenzKarte(spiel = k, onClick = { onKlick(k) }, modifier = Modifier.fillMaxWidth().height(140.dp))
+                if (!k.laeuft) {
+                    Spacer(Modifier.height(6.dp))
+                    tv.own.owntv.ui.components.OwnTVButton(
+                        stringResource(if (erinnern.erinnert(k)) R.string.g4k_erinnern_knopf_gesetzt else R.string.g4k_erinnern_knopf),
+                        onClick = { erinnern.umschalten(k) },
+                        style = tv.own.owntv.ui.components.OwnTVButtonStyle.SECONDARY,
+                        selected = erinnern.erinnert(k),
+                        compact = true,
+                    )
+                }
+            }
+        }
         abschnitt(regale.live) { AbschnittTitel(stringResource(R.string.g4k_sport_regal_live)) }
         abschnitt(regale.heute) { AbschnittTitel(stringResource(R.string.g4k_sport_regal_heute)) }
         tage.forEach { (tag, spiele) -> abschnitt(spiele) { TagTitel(tag) } }
@@ -416,8 +504,11 @@ private fun MobilListe(regale: SportRegale, onKlick: (German4kSpiel) -> Unit) {
 @Composable
 internal fun SpielKarte(spiel: German4kSpiel, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val colors = OwnTVTheme.colors
+    val erinnern = LocalSportErinnern.current
     FocusableSurface(
         onClick = onClick,
+        // German4K 3.2 (N7): lange OK = „⏰ Erinnern“ (nur künftige Spiele; sonst sagt der Hinweis, warum nicht).
+        onLongClick = { erinnern.umschalten(spiel) },
         shape = RoundedCornerShape(16.dp),
         unfocusedContainerColor = colors.surfaceContainer,
         contentAlignment = Alignment.TopStart,
@@ -454,7 +545,10 @@ internal fun SpielKarte(spiel: German4kSpiel, onClick: () -> Unit, modifier: Mod
                     // German4K 3.0/32 (R2): roter Chip „LIVE 34′" statt der großen Uhrzeit.
                     LiveMinutenChip(spiel)
                 } else {
-                    Text(uhrzeitBerlin(spiel.start), style = MaterialTheme.typography.titleLarge, color = colors.onSurface, fontWeight = FontWeight.Bold)
+                    Text(
+                        (if (erinnern.erinnert(spiel)) "⏰ " else "") + uhrzeitBerlin(spiel.start),
+                        style = MaterialTheme.typography.titleLarge, color = colors.onSurface, fontWeight = FontWeight.Bold,
+                    )
                 }
             }
             Spacer(Modifier.height(6.dp))
@@ -528,4 +622,61 @@ internal fun fusszeileText(spiel: German4kSpiel): String = when (val f = sportFu
     is SportFusszeile.Rechte -> stringResource(R.string.g4k_sport_fuss_rechte, f.sender)
     is SportFusszeile.Bereich -> stringResource(R.string.g4k_sport_fuss_bereich, f.name)
     SportFusszeile.Keine -> ""
+}
+
+/** „Sa 15:30“ für die Konferenz-Karte, Wochentag in der Sprache der App. */
+private const val KONFERENZ_ZEIT_MUSTER = "EEE HH:mm"
+
+/**
+ * German4K 3.2 (N4): die Konferenz-Karte — „🔴 Bundesliga-Konferenz · Sa 15:30 · 5 Spiele“, darunter die
+ * Paarungen klein, LIVE ab Anstoß −10 min (Server-Zustand). Klick spielt wie ein Spiel (frisch geholte
+ * Platzwahl, nie gespeicherte IDs), lange OK = ⏰ Erinnern.
+ */
+@Composable
+internal fun KonferenzKarte(spiel: German4kSpiel, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = OwnTVTheme.colors
+    val erinnern = LocalSportErinnern.current
+    val locale = LocalConfiguration.current.locales[0]
+    val zeit = remember(spiel.start, locale) { DateTimeFormatter.ofPattern(KONFERENZ_ZEIT_MUSTER, locale).format(spiel.start.atZone(SPORT_ZONE)) }
+    FocusableSurface(
+        onClick = onClick,
+        onLongClick = { erinnern.umschalten(spiel) },
+        shape = RoundedCornerShape(16.dp),
+        unfocusedContainerColor = colors.surfaceContainerHigh,
+        contentAlignment = Alignment.TopStart,
+        modifier = modifier,
+    ) { _ ->
+        Column(Modifier.fillMaxSize().padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.g4k_sport_konferenz_kopf, spiel.titel, zeit, spiel.gast),
+                    style = MaterialTheme.typography.titleLarge, color = colors.onSurface, fontWeight = FontWeight.Bold,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                )
+                if (erinnern.erinnert(spiel)) {
+                    Spacer(Modifier.width(8.dp))
+                    Text("⏰", style = MaterialTheme.typography.titleLarge)
+                }
+                if (spiel.laeuft) {
+                    Spacer(Modifier.width(8.dp))
+                    LiveMinutenChip(spiel)
+                }
+            }
+            if (spiel.paarungen.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    spiel.paarungen.joinToString("  ·  ") { "${it.heim} – ${it.gast}" },
+                    style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            val fuss = fusszeileText(spiel)
+            Text(
+                if (spiel.bestaetigt == false) listOf(fuss, stringResource(R.string.g4k_sport_konferenz_laut_plan)).filter { it.isNotBlank() }.joinToString(" · ") else fuss,
+                style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
 }

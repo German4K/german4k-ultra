@@ -95,7 +95,7 @@ private enum class MorePage { ROOT, FAVORITES, HISTORY, BACKUP, LOCAL_SYNC }
  * (Downloads …), Einstellungen, Hilfe & Verbindung, Über. Sicherung, lokale Synchronisierung und das
  * Fehlerprotokoll stehen jetzt in den Einstellungen unter „App".
  */
-private enum class MoreRow { ZUGANG, BEREICHE, FAVORITES, HISTORY, SETTINGS, HILFE, ABOUT }
+private enum class MoreRow { ZUGANG, BEREICHE, ERINNERUNGEN, FAVORITES, HISTORY, SETTINGS, HILFE, ABOUT }
 
 /**
  * The hub the rail's last item opens — everything that is neither a channel nor a preference.
@@ -305,6 +305,19 @@ fun MoreScreen(
                     onClick = { focusRow(MoreRow.BEREICHE); tv.own.owntv.core.german4k.German4kSupport.bereicheOeffnen() },
                     modifier = Modifier.focusRequester(rowFocus.getValue(MoreRow.BEREICHE)),
                 )
+                // German4K 3.2 (N7): „Meine Erinnerungen“ — gemerkte Sendungen und Spiele, löschen möglich.
+                SpineItem(
+                    label = stringResource(R.string.g4k_erinnern_liste_titel),
+                    summary = "",
+                    icon = OwnTVIcon.EPG,
+                    count = 0,
+                    showBadge = false,
+                    selected = selected == MoreRow.ERINNERUNGEN,
+                    active = false,
+                    onFocused = { selected = MoreRow.ERINNERUNGEN },
+                    onClick = { focusRow(MoreRow.ERINNERUNGEN); tv.own.owntv.core.german4k.German4kSupport.erinnerungenOeffnen() },
+                    modifier = Modifier.focusRequester(rowFocus.getValue(MoreRow.ERINNERUNGEN)),
+                )
                 SpineRow(
                     row = MoreRow.FAVORITES,
                     icon = OwnTVIcon.FAVORITE,
@@ -400,6 +413,7 @@ fun MoreScreen(
                     val destination = when (selected) {
                         MoreRow.ZUGANG -> stringResource(R.string.g4k_mehr_zugang)
                         MoreRow.BEREICHE -> stringResource(R.string.g4k_bereiche_titel)
+                        MoreRow.ERINNERUNGEN -> stringResource(R.string.g4k_erinnern_liste_titel)
                         MoreRow.SETTINGS -> stringResource(R.string.common_nav_settings)
                         MoreRow.FAVORITES -> stringResource(R.string.content_category_favorites)
                         MoreRow.HISTORY -> stringResource(R.string.content_category_history)
@@ -416,6 +430,7 @@ fun MoreScreen(
                             MoreRow.ZUGANG -> g4kAnswer?.expireDate?.takeIf { it.isNotBlank() }
                                 ?.let { stringResource(R.string.g4k_expires, it) }.orEmpty()
                             MoreRow.BEREICHE -> stringResource(R.string.g4k_bereiche_text)
+                            MoreRow.ERINNERUNGEN -> stringResource(R.string.g4k_erinnern_liste_text)
                             MoreRow.SETTINGS -> stringResource(R.string.more_spine_settings_summary)
                             MoreRow.FAVORITES -> stringResource(R.string.more_pane_favorites_summary)
                             MoreRow.HISTORY -> stringResource(R.string.more_pane_history_summary)
@@ -424,7 +439,7 @@ fun MoreScreen(
                         },
                         tag = when (selected) {
                             MoreRow.ZUGANG -> g4kZugangText
-                            MoreRow.BEREICHE, MoreRow.HILFE -> ""
+                            MoreRow.BEREICHE, MoreRow.ERINNERUNGEN, MoreRow.HILFE -> ""
                             MoreRow.SETTINGS ->
                                 pluralStringResource(R.plurals.settings_pinned_count, quickPinned.size, quickPinned.size)
                             MoreRow.FAVORITES -> favorites.total.toString()
@@ -439,7 +454,7 @@ fun MoreScreen(
                             .padding(horizontal = 18.dp, vertical = 6.dp),
                     ) {
                         when (selected) {
-                            MoreRow.ZUGANG, MoreRow.BEREICHE, MoreRow.HILFE -> Unit
+                            MoreRow.ZUGANG, MoreRow.BEREICHE, MoreRow.ERINNERUNGEN, MoreRow.HILFE -> Unit
                             MoreRow.SETTINGS -> SettingsPane(quickPreview)
                             MoreRow.FAVORITES -> CountsPane(favorites, favoriteItems)
                             MoreRow.HISTORY -> CountsPane(history, historyItems)

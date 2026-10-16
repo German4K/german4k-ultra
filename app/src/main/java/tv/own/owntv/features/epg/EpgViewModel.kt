@@ -827,7 +827,8 @@ class EpgViewModel(
             // Respect customizations: hidden channels stay out of the guide, renames show.
             val cust = customize.observe(pid, MediaType.LIVE).first()
             val q = _query.value.trim()
-            val rawChannels = channelDao.channelsWithGuide(ids, q, MAX_CHANNELS)
+            // German4K 3.2 (F3): seitenweise — `SELECT *` über 20.000 Sender sprengte das CursorWindow.
+            val rawChannels = channelDao.channelsWithGuidePaged(ids, q, MAX_CHANNELS)
             // Catch-up count comes from the playlist channels (the tv_archive flag), so it shows even
             // before any XMLTV guide is downloaded — it tells the user their provider supports catch-up.
             val catchupCount = channelDao.countCatchup(playlistIds)

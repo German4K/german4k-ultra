@@ -64,6 +64,14 @@ import tv.own.owntv.ui.theme.OwnTVTheme
  */
 @Composable
 fun German4kBereicheScreen(onBack: () -> Unit) {
+    // German4K 3.2 (N8): Länder-Ansicht. Liefert ein alter Server keine Länder, bleibt die flache Liste.
+    var flach by remember { mutableStateOf(false) }
+    if (flach) German4kBereicheFlach(onBack) else German4kLaenderScreen(onBack = onBack, onKeineLaender = { flach = true })
+}
+
+/** Die flache Bereichsliste bis 3.1.1 — Rückfall, wenn der Server die Länder-Ansicht nicht kennt. */
+@Composable
+private fun German4kBereicheFlach(onBack: () -> Unit) {
     val panel: German4kPanelClient = koinInject()
     val context = LocalContext.current
     val colors = OwnTVTheme.colors

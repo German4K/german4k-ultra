@@ -85,6 +85,8 @@ internal fun ProgrammeStripCanvas(
     highlightTime: Long?,
     catchupIds: Set<Long>,
     hScroll: androidx.compose.foundation.ScrollState,
+    /** German4K 3.2 (N7): Beginnzeiten gemerkter Sendungen dieses Senders — sie tragen ein ⏰ vor dem Titel. */
+    erinnertBeginne: Set<Long> = emptySet(),
 ) {
     val colors = OwnTVTheme.colors
     val density = androidx.compose.ui.platform.LocalDensity.current
@@ -175,7 +177,7 @@ internal fun ProgrammeStripCanvas(
             if (textW > 8) {
                 val tStyle = if (isNow && !hi) titleNowStyle else titleStyle
                 val mStyle = if (isNow && !hi) timeNowStyle else timeStyle
-                val title = measurer.measure(p.title, tStyle, overflow = TextOverflow.Ellipsis, maxLines = 1, constraints = Constraints(maxWidth = textW))
+                val title = measurer.measure(if (p.startMs in erinnertBeginne) "⏰ " + p.title else p.title, tStyle, overflow = TextOverflow.Ellipsis, maxLines = 1, constraints = Constraints(maxWidth = textW))
                 val time = measurer.measure(labels[i], mStyle, overflow = TextOverflow.Ellipsis, maxLines = 1, constraints = Constraints(maxWidth = textW))
                 val top = (h - (title.size.height + time.size.height + 2)) / 2f
                 drawText(title, topLeft = Offset(x + padPx, top))
@@ -239,6 +241,11 @@ internal fun ProgrammeDetailDialog(
     seriesRuleActive: Boolean = false,
     onRecordSeries: () -> Unit = {},
     onStopSeries: () -> Unit = {},
+    // --- German4K 3.2 (N7): „⏰ Erinnern“. Defaulted: der Catch-up-Picker im Player bietet es nicht an.
+    /** Künftige Sendung, nicht erwachsen — dann gibt es den Knopf. */
+    erinnernMoeglich: Boolean = false,
+    erinnert: Boolean = false,
+    onErinnern: () -> Unit = {},
 ) {
     val colors = OwnTVTheme.colors
     val formatTime = rememberSystemTimeFormatter()
@@ -366,6 +373,16 @@ internal fun ProgrammeDetailDialog(
                             ),
                             onClick = if (seriesRuleActive) onStopSeries else onRecordSeries,
                             style = OwnTVButtonStyle.SECONDARY,
+                            compact = compact,
+                        )
+                    }
+                    // German4K 3.2 (N7): merken bzw. vergessen; die Beschriftung kippt an Ort und Stelle.
+                    if (erinnernMoeglich || erinnert) {
+                        OwnTVButton(
+                            stringResource(if (erinnert) R.string.g4k_erinnern_knopf_gesetzt else R.string.g4k_erinnern_knopf),
+                            onClick = onErinnern,
+                            style = OwnTVButtonStyle.SECONDARY,
+                            selected = erinnert,
                             compact = compact,
                         )
                     }

@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -129,6 +131,10 @@ class MainActivity : ComponentActivity() {
         if (intent?.getBooleanExtra("g4k_help", false) == true) tv.own.owntv.core.german4k.German4kSupport.oeffnen()
         if (intent?.getBooleanExtra("g4k_kunde", false) == true) tv.own.owntv.core.german4k.German4kSupport.kundeOeffnen()
         if (intent?.getBooleanExtra("g4k_bereiche", false) == true) tv.own.owntv.core.german4k.German4kSupport.bereicheOeffnen()
+        // German4K 3.2 (N7/F10): `--ez g4k_erinnerung_test true` (nur Debug) legt eine sofort fällige Erinnerung an,
+        // `--ez g4k_erinnerungen true` öffnet „Meine Erinnerungen“.
+        if (intent?.getBooleanExtra("g4k_erinnerungen", false) == true) tv.own.owntv.core.german4k.German4kSupport.erinnerungenOeffnen()
+        if (intent?.getBooleanExtra("g4k_erinnerung_test", false) == true) g4kErinnerungTest()
         intent?.getStringExtra("g4k_stoerung_test")?.let {
             tv.own.owntv.core.german4k.German4kStoerung.melde("Testsender", it)
         }
@@ -149,8 +155,22 @@ class MainActivity : ComponentActivity() {
         Log.d(TAG, "onNewIntent deepLinkHost=${intent.data?.host} deepLinkType=${pendingDeepLink?.javaClass?.simpleName ?: "none"}")
     }
 
+    /** German4K 3.2 (N7/F10), nur Debug-Builds: eine Erinnerung, die in 3 min beginnt (= sofort fällig). */
+    private fun g4kErinnerungTest() {
+        if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE == 0) return
+        lifecycleScope.launch {
+            val kanal = runCatching {
+                val quelle = get<tv.own.owntv.core.database.dao.SourceDao>().getAllOnce().firstOrNull()
+                quelle?.let { get<tv.own.owntv.core.database.dao.ChannelDao>().allForSources(listOf(it.id), 1).firstOrNull() }
+            }.getOrNull()
+            get<tv.own.owntv.core.german4k.German4kErinnerungen>().debugEinfuegen(kanal, inMinuten = 3)
+        }
+    }
+
     override fun onStop() {
         super.onStop()
+        // German4K 3.2 (N7): unsichtbar → ein klingelnder Erinnerungs-Wecker zeigt eine Benachrichtigung.
+        tv.own.owntv.core.german4k.German4kErinnern.vordergrund = false
         // Backgrounded (Home / another app), exited, or logged out: stop playback and free the demuxer
         // cache + decoder buffers — holding them while invisible got the process LMK-killed on real TVs.
         if (!isChangingConfigurations) {
@@ -164,6 +184,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        // German4K 3.2 (N7): sichtbar → der Hinweis kommt im Bild, keine Benachrichtigung zusätzlich.
+        tv.own.owntv.core.german4k.German4kErinnern.vordergrund = true
         // Paired with onStop: bring back what was freed while backgrounded (notably the TV screensaver, which
         // kicks in during a long pause) — a VOD restored paused at its position, and a live channel re-tuned
         // to the live edge — so Play resumes instead of sitting on a dead/empty stream. No-op on fresh launch.
@@ -214,6 +236,10 @@ class MainActivity : ComponentActivity() {
         if (intent?.getBooleanExtra("g4k_help", false) == true) tv.own.owntv.core.german4k.German4kSupport.oeffnen()
         if (intent?.getBooleanExtra("g4k_kunde", false) == true) tv.own.owntv.core.german4k.German4kSupport.kundeOeffnen()
         if (intent?.getBooleanExtra("g4k_bereiche", false) == true) tv.own.owntv.core.german4k.German4kSupport.bereicheOeffnen()
+        // German4K 3.2 (N7/F10): `--ez g4k_erinnerung_test true` (nur Debug) legt eine sofort fällige Erinnerung an,
+        // `--ez g4k_erinnerungen true` öffnet „Meine Erinnerungen“.
+        if (intent?.getBooleanExtra("g4k_erinnerungen", false) == true) tv.own.owntv.core.german4k.German4kSupport.erinnerungenOeffnen()
+        if (intent?.getBooleanExtra("g4k_erinnerung_test", false) == true) g4kErinnerungTest()
         intent?.getStringExtra("g4k_stoerung_test")?.let {
             tv.own.owntv.core.german4k.German4kStoerung.melde("Testsender", it)
         }

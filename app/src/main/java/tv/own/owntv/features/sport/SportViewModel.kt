@@ -47,7 +47,21 @@ class SportViewModel(
     private val categoryDao: CategoryDao,
     private val sourceDao: SourceDao,
     private val settings: SettingsRepository,
+    private val erinnerungen: tv.own.owntv.core.german4k.German4kErinnerungen,
 ) : ViewModel() {
+
+    /** German4K 3.2 (N7): Schlüssel der gemerkten Spiele/Konferenzen — für das ⏰ auf den Karten. */
+    val erinnert: StateFlow<Set<String>> = erinnerungen.schluessel
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    fun istErinnert(spiel: German4kSpiel, schluessel: Set<String>): Boolean =
+        tv.own.owntv.core.german4k.German4kErinnern.spielSchluessel(spiel.id) in schluessel
+
+    /** Merken/vergessen. true = gemerkt, false = gelöscht, null = geht nicht (läuft schon/vorbei). */
+    suspend fun erinnernUmschalten(spiel: German4kSpiel): Boolean? = erinnerungen.spielUmschalten(spiel)
+
+    /** German4K 3.2 (N4/C1): Mess-Ereignis, still. */
+    fun konferenzKlick(spiel: German4kSpiel) = erinnerungen.ereignis("konferenz_klick", "${spiel.id}:${spiel.titel}")
 
     val antwort: StateFlow<German4kSportAntwort?> = repo.antwort
     val offline: StateFlow<Boolean> = repo.offline

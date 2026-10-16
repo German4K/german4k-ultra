@@ -1269,6 +1269,17 @@ class LiveViewModel(
         recordLiveHistory(channel, immediate = true)
     }
 
+    /**
+     * German4K 3.2 (F4/N5): wie [watchFromGuide], aber Hoch/Runter im Vollbild folgt der Liste, aus der
+     * gestartet wurde — den Zeilen des Programmführers (auch „nur Favoriten“), den Suchtreffern, den
+     * Sendern eines Spiels im Sport-Hub. Ohne brauchbare Liste wie bisher die Kategorie des Senders.
+     */
+    fun watchFromList(channel: ChannelEntity, origin: List<ChannelEntity>, title: String? = null) {
+        zapList.armFromOrigin(channel, origin, title)
+        ensurePlaying(channel)
+        recordLiveHistory(channel, immediate = true)
+    }
+
     /** Zap to the neighbouring channel ([delta] = +1 down / -1 up) — see [LiveZapList.next] for how
      *  the target is chosen. [ensurePlaying], reached through [zapTo], cancels any pending rebuild. */
     fun zap(delta: Int) {
@@ -1527,6 +1538,8 @@ class LiveViewModel(
         // Sendung in einer spielbaren Fassung in der Liste steht, nehmen wir gleich die; zehn Sekunden
         // schwarzes Bild vorweg helfen niemandem.
         g4kStattUhd(channel)?.let { ersatz ->
+            // German4K 3.2 (F4/N5): Hoch/Runter geht von der Stelle des Listeneintrags weiter.
+            zapList.merkeErsatz(channel.id, ersatz.id)
             engineLog("'${channel.name}' → '${ersatz.name}' (kein 4K-Decoder auf diesem Gerät)")
             playChannel(ersatz)
             return
@@ -2016,6 +2029,7 @@ class LiveViewModel(
                 val ersatz = g4kAusweich(channel)
                 if (ersatz != null) {
                     g4kVarianteVersucht = true
+                    zapList.merkeErsatz(channel.id, ersatz.id) // German4K 3.2 (F4/N5)
                     engineLog("'${channel.name}' → '${ersatz.name}' (andere Qualitätsstufe nach: $reason)")
                     recordLadderEvent(tv.own.owntv.player.PlayerFailureReason.LIVE_FALLBACK, channel, "Qualitätsstufe — $reason")
                     viewModelScope.launch { playChannel(ersatz) }
