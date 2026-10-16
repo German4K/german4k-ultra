@@ -47,13 +47,19 @@ class ProfilesViewModel(
 
     /** Make [profile] active (routes the app into the shell) once the preference write commits. */
     fun switchTo(profile: ProfileEntity, onSwitched: () -> Unit = {}) {
+        // German4K 3.2 (F1): Erwachsenes in der Suche gilt nur für das Profil, dessen PIN eingegeben wurde.
+        // Ein Wechsel ohne PIN sperrt wieder; mit PIN hat [verifyPin] die Freigabe gerade erst gesetzt.
+        if (profile.pinHash == null) tv.own.owntv.core.content.German4kErwachsenSitzung.sperren()
         viewModelScope.launch {
             manager.switchTo(profile.id)
             onSwitched()
         }
     }
 
-    fun verifyPin(profile: ProfileEntity, pin: String): Boolean = manager.verifyPin(profile, pin)
+    fun verifyPin(profile: ProfileEntity, pin: String): Boolean = manager.verifyPin(profile, pin).also { ok ->
+        // German4K 3.2 (F1): „Erwachsenes nur nach PIN-Eingabe in dieser Sitzung" (globale Suche).
+        if (ok && !profile.isKids) tv.own.owntv.core.content.German4kErwachsenSitzung.pinEingegeben()
+    }
 
     /**
      * Create a new profile. New profiles inherit the existing sources (single-account, multi-viewer)

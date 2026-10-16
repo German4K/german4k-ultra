@@ -1106,6 +1106,12 @@ fun OwnTVShell(
                                 onSelectSection(MainSection.MOVIES)
                                 movieVm.openDetails(id)
                             },
+                            // German4K 3.2: Serie aus „🔥 Angesagt" — Detailseite im Serienbereich.
+                            onOpenSeries = { id ->
+                                homeVm.stopPreview()
+                                onSelectSection(MainSection.SERIES)
+                                seriesVm.openDetails(id)
+                            },
                             modifier = Modifier.fillMaxSize(),
                         )
 

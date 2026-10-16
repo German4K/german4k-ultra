@@ -197,6 +197,7 @@ fun SeriesScreen(
             onOpenMovie = onOpenMovie,
             kategorieOffen = kategorieOffen,
             onKategorieOffen = onKategorieOffen,
+            onFullscreen = onFullscreen,
             modifier = modifier,
         )
     }
@@ -287,6 +288,8 @@ private fun SeriesGrid(
     // German4K: Drill-down-Zustand des Mobil-Rahmens, gehalten von [SeriesScreen].
     kategorieOffen: Boolean = false,
     onKategorieOffen: (Boolean) -> Unit = {},
+    // German4K 3.2: „Abspielen" auf der Detailseite startet die Folge im Vollbild.
+    onFullscreen: () -> Unit = {},
     modifier: Modifier,
 ) {
     val alreadyDownloadedMessage = stringResource(R.string.content_already_downloaded)
@@ -372,12 +375,33 @@ private fun SeriesGrid(
         else g4kScope.launch { oeffneSerieDirekt(vm.seriesById(zielId) ?: s, s, index) }
     }
     val fassungsAnzahl by vm.fassungsAnzahl.collectAsStateWithLifecycle()
+    // German4K 3.2: Für „Abspielen" auf der Detailseite (direkt ins Vollbild, wie bei den Filmen).
+    val g4kExternerPlayer by vm.externalPlayerOn.collectAsStateWithLifecycle()
+
+    // German4K 3.2: Auftrag von der Startseite („🔥 Angesagt") — die Huelle hat schon auf „Serien"
+    // umgeschaltet; hier geht die Detailseite auf. Schalter aus = gleich in die Folgenansicht.
+    val g4kPendingDetailsId by vm.pendingDetailsId.collectAsStateWithLifecycle()
+    LaunchedEffect(g4kPendingDetailsId) {
+        val id = g4kPendingDetailsId ?: return@LaunchedEffect
+        if (!vm.pendingDetailsFrisch()) { vm.clearPendingDetails(); return@LaunchedEffect }
+        vm.seriesById(id)?.let { s -> oeffneSerieDirekt(s, s, -1) }
+        vm.clearPendingDetails()
+    }
 
     val selectedIndex = railItems.indexOfFirst { it.key == selectedKey }.coerceAtLeast(0)
     val selectedItem = railItems.getOrNull(selectedIndex)
     val selectedLabel = selectedItem?.displayLabel(R.string.content_category_all_series) ?: stringResource(R.string.content_category_all_series)
     val gridSelFocus = remember { androidx.compose.ui.focus.FocusRequester() }
     val firstItemFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+    // German4K 3.2 (N2): „🏆 Top 10 Serien bei German4K" + „🔥 Angesagt" als erstes Raster-Element —
+    // nur in „Alle Serien" ohne Suche, nur im Raster. Alle Raster-Indizes unten um [g4kKopf] verschoben.
+    val g4kAngesagtVm: tv.own.owntv.features.home.German4kAngesagtViewModel = koinViewModel()
+    val g4kRegale by g4kAngesagtVm.regale.collectAsStateWithLifecycle()
+    LaunchedEffect(g4kAngesagtVm) { g4kAngesagtVm.neuLaden() }
+    val g4kKopfZeigen = lockedKey == null && selectedKey == LiveKey.All && searchQuery.isBlank() &&
+        viewMode == SettingsRepository.VodViewMode.GRID &&
+        (g4kRegale.serienTop.isNotEmpty() || g4kRegale.serienAngesagt.isNotEmpty())
+    val g4kKopf = if (g4kKopfZeigen) 1 else 0
     val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
 
@@ -417,9 +441,9 @@ private fun SeriesGrid(
     LaunchedEffect(effectiveGridState, effectiveListState, viewMode, series) {
         val grid = viewMode != SettingsRepository.VodViewMode.LIST
         snapshotFlow {
-            val indices = if (grid) effectiveGridState.layoutInfo.visibleItemsInfo.map { it.index }
+            val indices = if (grid) effectiveGridState.layoutInfo.visibleItemsInfo.map { it.index - g4kKopf }
             else effectiveListState.layoutInfo.visibleItemsInfo.map { it.index }
-            indices.filter { it < series.itemCount }
+            indices.filter { it >= 0 && it < series.itemCount }
                 .mapNotNull { series.peek(it) }
                 .filter { it.posterUrl.isNullOrBlank() }
         }.distinctUntilChanged().collect { vm.onPosterlessVisible(it) }
@@ -437,7 +461,7 @@ private fun SeriesGrid(
                 // LIST view unscrolled, so a show further down was never composed, the focus request
                 // failed, and focus fell out to the CategoryRail instead of the show you came back from.
                 if (viewMode == SettingsRepository.VodViewMode.GRID) {
-                    runCatching { effectiveGridState.scrollToItem(idx) }
+                    runCatching { effectiveGridState.scrollToItem(idx + g4kKopf) }
                 } else {
                     runCatching { effectiveListState.scrollToItem(idx) }
                 }
@@ -480,7 +504,7 @@ private fun SeriesGrid(
         if (idx >= 0) {
             runCatching {
                 if (viewMode == SettingsRepository.VodViewMode.LIST) effectiveListState.scrollToItem(idx)
-                else effectiveGridState.scrollToItem(idx)
+                else effectiveGridState.scrollToItem(idx + g4kKopf)
             }
             withFrameNanos { }
             runCatching { contextFocus.requestFocus() }
@@ -494,7 +518,7 @@ private fun SeriesGrid(
                 val neighborIdx = items.indexOfFirst { it.id == neighbor.id }.coerceAtLeast(0)
                 runCatching {
                     if (viewMode == SettingsRepository.VodViewMode.LIST) effectiveListState.scrollToItem(neighborIdx)
-                    else effectiveGridState.scrollToItem(neighborIdx)
+                    else effectiveGridState.scrollToItem(neighborIdx + g4kKopf)
                 }
                 contextSeriesId = neighbor.id
                 withFrameNanos { }
@@ -596,10 +620,10 @@ private fun SeriesGrid(
                         if (sel != null) {
                             val idx = series.itemSnapshotList.items.indexOfFirst { it.id == sel.id }
                             if (idx >= 0) idx
-                            else if (viewMode == SettingsRepository.VodViewMode.GRID) effectiveGridState.firstVisibleItemIndex
+                            else if (viewMode == SettingsRepository.VodViewMode.GRID) (effectiveGridState.firstVisibleItemIndex - g4kKopf).coerceAtLeast(0)
                             else effectiveListState.firstVisibleItemIndex
                         } else {
-                            if (viewMode == SettingsRepository.VodViewMode.GRID) effectiveGridState.firstVisibleItemIndex
+                            if (viewMode == SettingsRepository.VodViewMode.GRID) (effectiveGridState.firstVisibleItemIndex - g4kKopf).coerceAtLeast(0)
                             else effectiveListState.firstVisibleItemIndex
                         }
                     },
@@ -607,7 +631,7 @@ private fun SeriesGrid(
                         scope.launch {
                             val item = series.itemSnapshotList.items.getOrNull(idx)
                             if (viewMode == SettingsRepository.VodViewMode.GRID) {
-                                runCatching { effectiveGridState.scrollToItem(idx) }
+                                runCatching { effectiveGridState.scrollToItem(idx + g4kKopf) }
                             } else {
                                 runCatching { effectiveListState.scrollToItem(idx) }
                             }
@@ -713,6 +737,24 @@ private fun SeriesGrid(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    // German4K 3.2 (N2): Top 10 + Angesagt über die ganze Breite; Klick = Detailseite.
+                    if (g4kKopfZeigen) {
+                        item(
+                            key = G4K_KOPF_SCHLUESSEL,
+                            span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) },
+                            contentType = G4K_KOPF_SCHLUESSEL,
+                        ) {
+                            tv.own.owntv.features.home.German4kAngesagtKopf(
+                                serien = true,
+                                top = g4kRegale.serienTop,
+                                angesagt = g4kRegale.serienAngesagt,
+                                onKarte = { k, top10 ->
+                                    g4kAngesagtVm.klick(k, top10, wo = G4K_QUELLE_SERIEN)
+                                    scope.launch { vm.seriesById(k.itemId)?.let { s -> oeffneSerieDirekt(s, s, -1) } }
+                                },
+                            )
+                        }
+                    }
                     items(
                         count = series.itemCount,
                         // German4K 3.1.1: Schlüssel = id@Index. Zwei gleiche ids in einer Seitenfolge (Paging-Nachladen,
@@ -1041,7 +1083,19 @@ private fun SeriesGrid(
                 // je Folge. Deshalb gibt es hier nur „Folgen".
                 fortsetzenMs = null,
             ),
-            onAbspielen = { detailsSeries = null; vm.openSeries(s) },
+            // German4K 3.2 (Plan §2.4): „Abspielen" = Weiterschauen, sonst S1E1 — direkt ins Bild. Findet
+            // sich keine Folge (Folgenliste lädt nicht), bleibt es beim alten Weg in die Folgenansicht.
+            onAbspielen = {
+                scope.launch {
+                    val start = vm.g4kStartFolge(s)
+                    detailsSeries = null
+                    if (start == null) vm.openSeries(s)
+                    else {
+                        vm.playEpisodeQueue(s, start.staffel, start.folge, start.startMs)
+                        if (!g4kExternerPlayer) onFullscreen()
+                    }
+                }
+            },
             onFavorit = { vm.toggleFavorite(s) },
             onFolgen = { detailsSeries = null; vm.openSeries(s) },
             onPerson = { d -> person = d.id to d.name },
@@ -2316,3 +2370,7 @@ private fun SortingRow(
 
 /** German4K 3.0/32 (I2): Spalten des Serienrasters am Fernseher. */
 private const val TV_SERIEN_SPALTEN = 6
+
+// German4K 3.2 (N2): Schlüssel des Top-10/Angesagt-Kopfs im Raster und Quelle fürs Mess-Ereignis.
+private const val G4K_KOPF_SCHLUESSEL = "g4k-angesagt-kopf"
+private const val G4K_QUELLE_SERIEN = "serien"

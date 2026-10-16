@@ -170,6 +170,8 @@ fun CustomizeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 if (entered == pinLock.pin || Pin.verify(entered, pinLock.pin)) {
                     unlocked = true
                     pinError = false
+                    // German4K 3.2 (F1): auch diese PIN gilt als PIN-Eingabe für die Suche.
+                    tv.own.owntv.core.content.German4kErwachsenSitzung.pinEingegeben()
                 } else {
                     pinError = true
                 }
