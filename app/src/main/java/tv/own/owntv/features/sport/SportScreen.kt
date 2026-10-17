@@ -37,6 +37,9 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -93,6 +96,43 @@ internal class SportErinnern(
     fun erinnert(spiel: German4kSpiel): Boolean =
         aktiv && tv.own.owntv.core.german4k.German4kErinnern.spielSchluessel(spiel.id) in schluessel
 }
+
+/**
+ * German4K 3.2 (Fehler Konferenz-Fokus): Reiter ↓ Konferenz-Karte ↓ Spiele, und von den Spielen ↑ wieder
+ * auf die Karte. Die freie 2D-Fokussuche hat die Karte übersprungen (Reiter ↓ landete auf dem ersten Spiel,
+ * ↑ aus den Spielen direkt auf den Reitern). Deshalb laufen diese drei Sprünge ausdrücklich über
+ * FocusRequester; vorher scrollt die Liste nach oben, damit die Karte sicher komponiert ist.
+ */
+internal class SportFokusWeg {
+    val liste = androidx.compose.foundation.lazy.LazyListState()
+    val konferenz = FocusRequester()
+    val spiel = FocusRequester()
+    @Volatile var hatKonferenz = false
+    @Volatile var hatSpiele = false
+
+    fun zurKonferenz(scope: kotlinx.coroutines.CoroutineScope): Boolean {
+        if (!hatKonferenz) return false
+        scope.launch {
+            liste.scrollToItem(0)
+            androidx.compose.runtime.withFrameNanos { }
+            runCatching { konferenz.requestFocus() }
+        }
+        return true
+    }
+
+    fun zuDenSpielen(): Boolean = hatSpiele && runCatching { spiel.requestFocus() }.isSuccess
+}
+
+/** Hoch/Runter (KeyDown) abfangen, sonst durchlassen. */
+internal fun Modifier.g4kSprung(hoch: (() -> Boolean)? = null, runter: (() -> Boolean)? = null): Modifier =
+    if (hoch == null && runter == null) this else onPreviewKeyEvent { e ->
+        if (e.type != androidx.compose.ui.input.key.KeyEventType.KeyDown) return@onPreviewKeyEvent false
+        when (e.key) {
+            androidx.compose.ui.input.key.Key.DirectionUp -> hoch?.invoke() ?: false
+            androidx.compose.ui.input.key.Key.DirectionDown -> runter?.invoke() ?: false
+            else -> false
+        }
+    }
 
 internal val LocalSportErinnern = androidx.compose.runtime.staticCompositionLocalOf { SportErinnern(emptySet()) {} }
 
@@ -201,6 +241,7 @@ fun SportScreen(
     }?.let { if (offline) stringResource(R.string.g4k_sport_offline, it) else stringResource(R.string.g4k_sport_stand, it) }
 
     val ersterFokus = remember { FocusRequester() }
+    val fokusWeg = remember { SportFokusWeg() }
     LaunchedEffect(regale.leer) {
         if (!regale.leer && !formfaktor.mobil) fokusMitWiederholung(ersterFokus)
     }
@@ -217,7 +258,12 @@ fun SportScreen(
                 standText?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant) }
             }
             Spacer(Modifier.height(10.dp))
-            ChipZeile(tabs = tabs, chip = tabs.firstOrNull { it.id == chip }?.id ?: tv.own.owntv.core.german4k.SportTab.ALLE_ID, onChip = { vm.chip.value = it }, onFocused = onChildFocused)
+            ChipZeile(
+                tabs = tabs, chip = tabs.firstOrNull { it.id == chip }?.id ?: tv.own.owntv.core.german4k.SportTab.ALLE_ID,
+                onChip = { vm.chip.value = it }, onFocused = onChildFocused,
+                // German4K 3.2: ↓ von den Reitern auf die Konferenz-Karte (nur Fernseher).
+                onRunter = { !formfaktor.mobil && fokusWeg.zurKonferenz(scope) },
+            )
             // German4K 3.2 (N7): wie man sich an ein Spiel erinnern lässt — auf dem Fernseher gibt es keinen
             // zweiten Knopf auf der Karte, also lange OK.
             if (!formfaktor.mobil && sportErinnern.aktiv) {
@@ -232,7 +278,7 @@ fun SportScreen(
                 regale.leer -> Hinweis(stringResource(R.string.g4k_sport_leer))
                 // German4K 3.0/32: Handy in Abschnitten mit Tagesköpfen statt einer flachen Liste.
                 formfaktor.mobil -> MobilListe(regale, onKlick = klick)
-                else -> TvRegale(regale = regale, ersterFokus = ersterFokus, onKlick = klick, onFocused = onChildFocused)
+                else -> TvRegale(regale = regale, ersterFokus = ersterFokus, onKlick = klick, onFocused = onChildFocused, fokusWeg = fokusWeg)
             }
         }
     }
@@ -274,10 +320,10 @@ private fun Hinweis(text: String) {
 }
 
 @Composable
-private fun ChipZeile(tabs: List<tv.own.owntv.core.german4k.SportTab>, chip: String, onChip: (String) -> Unit, onFocused: () -> Unit) {
+private fun ChipZeile(tabs: List<tv.own.owntv.core.german4k.SportTab>, chip: String, onChip: (String) -> Unit, onFocused: () -> Unit, onRunter: () -> Boolean = { false }) {
     val colors = OwnTVTheme.colors
     Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).focusGroup(),
+        Modifier.fillMaxWidth().g4kSprung(runter = onRunter).horizontalScroll(rememberScrollState()).focusGroup(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         // German4K 3.2: Reiter vom Server (Titel fertig), sonst die festen Chips mit App-Text.
@@ -327,6 +373,7 @@ private fun TvRegale(
     ersterFokus: FocusRequester,
     onKlick: (German4kSpiel) -> Unit,
     onFocused: () -> Unit,
+    fokusWeg: SportFokusWeg = remember { SportFokusWeg() },
 ) {
     // German4K 3.0/32 (S2): „Morgen & später" ist offen, wenn heute höchstens acht Spiele laufen.
     var spaeterOffen by rememberSaveable { mutableStateOf(spaeterStandardOffen(regale.heute.size)) }
@@ -340,8 +387,20 @@ private fun TvRegale(
         else -> 2
     }
     val tage = remember(regale.spaeter) { nachTagen(regale.spaeter) }
+    // German4K 3.2: erstes Spiele-Regal unter der Konferenz — dorthin ↓ von der Karte, von dort ↑ zurück.
+    val ersteSpiele = when {
+        liveRegal.isNotEmpty() -> 0
+        regale.heute.isNotEmpty() -> 1
+        regale.spaeter.isNotEmpty() -> 2
+        else -> 3
+    }
+    val fokusScope = rememberCoroutineScope()
+    fokusWeg.hatKonferenz = regale.konferenzen.isNotEmpty()
+    fokusWeg.hatSpiele = ersteSpiele < 3
+    val hochZurKonferenz: (() -> Boolean)? = if (regale.konferenzen.isNotEmpty()) ({ fokusWeg.zurKonferenz(fokusScope) }) else null
     LazyColumn(
         Modifier.fillMaxSize(),
+        state = fokusWeg.liste,
         verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(bottom = 24.dp),
     ) {
@@ -349,11 +408,19 @@ private fun TvRegale(
         regale.konferenzen.forEachIndexed { i, k ->
             item(key = "konferenz-${k.id}") {
                 val erinnern = LocalSportErinnern.current
-                Row(Modifier.fillMaxWidth().focusGroup(), verticalAlignment = Alignment.CenterVertically) {
+                val letzte = i == regale.konferenzen.lastIndex
+                Row(
+                    Modifier.fillMaxWidth()
+                        // ↓ von der (letzten) Konferenz-Zeile auf das erste Spiel, Karte wie Erinnern-Knopf.
+                        .g4kSprung(runter = if (letzte) ({ fokusWeg.zuDenSpielen() }) else null)
+                        .focusGroup(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     KonferenzKarte(
                         spiel = k,
                         onClick = { onFocused(); onKlick(k) },
                         modifier = Modifier.weight(1f).height(TV_KONFERENZ_HOEHE)
+                            .then(if (i == 0) Modifier.focusRequester(fokusWeg.konferenz) else Modifier)
                             .then(if (i == 0 && erstesRegal == -1) Modifier.focusRequester(ersterFokus) else Modifier),
                     )
                     // German4K 3.2 (N7): eigener Knopf neben der Karte — rechts vom Fokus erreichbar.
@@ -371,12 +438,18 @@ private fun TvRegale(
         }
         // „Jetzt live" bleibt vorn und bleibt eine Reihe.
         if (liveRegal.isNotEmpty()) item(key = "live") {
-            Regal(stringResource(R.string.g4k_sport_regal_live), liveRegal, if (erstesRegal == 0) ersterFokus else null, onKlick, onFocused)
+            Regal(
+                stringResource(R.string.g4k_sport_regal_live), liveRegal, if (erstesRegal == 0) ersterFokus else null, onKlick, onFocused,
+                sprungFokus = fokusWeg.spiel.takeIf { ersteSpiele == 0 }, hoch = hochZurKonferenz.takeIf { ersteSpiele == 0 },
+            )
         }
         // German4K 3.0/32 (S2): „Heute" als Raster mit vier Karten je Zeile.
         if (regale.heute.isNotEmpty()) {
             item(key = "heute") { AbschnittTitel(stringResource(R.string.g4k_sport_regal_heute)) }
-            rasterZeilen(regale.heute, if (erstesRegal == 1) ersterFokus else null, onKlick, onFocused)
+            rasterZeilen(
+                regale.heute, if (erstesRegal == 1) ersterFokus else null, onKlick, onFocused,
+                sprungFokus = fokusWeg.spiel.takeIf { ersteSpiele == 1 }, hoch = hochZurKonferenz.takeIf { ersteSpiele == 1 },
+            )
         }
         if (regale.spaeter.isNotEmpty()) {
             item(key = "spaeter") {
@@ -385,7 +458,8 @@ private fun TvRegale(
                     onClick = { spaeterOffen = !spaeterOffen },
                     shape = RoundedCornerShape(12.dp),
                     contentAlignment = Alignment.CenterStart,
-                    modifier = if (erstesRegal == 2) Modifier.focusRequester(ersterFokus) else Modifier,
+                    modifier = (if (erstesRegal == 2) Modifier.focusRequester(ersterFokus) else Modifier)
+                        .then(if (ersteSpiele == 2) Modifier.focusRequester(fokusWeg.spiel).g4kSprung(hoch = hochZurKonferenz) else Modifier),
                 ) { _ ->
                     Text(
                         (if (offen) "▾ " else "▸ ") + stringResource(R.string.g4k_sport_regal_spaeter) + " · " + regale.spaeter.size,
@@ -410,6 +484,8 @@ private fun LazyListScope.rasterZeilen(
     fokus: FocusRequester?,
     onKlick: (German4kSpiel) -> Unit,
     onFocused: () -> Unit,
+    sprungFokus: FocusRequester? = null,
+    hoch: (() -> Boolean)? = null,
 ) {
     val zeilen = spiele.chunked(TV_SPALTEN)
     zeilen.forEachIndexed { zi, zeile ->
@@ -420,12 +496,15 @@ private fun LazyListScope.rasterZeilen(
             ) {
                 zeile.forEachIndexed { si, s ->
                     val f = fokus?.takeIf { zi == 0 && si == 0 }
+                    val sf = sprungFokus?.takeIf { zi == 0 && si == 0 }
                     SpielKarte(
                         spiel = s,
                         onClick = { onFocused(); onKlick(s) },
                         modifier = Modifier
                             .weight(1f)
                             .height(TV_KARTE_HOEHE)
+                            .then(if (zi == 0) Modifier.g4kSprung(hoch = hoch) else Modifier)
+                            .then(if (sf != null) Modifier.focusRequester(sf) else Modifier)
                             .then(if (f != null) Modifier.focusRequester(f) else Modifier),
                     )
                 }
@@ -451,15 +530,21 @@ private fun TagTitel(tag: LocalDate) {
 }
 
 @Composable
-private fun Regal(titel: String, spiele: List<German4kSpiel>, fokus: FocusRequester?, onKlick: (German4kSpiel) -> Unit, onFocused: () -> Unit) {
+private fun Regal(
+    titel: String, spiele: List<German4kSpiel>, fokus: FocusRequester?, onKlick: (German4kSpiel) -> Unit, onFocused: () -> Unit,
+    sprungFokus: FocusRequester? = null, hoch: (() -> Boolean)? = null,
+) {
     Column {
         Text(titel, style = MaterialTheme.typography.titleMedium, color = OwnTVTheme.colors.onSurface, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
-        KartenReihe(spiele, fokus, onKlick, onFocused)
+        KartenReihe(spiele, fokus, onKlick, onFocused, sprungFokus, hoch)
     }
 }
 
 @Composable
-private fun KartenReihe(spiele: List<German4kSpiel>, fokus: FocusRequester?, onKlick: (German4kSpiel) -> Unit, onFocused: () -> Unit) {
+private fun KartenReihe(
+    spiele: List<German4kSpiel>, fokus: FocusRequester?, onKlick: (German4kSpiel) -> Unit, onFocused: () -> Unit,
+    sprungFokus: FocusRequester? = null, hoch: (() -> Boolean)? = null,
+) {
     LazyRow(
         Modifier.fillMaxWidth().focusGroup(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -467,12 +552,15 @@ private fun KartenReihe(spiele: List<German4kSpiel>, fokus: FocusRequester?, onK
     ) {
         items(spiele, key = { it.id }) { s ->
             val f = fokus?.takeIf { s.id == spiele.first().id }
+            val sf = sprungFokus?.takeIf { s.id == spiele.first().id }
             SpielKarte(
                 spiel = s,
                 onClick = { onFocused(); onKlick(s) },
                 modifier = Modifier
                     .width(280.dp)
                     .height(TV_KARTE_HOEHE)
+                    .g4kSprung(hoch = hoch)
+                    .then(if (sf != null) Modifier.focusRequester(sf) else Modifier)
                     .then(if (f != null) Modifier.focusRequester(f) else Modifier),
             )
         }
