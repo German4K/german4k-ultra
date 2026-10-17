@@ -89,21 +89,7 @@ fun PosterCard(
                 // German4K: IMDb-Note oben rechts, mit dem gelben IMDb-Schild (Kundenwunsch 21.09.2026,
                 // „wie in UHF"). Unser Server liefert in der Liste nur IMDb-Noten (streams.note), das
                 // Schild lügt also nicht. Der Favoriten-Stern ist dafür nach oben links gewandert.
-                if (rating != null && rating > 0) {
-                    Row(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(6.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color.Black.copy(alpha = 0.72f))
-                            .padding(start = 3.dp, end = 6.dp, top = 3.dp, bottom = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        ImdbZeichen(hoehe = 14.dp)
-                        Spacer(Modifier.size(4.dp))
-                        Text(german4kNote(rating), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.White)
-                    }
-                }
+                German4kImdbSchild(rating, Modifier.align(Alignment.TopEnd))
 
                 // Watched: dim the art and stamp a teal ✓ badge (bottom-end). No progress bar is drawn
                 // for a completed item (the caller passes progressFraction = null in that case).
@@ -198,4 +184,25 @@ private fun PlakatPlakette(text: String) {
             .background(Color.Black.copy(alpha = 0.72f))
             .padding(horizontal = 5.dp, vertical = 2.dp),
     )
+}
+
+/**
+ * German4K: das IMDb-Schild oben rechts auf einem Poster (gelbes Zeichen + Note). Eine Komponente für alle
+ * Reihen (PosterCard, seit 3.2 auch Angesagt/Top 10), damit es überall gleich aussieht. Ohne Note: nichts.
+ */
+@Composable
+fun German4kImdbSchild(rating: Double?, modifier: Modifier = Modifier) {
+    if (rating == null || rating <= 0) return
+    Row(
+        modifier = modifier
+            .padding(6.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(Color.Black.copy(alpha = 0.72f))
+            .padding(start = 3.dp, end = 6.dp, top = 3.dp, bottom = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ImdbZeichen(hoehe = 14.dp)
+        Spacer(Modifier.size(4.dp))
+        Text(german4kNote(rating), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.White)
+    }
 }

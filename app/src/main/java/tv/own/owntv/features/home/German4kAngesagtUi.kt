@@ -423,6 +423,8 @@ private fun AngesagtPoster(
                     modifier = Modifier.align(Alignment.Center).padding(8.dp),
                 )
             }
+            // German4K 3.2: IMDb-Note oben rechts wie in jeder anderen Reihe (Note aus dem lokalen Katalog).
+            tv.own.owntv.ui.components.German4kImdbSchild(k.note, Modifier.align(Alignment.TopEnd))
             k.badge?.let { b ->
                 Text(
                     stringResource(
