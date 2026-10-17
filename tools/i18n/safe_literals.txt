@@ -653,7 +653,6 @@
 1	technical	app/src/main/java/tv/own/owntv/features/shell/components/TopBar.kt	thunder
 1	technical	app/src/main/java/tv/own/owntv/features/shell/components/TopBar.kt	topBarHeight
 3	empty	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	\0
-1	technical	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	${it.heim} – ${it.gast}
 1	technical	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	EEE HH:mm
 1	technical	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	EEE, dd.MM.
 1	technical	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	HH:mm
@@ -662,7 +661,7 @@
 1	technical	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	konferenz-${k.id}
 1	technical	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	live
 1	technical	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	spaeter
-4	technical	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	·
+3	technical	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	·
 2	technical	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	⏰
 1	technical	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	▸
 1	technical	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	▾
@@ -671,6 +670,7 @@
 1	technical	app/src/main/java/tv/own/owntv/features/sport/SportSpielScreen.kt	▾
 1	technical	app/src/main/java/tv/own/owntv/features/sport/SportViewModel.kt	${spiel.id}:${spiel.titel}
 1	json	app/src/main/java/tv/own/owntv/features/sport/SportViewModel.kt	konferenz_klick
+2	technical	app/src/main/java/tv/own/owntv/features/sport/SportWappen.kt	–
 1	json	app/src/main/java/tv/own/owntv/features/subtitles/SubtitleSearchViewModel.kt	ai_translated
 1	json	app/src/main/java/tv/own/owntv/features/subtitles/SubtitleSearchViewModel.kt	attributes
 1	json	app/src/main/java/tv/own/owntv/features/subtitles/SubtitleSearchViewModel.kt	data

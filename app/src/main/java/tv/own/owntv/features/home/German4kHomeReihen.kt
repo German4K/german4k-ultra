@@ -95,6 +95,8 @@ internal fun German4kFussballReihe(
                 SpielKarte(
                     spiel = s,
                     onClick = { onKlick(s) },
+                    // German4K 3.2 (C5): kleine Wappen — die Kachel behält ihre Höhe in der Startseiten-Reihe.
+                    wappen = tv.own.owntv.features.sport.KartenWappen.KLEIN,
                     modifier = Modifier
                         .width(if (mobil) 250.dp else 280.dp)
                         .height(if (mobil) 128.dp else 140.dp)

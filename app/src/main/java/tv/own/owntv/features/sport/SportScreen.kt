@@ -303,6 +303,12 @@ private fun chipLabel(c: SportChip): Int = when (c) {
 // German4K 3.0/32 (S2): Karten je Rasterzeile auf dem Fernseher.
 private const val TV_SPALTEN = 4
 
+// German4K 3.2 (C5): mit großen Wappen werden die Karten höher (vorher TV 140 dp, Handy 120 dp).
+private val TV_KARTE_HOEHE = 204.dp
+private val MOBIL_KARTE_HOEHE = 180.dp
+private val TV_KONFERENZ_HOEHE = 156.dp
+private val MOBIL_KONFERENZ_HOEHE = 150.dp
+
 /** Datum im Tageskopf, z. B. „Do., 01.10." — Wochentag in der Sprache der App. */
 private const val TAG_MUSTER = "EEE, dd.MM."
 
@@ -338,7 +344,7 @@ private fun TvRegale(
                     KonferenzKarte(
                         spiel = k,
                         onClick = { onFocused(); onKlick(k) },
-                        modifier = Modifier.weight(1f).height(150.dp)
+                        modifier = Modifier.weight(1f).height(TV_KONFERENZ_HOEHE)
                             .then(if (i == 0 && erstesRegal == -1) Modifier.focusRequester(ersterFokus) else Modifier),
                     )
                     // German4K 3.2 (N7): eigener Knopf neben der Karte — rechts vom Fokus erreichbar.
@@ -410,7 +416,7 @@ private fun LazyListScope.rasterZeilen(
                         onClick = { onFocused(); onKlick(s) },
                         modifier = Modifier
                             .weight(1f)
-                            .height(140.dp)
+                            .height(TV_KARTE_HOEHE)
                             .then(if (f != null) Modifier.focusRequester(f) else Modifier),
                     )
                 }
@@ -457,7 +463,7 @@ private fun KartenReihe(spiele: List<German4kSpiel>, fokus: FocusRequester?, onK
                 onClick = { onFocused(); onKlick(s) },
                 modifier = Modifier
                     .width(280.dp)
-                    .height(140.dp)
+                    .height(TV_KARTE_HOEHE)
                     .then(if (f != null) Modifier.focusRequester(f) else Modifier),
             )
         }
@@ -473,14 +479,14 @@ private fun MobilListe(regale: SportRegale, onKlick: (German4kSpiel) -> Unit) {
             if (spiele.isEmpty()) return
             item { kopf() }
             items(spiele, key = { it.id }) { s ->
-                SpielKarte(spiel = s, onClick = { onKlick(s) }, modifier = Modifier.fillMaxWidth().height(120.dp))
+                SpielKarte(spiel = s, onClick = { onKlick(s) }, modifier = Modifier.fillMaxWidth().height(MOBIL_KARTE_HOEHE))
             }
         }
         // German4K 3.2 (N4): Konferenzen zuerst.
         items(regale.konferenzen, key = { "konferenz-${it.id}" }) { k ->
             val erinnern = LocalSportErinnern.current
             Column {
-                KonferenzKarte(spiel = k, onClick = { onKlick(k) }, modifier = Modifier.fillMaxWidth().height(140.dp))
+                KonferenzKarte(spiel = k, onClick = { onKlick(k) }, modifier = Modifier.fillMaxWidth().height(MOBIL_KONFERENZ_HOEHE))
                 if (!k.laeuft) {
                     Spacer(Modifier.height(6.dp))
                     tv.own.owntv.ui.components.OwnTVButton(
@@ -500,10 +506,24 @@ private fun MobilListe(regale: SportRegale, onKlick: (German4kSpiel) -> Unit) {
     }
 }
 
+/** German4K 3.2 (C5): wie groß die Wappen auf einer [SpielKarte] stehen. */
+internal enum class KartenWappen {
+    /** Sport-Hub: Wappen über dem Namen, wie im Entwurf. */
+    GROSS,
+    /** Startseite „Jetzt im Fußball“: zwei Zeilen „Wappen Name“, Kachel bleibt so hoch wie bisher. */
+    KLEIN,
+}
+
 /** Eine Spielkarte: Wettbewerb, Paarung, Anstoß oder LIVE mit Minute, Sprache + Marke des ersten Senders. */
 @Composable
-internal fun SpielKarte(spiel: German4kSpiel, onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun SpielKarte(
+    spiel: German4kSpiel,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    wappen: KartenWappen = KartenWappen.GROSS,
+) {
     val colors = OwnTVTheme.colors
+    val mobil = LocalFormfaktor.current.mobil
     val erinnern = LocalSportErinnern.current
     FocusableSurface(
         onClick = onClick,
@@ -551,14 +571,31 @@ internal fun SpielKarte(spiel: German4kSpiel, onClick: () -> Unit, modifier: Mod
                     )
                 }
             }
-            Spacer(Modifier.height(6.dp))
-            Text(
-                spiel.titel,
-                style = MaterialTheme.typography.titleMedium,
-                color = colors.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            // German4K 3.2 (C5): Vereinswappen statt der reinen Textpaarung; ohne Heim/Gast wie bisher der Titel.
+            when {
+                !spiel.hatPaarung() -> {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        spiel.titel,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = colors.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                wappen == KartenWappen.GROSS -> {
+                    Spacer(Modifier.height(8.dp))
+                    PaarungMitWappen(
+                        spiel = spiel,
+                        wappen = if (mobil) WAPPEN_MOBIL else WAPPEN_TV,
+                        namenStil = if (mobil) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleSmall,
+                    )
+                }
+                else -> {
+                    Spacer(Modifier.height(8.dp))
+                    PaarungKompakt(spiel, wappen = if (mobil) WAPPEN_KLEIN_MOBIL else WAPPEN_KLEIN_TV)
+                }
+            }
             Spacer(Modifier.weight(1f))
             Text(
                 fusszeileText(spiel),
@@ -570,6 +607,13 @@ internal fun SpielKarte(spiel: German4kSpiel, onClick: () -> Unit, modifier: Mod
         }
     }
 }
+
+// German4K 3.2 (C5): Wappengrößen — Hub-Karte groß, Startseite und Konferenz klein.
+private val WAPPEN_TV = 76.dp
+private val WAPPEN_MOBIL = 56.dp
+private val WAPPEN_KLEIN_TV = 26.dp
+private val WAPPEN_KLEIN_MOBIL = 24.dp
+private val WAPPEN_KONFERENZ = 26.dp
 
 /** German4K 3.0/32 (R2): LIVE-Chip mit grober Spielminute, zählt alle 30 s weiter. */
 @Composable
@@ -663,12 +707,9 @@ internal fun KonferenzKarte(spiel: German4kSpiel, onClick: () -> Unit, modifier:
                 }
             }
             if (spiel.paarungen.isNotEmpty()) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    spiel.paarungen.joinToString("  ·  ") { "${it.heim} – ${it.gast}" },
-                    style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis,
-                )
+                Spacer(Modifier.height(8.dp))
+                // German4K 3.2 (C5): kleine Wappen vor jedem Verein statt einer Textzeile „A – B · C – D“.
+                KonferenzPaarungen(spiel.paarungen, wappen = WAPPEN_KONFERENZ, zeilen = 2)
             }
             Spacer(Modifier.weight(1f))
             val fuss = fusszeileText(spiel)

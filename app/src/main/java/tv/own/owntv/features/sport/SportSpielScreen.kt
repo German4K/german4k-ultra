@@ -55,6 +55,10 @@ import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.fokusMitWiederholung
 import tv.own.owntv.ui.theme.OwnTVTheme
 
+// German4K 3.2 (C5): Wappen im Kopf der Spielseite.
+private val SPIELSEITE_WAPPEN_TV = 92.dp
+private val SPIELSEITE_WAPPEN_MOBIL = 64.dp
+
 /** Eine Zeile der Spielseite — was sie zeigt und was ein Klick tut. */
 private sealed interface SpielZeile {
     data class Sender(val sender: German4kSportSender) : SpielZeile
@@ -166,8 +170,16 @@ internal fun SportSpielScreen(
 
     val liste: @Composable (Modifier) -> Unit = { m ->
         Column(m) {
-            // German4K 3.0/32 (U2): auf dem Handy steht die Paarung schon in der Kopfzeile.
-            if (!formfaktor.mobil) {
+            // German4K 3.2 (C5): große Wappen im Kopf (Fernseher und Handy); ohne Heim/Gast wie bisher der Titel.
+            if (spiel.hatPaarung()) {
+                PaarungMitWappen(
+                    spiel = spiel,
+                    wappen = if (formfaktor.mobil) SPIELSEITE_WAPPEN_MOBIL else SPIELSEITE_WAPPEN_TV,
+                    namenStil = if (formfaktor.mobil) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleLarge,
+                )
+                Spacer(Modifier.height(10.dp))
+            } else if (!formfaktor.mobil) {
+                // German4K 3.0/32 (U2): auf dem Handy steht die Paarung schon in der Kopfzeile.
                 Text(spiel.titel, style = MaterialTheme.typography.headlineSmall, color = colors.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(4.dp))
             }
