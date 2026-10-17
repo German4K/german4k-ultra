@@ -425,46 +425,55 @@ private fun AngesagtPoster(
             }
             // German4K 3.2: IMDb-Note oben rechts wie in jeder anderen Reihe (Note aus dem lokalen Katalog).
             tv.own.owntv.ui.components.German4kImdbSchild(k.note, Modifier.align(Alignment.TopEnd))
-            k.badge?.let { b ->
-                Text(
-                    stringResource(
-                        when (b) {
-                            AngesagtBadge.NEUE_FOLGE -> R.string.g4k_badge_neue_folge
-                            AngesagtBadge.NEU -> R.string.g4k_badge_neu
-                            AngesagtBadge.VIERK -> R.string.g4k_badge_4k
-                        },
-                    ),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 1,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(6.dp)
-                        .clip(RoundedCornerShape(5.dp))
-                        .background(colors.primary)
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                )
-            }
-            if (mitKennung) {
+            // German4K 3.2: oben rechts nur IMDb; NEU / NEUE FOLGE / 4K unten rechts in der Zeile von
+            // „● FILM / ● SERIE" — auf dem schmalen Poster verdeckte das breite Schild oben links sonst die Note.
+            // FILM/SERIE behält immer seinen Platz, das Schild bekommt den Rest und kürzt notfalls mit „…".
+            val badge = k.badge
+            if (mitKennung || badge != null) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .fillMaxWidth()
                         .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))))
-                        .padding(start = 8.dp, end = 8.dp, top = 18.dp, bottom = 6.dp),
+                        .padding(start = 8.dp, end = 6.dp, top = 18.dp, bottom = 6.dp),
                 ) {
-                    val farbe = if (k.serie) G4kHellblau else G4kLila
-                    Box(Modifier.size(6.dp).clip(CircleShape).background(farbe))
-                    Spacer(Modifier.width(5.dp))
-                    Text(
-                        stringResource(if (k.serie) R.string.g4k_kennung_serie else R.string.g4k_kennung_film),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White.copy(alpha = 0.92f),
-                        maxLines = 1,
-                    )
+                    if (mitKennung) {
+                        val farbe = if (k.serie) G4kHellblau else G4kLila
+                        Box(Modifier.size(6.dp).clip(CircleShape).background(farbe))
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            stringResource(if (k.serie) R.string.g4k_kennung_serie else R.string.g4k_kennung_film),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White.copy(alpha = 0.92f),
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                        if (badge != null) {
+                            Text(
+                                stringResource(
+                                    when (badge) {
+                                        AngesagtBadge.NEUE_FOLGE -> R.string.g4k_badge_neue_folge
+                                        AngesagtBadge.NEU -> R.string.g4k_badge_neu
+                                        AngesagtBadge.VIERK -> R.string.g4k_badge_4k
+                                    },
+                                ),
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(colors.primary)
+                                    .padding(horizontal = 4.dp, vertical = 1.dp),
+                            )
+                        }
+                    }
                 }
             }
         }
