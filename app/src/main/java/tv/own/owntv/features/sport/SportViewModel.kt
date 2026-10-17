@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import tv.own.owntv.core.database.dao.CategoryDao
@@ -65,10 +66,19 @@ class SportViewModel(
 
     val antwort: StateFlow<German4kSportAntwort?> = repo.antwort
     val offline: StateFlow<Boolean> = repo.offline
-    val chip = MutableStateFlow(SportChip.ALLE)
+    /** German4K 3.2: gewählter Reiter (id). Verschwindet er aus der Antwort, gilt wieder „Alle“. */
+    val chip = MutableStateFlow(tv.own.owntv.core.german4k.SportTab.ALLE_ID)
+
+    /** German4K 3.2: Server-Reiter, sonst die festen Chips (alter Server). */
+    val tabs: StateFlow<List<tv.own.owntv.core.german4k.SportTab>> = repo.antwort
+        .map { tv.own.owntv.core.german4k.sportTabs(it?.reiter) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.german4k.sportTabs(null))
 
     val regale: StateFlow<SportRegale> = combine(repo.antwort, chip) { a, c ->
-        if (a == null || !a.ok) SportRegale() else regale(chipFilter(a.spiele, c), LocalDate.now(SPORT_ZONE), SPORT_ZONE)
+        if (a == null || !a.ok) SportRegale() else {
+            val tab = tv.own.owntv.core.german4k.sportTabs(a.reiter).firstOrNull { it.id == c } ?: tv.own.owntv.core.german4k.SportTab.ALLE
+            regale(tv.own.owntv.core.german4k.tabFilter(a.spiele, tab), LocalDate.now(SPORT_ZONE), SPORT_ZONE)
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SportRegale())
 
     private val offenId = MutableStateFlow<Long?>(null)

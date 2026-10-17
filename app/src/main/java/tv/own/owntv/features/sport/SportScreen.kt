@@ -128,6 +128,7 @@ fun SportScreen(
     val antwort by vm.antwort.collectAsStateWithLifecycle()
     val offline by vm.offline.collectAsStateWithLifecycle()
     val chip by vm.chip.collectAsStateWithLifecycle()
+    val tabs by vm.tabs.collectAsStateWithLifecycle()
     val regale by vm.regale.collectAsStateWithLifecycle()
     val offenesSpiel by vm.offenesSpiel.collectAsStateWithLifecycle()
     // German4K 3.2 (N7): gemerkte Spiele + Rückmeldung als kleiner Hinweis unten.
@@ -216,7 +217,7 @@ fun SportScreen(
                 standText?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant) }
             }
             Spacer(Modifier.height(10.dp))
-            ChipZeile(chip = chip, onChip = { vm.chip.value = it }, onFocused = onChildFocused)
+            ChipZeile(tabs = tabs, chip = tabs.firstOrNull { it.id == chip }?.id ?: tv.own.owntv.core.german4k.SportTab.ALLE_ID, onChip = { vm.chip.value = it }, onFocused = onChildFocused)
             // German4K 3.2 (N7): wie man sich an ein Spiel erinnern lässt — auf dem Fernseher gibt es keinen
             // zweiten Knopf auf der Karte, also lange OK.
             if (!formfaktor.mobil && sportErinnern.aktiv) {
@@ -273,21 +274,22 @@ private fun Hinweis(text: String) {
 }
 
 @Composable
-private fun ChipZeile(chip: SportChip, onChip: (SportChip) -> Unit, onFocused: () -> Unit) {
+private fun ChipZeile(tabs: List<tv.own.owntv.core.german4k.SportTab>, chip: String, onChip: (String) -> Unit, onFocused: () -> Unit) {
     val colors = OwnTVTheme.colors
     Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).focusGroup(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        SportChip.entries.forEach { c ->
-            val aktiv = c == chip
+        // German4K 3.2: Reiter vom Server (Titel fertig), sonst die festen Chips mit App-Text.
+        tabs.forEach { t ->
+            val aktiv = t.id == chip
             FocusableSurface(
-                onClick = { onChip(c); onFocused() },
+                onClick = { onChip(t.id); onFocused() },
                 selected = aktiv,
                 shape = RoundedCornerShape(50),
             ) { _ ->
                 Text(
-                    stringResource(chipLabel(c)),
+                    t.titel ?: stringResource(chipLabel(t.chip ?: SportChip.ALLE)),
                     style = MaterialTheme.typography.labelLarge,
                     color = if (aktiv) colors.primary else colors.onSurfaceVariant,
                     fontWeight = if (aktiv) FontWeight.SemiBold else FontWeight.Normal,
