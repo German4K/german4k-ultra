@@ -58,6 +58,9 @@ import tv.own.owntv.ui.theme.OwnTVTheme
 // German4K 3.2 (C5): Wappen im Kopf der Spielseite.
 private val SPIELSEITE_WAPPEN_TV = 92.dp
 private val SPIELSEITE_WAPPEN_MOBIL = 64.dp
+// German4K 3.2 (C6): Wettbewerbslogo neben „Bundesliga · Sa., 17.10., 15:30“ — dezent, etwa Zeilenhöhe.
+private val SPIELSEITE_WETTBEWERB_LOGO_TV = 22.dp
+private val SPIELSEITE_WETTBEWERB_LOGO_MOBIL = 18.dp
 
 /** Eine Zeile der Spielseite — was sie zeigt und was ein Klick tut. */
 private sealed interface SpielZeile {
@@ -188,6 +191,10 @@ internal fun SportSpielScreen(
                 if (spiel.laeuft) {
                     Text(stringResource(R.string.g4k_sport_live), style = MaterialTheme.typography.labelMedium, color = SportLiveRot, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.width(8.dp))
+                }
+                // German4K 3.2 (C6): Wettbewerbslogo neben dem Wettbewerbsnamen; ohne Logo nichts.
+                if (spiel.wettbewerb != null) {
+                    WettbewerbsLogo(spiel.wettbewerbLogo, if (formfaktor.mobil) SPIELSEITE_WETTBEWERB_LOGO_MOBIL else SPIELSEITE_WETTBEWERB_LOGO_TV)
                 }
                 Text(unter, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }

@@ -91,6 +91,33 @@ internal fun VereinsWappen(url: String?, name: String, groesse: Dp, modifier: Mo
     }
 }
 
+/**
+ * German4K 3.2 (C6): kleines Wettbewerbslogo (Bundesliga, Champions League …) vor dem Wettbewerbsnamen.
+ *
+ * Bewusst KEIN Platzhalter: ohne URL kommt gar nichts in die Komposition — die Karte sieht dann aus wie in
+ * 3.1, nichts wird reserviert. Mit URL steht sofort ein Kasten in fester Größe [groesse] (auch während des
+ * Ladens), damit der Name daneben beim Nachladen nicht seitwärts springt.
+ * Gleicher App-weiter Coil-Loader wie [VereinsWappen]; nie fokussierbar (reines Bild, kein Klickziel).
+ * [abstand] folgt nur, wenn ein Logo da ist — so entsteht ohne Logo auch kein Leerraum.
+ */
+@Composable
+internal fun WettbewerbsLogo(url: String?, groesse: Dp, abstand: Dp = 6.dp) {
+    // Ladefehler (Datei fehlt auf dem CDN): Platz wieder freigeben statt dauerhaft ein Loch vor dem Namen
+    // zu lassen — ein einmaliges Nachrücken nur im Fehlerfall, der Normalfall springt nie.
+    var fehler by remember(url) { mutableStateOf(false) }
+    if (url == null || fehler) return
+    val ctx = LocalPlatformContext.current
+    val request = remember(url, ctx) { ImageRequest.Builder(ctx).data(url).build() }
+    AsyncImage(
+        model = request,
+        contentDescription = null,
+        contentScale = ContentScale.Fit,
+        modifier = Modifier.size(groesse),
+        onState = { s -> if (s is AsyncImagePainter.State.Error) fehler = true },
+    )
+    Spacer(Modifier.width(abstand))
+}
+
 @Composable
 private fun WappenPlatzhalter(name: String, groesse: Dp, mitText: Boolean) {
     val initialen = remember(name) { vereinsInitialen(name) }

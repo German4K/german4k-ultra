@@ -540,6 +540,8 @@ internal fun SpielKarte(
                 // zweiten Gewichts-Spacer und wurde zu „Nations …"), die Uhrzeit bleibt rechtsbündig.
                 // Passt der Name nicht, erst auf 11sp verkleinern, dann kürzen.
                 val wettbewerb = spiel.wettbewerb
+                // German4K 3.2 (C6): Wettbewerbslogo klein vor dem Chip; ohne Logo nichts (kein Platzhalter).
+                WettbewerbsLogo(spiel.wettbewerbLogo, if (mobil) WETTBEWERB_LOGO_MOBIL else WETTBEWERB_LOGO_TV)
                 if (wettbewerb != null) {
                     var klein by remember(wettbewerb) { mutableStateOf(false) }
                     val basis = MaterialTheme.typography.labelMedium
@@ -615,6 +617,11 @@ private val WAPPEN_KLEIN_TV = 26.dp
 private val WAPPEN_KLEIN_MOBIL = 24.dp
 private val WAPPEN_KONFERENZ = 26.dp
 
+// German4K 3.2 (C6): Wettbewerbslogo dezent — kleiner als die Wappen, etwa so hoch wie der Chip bzw. Kopftext.
+private val WETTBEWERB_LOGO_TV = 22.dp
+private val WETTBEWERB_LOGO_MOBIL = 18.dp
+private val WETTBEWERB_LOGO_KONFERENZ_TV = 24.dp
+
 /** German4K 3.0/32 (R2): LIVE-Chip mit grober Spielminute, zählt alle 30 s weiter. */
 @Composable
 private fun LiveMinutenChip(spiel: German4kSpiel) {
@@ -680,6 +687,7 @@ private const val KONFERENZ_ZEIT_MUSTER = "EEE HH:mm"
 internal fun KonferenzKarte(spiel: German4kSpiel, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val colors = OwnTVTheme.colors
     val erinnern = LocalSportErinnern.current
+    val mobil = LocalFormfaktor.current.mobil
     val locale = LocalConfiguration.current.locales[0]
     val zeit = remember(spiel.start, locale) { DateTimeFormatter.ofPattern(KONFERENZ_ZEIT_MUSTER, locale).format(spiel.start.atZone(SPORT_ZONE)) }
     FocusableSurface(
@@ -692,8 +700,12 @@ internal fun KonferenzKarte(spiel: German4kSpiel, onClick: () -> Unit, modifier:
     ) { _ ->
         Column(Modifier.fillMaxSize().padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // German4K 3.2 (C6): mit Logo steht das Logo statt des roten Punkts vor dem Titel; ohne Logo
+                // bleibt der Kopf wie in 3.2 vorher. Der rote LIVE-Chip rechts bleibt in beiden Fällen.
+                val logo = spiel.wettbewerbLogo
+                WettbewerbsLogo(logo, if (mobil) WETTBEWERB_LOGO_MOBIL else WETTBEWERB_LOGO_KONFERENZ_TV, abstand = 8.dp)
                 Text(
-                    stringResource(R.string.g4k_sport_konferenz_kopf, spiel.titel, zeit, spiel.gast),
+                    stringResource(if (logo != null) R.string.g4k_sport_konferenz_kopf_logo else R.string.g4k_sport_konferenz_kopf, spiel.titel, zeit, spiel.gast),
                     style = MaterialTheme.typography.titleLarge, color = colors.onSurface, fontWeight = FontWeight.Bold,
                     maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
                 )
