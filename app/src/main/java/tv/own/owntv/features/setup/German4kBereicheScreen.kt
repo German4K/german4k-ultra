@@ -65,7 +65,8 @@ import tv.own.owntv.ui.theme.OwnTVTheme
 @Composable
 fun German4kBereicheScreen(onBack: () -> Unit) {
     // German4K 3.2 (N8): Länder-Ansicht. Liefert ein alter Server keine Länder, bleibt die flache Liste.
-    var flach by remember { mutableStateOf(false) }
+    // German4K 3.2: Notschalter `laender_v2` aus → gleich die flache Liste (Anfrage ohne ansicht:"laender").
+    var flach by remember { mutableStateOf(!tv.own.owntv.core.german4k.German4kFeatures.an(tv.own.owntv.core.german4k.German4kSchalter.LAENDER_V2)) }
     if (flach) German4kBereicheFlach(onBack) else German4kLaenderScreen(onBack = onBack, onKeineLaender = { flach = true })
 }
 

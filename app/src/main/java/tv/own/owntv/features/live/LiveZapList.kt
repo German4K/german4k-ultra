@@ -200,7 +200,7 @@ class LiveZapList(
         val currentId = playingChannelId()
         var i = if (currentId != null) list.indexOfFirst { it.id == currentId } else -1
         // German4K 3.2 (F4/N5): a stand-in variant steps from the place of the entry it replaced.
-        if (i < 0 && currentId != null) {
+        if (i < 0 && currentId != null && tv.own.owntv.core.german4k.German4kFeatures.an(tv.own.owntv.core.german4k.German4kSchalter.ZAPP_LISTE)) {
             stellvertreter[currentId]?.let { original -> i = list.indexOfFirst { it.id == original } }
         }
         if (i >= 0) {

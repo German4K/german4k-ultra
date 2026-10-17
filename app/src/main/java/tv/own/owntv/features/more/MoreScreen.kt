@@ -306,7 +306,8 @@ fun MoreScreen(
                     modifier = Modifier.focusRequester(rowFocus.getValue(MoreRow.BEREICHE)),
                 )
                 // German4K 3.2 (N7): „Meine Erinnerungen“ — gemerkte Sendungen und Spiele, löschen möglich.
-                SpineItem(
+                // Notschalter `erinnern` aus → Zeile weg.
+                if (tv.own.owntv.features.german4kAn(tv.own.owntv.core.german4k.German4kSchalter.ERINNERN)) SpineItem(
                     label = stringResource(R.string.g4k_erinnern_liste_titel),
                     summary = "",
                     icon = OwnTVIcon.EPG,

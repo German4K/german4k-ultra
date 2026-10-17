@@ -67,7 +67,9 @@ private enum class WappenZustand { LAEDT, DA, KEINS }
  * erst als „EF“ aufblitzt.
  */
 @Composable
-internal fun VereinsWappen(url: String?, name: String, groesse: Dp, modifier: Modifier = Modifier) {
+internal fun VereinsWappen(urlServer: String?, name: String, groesse: Dp, modifier: Modifier = Modifier) {
+    // German4K 3.2: Notschalter `vereinslogos` aus → nichts laden, nur der Initialen-Kreis.
+    val url = urlServer?.takeIf { tv.own.owntv.features.german4kAn(tv.own.owntv.core.german4k.German4kSchalter.VEREINSLOGOS) }
     var zustand by remember(url) { mutableStateOf(if (url == null) WappenZustand.KEINS else WappenZustand.LAEDT) }
     Box(modifier.size(groesse), contentAlignment = Alignment.Center) {
         if (zustand != WappenZustand.DA) WappenPlatzhalter(name, groesse, mitText = zustand == WappenZustand.KEINS)
@@ -101,7 +103,9 @@ internal fun VereinsWappen(url: String?, name: String, groesse: Dp, modifier: Mo
  * [abstand] folgt nur, wenn ein Logo da ist — so entsteht ohne Logo auch kein Leerraum.
  */
 @Composable
-internal fun WettbewerbsLogo(url: String?, groesse: Dp, abstand: Dp = 6.dp) {
+internal fun WettbewerbsLogo(urlServer: String?, groesse: Dp, abstand: Dp = 6.dp) {
+    // German4K 3.2: Notschalter `wettbewerb_logo` aus → kein Logo, Karte wie 3.1.
+    val url = urlServer?.takeIf { tv.own.owntv.features.german4kAn(tv.own.owntv.core.german4k.German4kSchalter.WETTBEWERB_LOGO) }
     // Ladefehler (Datei fehlt auf dem CDN): Platz wieder freigeben statt dauerhaft ein Loch vor dem Namen
     // zu lassen — ein einmaliges Nachrücken nur im Fehlerfall, der Normalfall springt nie.
     var fehler by remember(url) { mutableStateOf(false) }

@@ -273,7 +273,13 @@ private fun stoerungTitel(k: German4kHealth.Klasse): String = stringResource(
 )
 
 @Composable
-private fun stoerungText(k: German4kHealth.Klasse): String = stringResource(
+private fun stoerungText(k: German4kHealth.Klasse): String = stoerungAppText(k).let { app ->
+    // German4K 3.2: Server-Text `konfig.texte.leitung_belegt_text` ersetzt den App-Text, wenn vorhanden.
+    if (k == German4kHealth.Klasse.LEITUNG_BELEGT) tv.own.owntv.core.german4k.German4kKonfig.text("leitung_belegt_text", app) else app
+}
+
+@Composable
+private fun stoerungAppText(k: German4kHealth.Klasse): String = stringResource(
     when (k) {
         German4kHealth.Klasse.LEITUNG_BELEGT -> R.string.g4k_fehler_leitung_belegt_body
         German4kHealth.Klasse.ABGELAUFEN -> R.string.g4k_fehler_abgelaufen_body

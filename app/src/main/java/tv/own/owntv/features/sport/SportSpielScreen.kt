@@ -201,7 +201,7 @@ internal fun SportSpielScreen(
             // German4K 3.2 (N7): „⏰ Erinnern“ für ein Spiel, das noch kommt (10 min vor Anpfiff, Sender wird
             // erst dann über den Sport-Hub bestimmt).
             val erinnern = LocalSportErinnern.current
-            if (!spiel.laeuft && !spiel.beendet) {
+            if (erinnern.aktiv && !spiel.laeuft && !spiel.beendet) {
                 Spacer(Modifier.height(10.dp))
                 tv.own.owntv.ui.components.OwnTVButton(
                     stringResource(if (erinnern.erinnert(spiel)) R.string.g4k_erinnern_knopf_gesetzt else R.string.g4k_erinnern_knopf),

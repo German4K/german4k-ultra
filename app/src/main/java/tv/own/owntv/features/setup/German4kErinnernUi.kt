@@ -107,7 +107,8 @@ internal fun German4kErinnerungsHinweis() {
         repo.weckerNachziehen()
         val nachgezogen = mutableSetOf<Long>()
         while (true) {
-            if (aktuell == null) {
+            // German4K 3.2: Notschalter `erinnern` aus → bestehende Erinnerungen lösen nicht aus (bleiben gespeichert).
+            if (aktuell == null && German4kErinnerungen.aktiv()) {
                 runCatching {
                     val jetzt = System.currentTimeMillis()
                     val offene = repo.offeneAktiv()
@@ -126,6 +127,7 @@ internal fun German4kErinnerungsHinweis() {
             delay(PRUEF_INTERVALL_MS)
         }
     }
+    if (!tv.own.owntv.features.german4kAn(tv.own.owntv.core.german4k.German4kSchalter.ERINNERN)) return
     val e = aktuell ?: return
     val scope = rememberCoroutineScope()
     ErinnerungDialog(

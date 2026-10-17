@@ -1275,6 +1275,10 @@ class LiveViewModel(
      * Sendern eines Spiels im Sport-Hub. Ohne brauchbare Liste wie bisher die Kategorie des Senders.
      */
     fun watchFromList(channel: ChannelEntity, origin: List<ChannelEntity>, title: String? = null) {
+        // German4K 3.2: Notschalter `zapp_liste` aus → altes Zappen (Kategorie des Senders) wie watchFromGuide.
+        if (!tv.own.owntv.core.german4k.German4kFeatures.an(tv.own.owntv.core.german4k.German4kSchalter.ZAPP_LISTE)) {
+            watchFromGuide(channel); return
+        }
         zapList.armFromOrigin(channel, origin, title)
         ensurePlaying(channel)
         recordLiveHistory(channel, immediate = true)

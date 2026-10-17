@@ -92,17 +92,21 @@ internal fun German4kAngesagtStart(
     trailerFokus: FocusRequester?,
 ) {
     val hero = karten.firstOrNull() ?: return
+    // German4K 3.2: Notschalter `angesagt_hero` aus → nur das Regal; der Startfokus geht dann auf dessen erste Karte.
+    val mitHero = tv.own.owntv.features.german4kAn(tv.own.owntv.core.german4k.German4kSchalter.ANGESAGT_HERO)
     Column(Modifier.fillMaxWidth()) {
-        AngesagtHero(hero, details, favorit, onAbspielen, onTrailer, onFavorit, onFocus, abspielenFokus, trailerFokus)
-        Spacer(Modifier.height(12.dp))
+        if (mitHero) {
+            AngesagtHero(hero, details, favorit, onAbspielen, onTrailer, onFavorit, onFocus, abspielenFokus, trailerFokus)
+            Spacer(Modifier.height(12.dp))
+        }
         German4kAngesagtRegal(
-            titel = stringResource(R.string.g4k_angesagt_titel),
-            untertitel = stringResource(R.string.g4k_angesagt_untertitel),
+            titel = tv.own.owntv.features.german4kText("angesagt_titel", stringResource(R.string.g4k_angesagt_titel)),
+            untertitel = tv.own.owntv.features.german4kText("angesagt_untertitel", stringResource(R.string.g4k_angesagt_untertitel)),
             karten = karten,
             mitKennung = true,
             onKarte = onKarte,
             onFocus = onFocus,
-            ersteFokus = null,
+            ersteFokus = if (mitHero) null else abspielenFokus,
         )
     }
 }
@@ -288,7 +292,7 @@ internal fun German4kTop10Regal(
     val zahlGroesse: TextUnit = if (mobil) 88.sp else 130.sp
     var fokus by remember(karten) { mutableStateOf<German4kAngesagtKarte?>(null) }
     Column(Modifier.fillMaxWidth()) {
-        RegalKopf(titel, stringResource(R.string.g4k_top10_untertitel))
+        RegalKopf(titel, tv.own.owntv.features.german4kText("top10_untertitel", stringResource(R.string.g4k_top10_untertitel)))
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(if (mobil) 4.dp else 8.dp),
             contentPadding = PaddingValues(horizontal = seitenrand, vertical = 6.dp),
@@ -337,10 +341,13 @@ internal fun German4kAngesagtKopf(
     angesagt: List<German4kAngesagtKarte>,
     onKarte: (German4kAngesagtKarte, top10: Boolean) -> Unit,
 ) {
+    // German4K 3.2: Notschalter `top10` aus → keine Top-10-Zeile, Angesagt bleibt.
+    val top = if (tv.own.owntv.features.german4kAn(tv.own.owntv.core.german4k.German4kSchalter.TOP10)) top else emptyList()
     if (top.isEmpty() && angesagt.isEmpty()) return
     Column(Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         German4kTop10Regal(
-            titel = stringResource(if (serien) R.string.g4k_top10_serien else R.string.g4k_top10_filme),
+            titel = if (serien) tv.own.owntv.features.german4kText("top10_serien_titel", stringResource(R.string.g4k_top10_serien))
+                else tv.own.owntv.features.german4kText("top10_filme_titel", stringResource(R.string.g4k_top10_filme)),
             karten = top,
             onKarte = { onKarte(it, true) },
             onFocus = {},
@@ -348,7 +355,7 @@ internal fun German4kAngesagtKopf(
             seitenrand = 0.dp,
         )
         German4kAngesagtRegal(
-            titel = stringResource(R.string.g4k_angesagt_titel),
+            titel = tv.own.owntv.features.german4kText("angesagt_titel", stringResource(R.string.g4k_angesagt_titel)),
             untertitel = stringResource(R.string.g4k_angesagt_unter_top),
             karten = angesagt,
             mitKennung = false,

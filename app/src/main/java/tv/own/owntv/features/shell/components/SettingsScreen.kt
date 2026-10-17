@@ -2289,8 +2289,8 @@ internal fun AboutDialog(onDismiss: () -> Unit) {
                     onClick = { onDismiss(); tv.own.owntv.core.german4k.German4kSupport.bereicheOeffnen() },
                     style = OwnTVButtonStyle.SECONDARY,
                 )
-                // German4K 3.2 (N7)
-                OwnTVButton(
+                // German4K 3.2 (N7); Notschalter `erinnern` aus → Knopf weg.
+                if (tv.own.owntv.features.german4kAn(tv.own.owntv.core.german4k.German4kSchalter.ERINNERN)) OwnTVButton(
                     stringResource(R.string.g4k_erinnern_liste_titel),
                     onClick = { onDismiss(); tv.own.owntv.core.german4k.German4kSupport.erinnerungenOeffnen() },
                     style = OwnTVButtonStyle.SECONDARY,

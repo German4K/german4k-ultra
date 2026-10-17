@@ -55,6 +55,7 @@
 1	file-path	app/src/main/java/tv/own/owntv/OwnTVApp.kt	image_cache
 1	performance	app/src/main/java/tv/own/owntv/OwnTVApp.kt	koin-started
 3	empty	app/src/main/java/tv/own/owntv/core/i18n/LocalizedContent.kt	\0
+1	json	app/src/main/java/tv/own/owntv/features/German4kSchalterUi.kt	aus
 1	assertion	app/src/main/java/tv/own/owntv/features/customize/CustomizeItemsViewModel.kt	EPISODE not applicable
 2	assertion	app/src/main/java/tv/own/owntv/features/customize/CustomizeItemsViewModel.kt	EPISODE not applicable to category items
 3	empty	app/src/main/java/tv/own/owntv/features/customize/CustomizeScreen.kt	\0
@@ -79,6 +80,11 @@
 1	technical	app/src/main/java/tv/own/owntv/features/epg/GuideCore.kt	↻
 1	technical	app/src/main/java/tv/own/owntv/features/epg/GuideCore.kt	⏰
 2	technical	app/src/main/java/tv/own/owntv/features/home/German4kAngesagtUi.kt	${k.serie}:${k.tmdb}
+2	json	app/src/main/java/tv/own/owntv/features/home/German4kAngesagtUi.kt	angesagt_titel
+1	json	app/src/main/java/tv/own/owntv/features/home/German4kAngesagtUi.kt	angesagt_untertitel
+1	json	app/src/main/java/tv/own/owntv/features/home/German4kAngesagtUi.kt	top10_filme_titel
+1	json	app/src/main/java/tv/own/owntv/features/home/German4kAngesagtUi.kt	top10_serien_titel
+1	json	app/src/main/java/tv/own/owntv/features/home/German4kAngesagtUi.kt	top10_untertitel
 1	json	app/src/main/java/tv/own/owntv/features/home/German4kAngesagtViewModel.kt	angesagt_klick
 1	json	app/src/main/java/tv/own/owntv/features/home/German4kAngesagtViewModel.kt	film
 1	technical	app/src/main/java/tv/own/owntv/features/home/German4kAngesagtViewModel.kt	rang=${karte.rang};platz=${karte.platz};quelle=$wo;art=${if (karte.serie) ART_SERIE else ART_FILM};tmdb=${karte.tmdb}
@@ -499,6 +505,7 @@
 1	empty	app/src/main/java/tv/own/owntv/features/setup/German4kOverlays.kt	\0
 3	protocol	app/src/main/java/tv/own/owntv/features/setup/German4kOverlays.kt	abgelaufen
 1	protocol	app/src/main/java/tv/own/owntv/features/setup/German4kOverlays.kt	info
+1	json	app/src/main/java/tv/own/owntv/features/setup/German4kOverlays.kt	leitung_belegt_text
 2	json	app/src/main/java/tv/own/owntv/features/setup/German4kOverlays.kt	test
 1	technical	app/src/main/java/tv/own/owntv/features/setup/German4kOverlays.kt	uhr:${java.time.LocalDate.now()}
 2	protocol	app/src/main/java/tv/own/owntv/features/setup/German4kOverlays.kt	verlaengern
@@ -653,12 +660,14 @@
 1	technical	app/src/main/java/tv/own/owntv/features/shell/components/TopBar.kt	thunder
 1	technical	app/src/main/java/tv/own/owntv/features/shell/components/TopBar.kt	topBarHeight
 3	empty	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	\0
+1	json	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	Bundesliga
 1	technical	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	EEE HH:mm
 1	technical	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	EEE, dd.MM.
 1	technical	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	HH:mm
 1	technical	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	heute
 1	technical	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	konferenz-${it.id}
 1	technical	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	konferenz-${k.id}
+1	json	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	konferenz_titel_bl
 1	technical	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	live
 1	technical	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	spaeter
 3	technical	app/src/main/java/tv/own/owntv/features/sport/SportScreen.kt	·

@@ -176,7 +176,10 @@ fun EpgScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     // German4K 3.2 (N7): „⏰ Erinnern“ — gemerkte Sendungen (Schlüssel) für Knopf und ⏰ im Raster.
     val g4kErinnerungen: tv.own.owntv.core.german4k.German4kErinnerungen = org.koin.compose.koinInject()
-    val g4kErinnertSchluessel by g4kErinnerungen.schluessel.collectAsStateWithLifecycle(initialValue = emptySet())
+    val g4kErinnertSchluesselRoh by g4kErinnerungen.schluessel.collectAsStateWithLifecycle(initialValue = emptySet())
+    // German4K 3.2: Notschalter `erinnern` aus → kein ⏰ im TV-Guide (Knopf fällt über erinnerbar() weg).
+    val g4kErinnernAn = tv.own.owntv.features.german4kAn(tv.own.owntv.core.german4k.German4kSchalter.ERINNERN)
+    val g4kErinnertSchluessel = if (g4kErinnernAn) g4kErinnertSchluesselRoh else emptySet()
     val g4kScope = androidx.compose.runtime.rememberCoroutineScope()
     val liveNow by produceState(initialValue = System.currentTimeMillis()) {
         while (true) {
@@ -548,7 +551,7 @@ fun EpgScreen(
     }
 
     detail?.let { (channel, p) ->
-        val g4kErinnerbar by produceState(false, channel.id, p.startMs) { value = g4kErinnerungen.erinnerbar(channel, p.startMs) }
+        val g4kErinnerbar by produceState(false, channel.id, p.startMs, g4kErinnernAn) { value = g4kErinnerungen.erinnerbar(channel, p.startMs) }
         val g4kErinnert = tv.own.owntv.core.german4k.German4kErinnerungen.sendungSchluessel(channel, p.startMs) in g4kErinnertSchluessel
         // Recompute as the recordings change, so pressing Record swaps the button to Cancel without
         // closing the dialog.

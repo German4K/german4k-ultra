@@ -83,9 +83,15 @@ import kotlinx.coroutines.delay
  * German4K 3.2 (N7): „⏰ Erinnern“ für die Karten, ohne jede Zwischen-Composable umzubauen. [schluessel] =
  * gemerkte Spiele/Konferenzen, [umschalten] merkt bzw. vergisst (OK lange drücken auf einer Karte).
  */
-internal class SportErinnern(val schluessel: Set<String>, val umschalten: (German4kSpiel) -> Unit) {
+internal class SportErinnern(
+    val schluessel: Set<String>,
+    /** German4K 3.2: Notschalter `erinnern` — aus ⇒ keine Knöpfe, kein ⏰, langes OK tut nichts. */
+    val aktiv: Boolean = true,
+    private val umschalter: (German4kSpiel) -> Unit,
+) {
+    val umschalten: (German4kSpiel) -> Unit = { if (aktiv) umschalter(it) }
     fun erinnert(spiel: German4kSpiel): Boolean =
-        tv.own.owntv.core.german4k.German4kErinnern.spielSchluessel(spiel.id) in schluessel
+        aktiv && tv.own.owntv.core.german4k.German4kErinnern.spielSchluessel(spiel.id) in schluessel
 }
 
 internal val LocalSportErinnern = androidx.compose.runtime.staticCompositionLocalOf { SportErinnern(emptySet()) {} }
@@ -128,13 +134,14 @@ fun SportScreen(
     val erinnertSchluessel by vm.erinnert.collectAsStateWithLifecycle()
     val toast = tv.own.owntv.ui.components.rememberInAppToast()
     val ctx = androidx.compose.ui.platform.LocalContext.current
-    val sportErinnern = remember(erinnertSchluessel) {
-        SportErinnern(erinnertSchluessel) { s ->
+    val erinnernAn = tv.own.owntv.features.german4kAn(tv.own.owntv.core.german4k.German4kSchalter.ERINNERN)
+    val sportErinnern = remember(erinnertSchluessel, erinnernAn) {
+        SportErinnern(erinnertSchluessel, aktiv = erinnernAn) { s ->
             scope.launch {
                 val r = vm.erinnernUmschalten(s)
                 toast.show(
                     when (r) {
-                        true -> ctx.getString(R.string.g4k_erinnern_gesetzt, tv.own.owntv.core.german4k.German4kErinnern.VORLAUF_SPIEL_MIN)
+                        true -> ctx.getString(R.string.g4k_erinnern_gesetzt, tv.own.owntv.core.german4k.German4kKonfig.erinnernVorlaufSpielMin)
                         false -> ctx.getString(R.string.g4k_erinnern_geloescht)
                         null -> ctx.getString(R.string.g4k_erinnern_geht_nicht)
                     },
@@ -212,7 +219,7 @@ fun SportScreen(
             ChipZeile(chip = chip, onChip = { vm.chip.value = it }, onFocused = onChildFocused)
             // German4K 3.2 (N7): wie man sich an ein Spiel erinnern lässt — auf dem Fernseher gibt es keinen
             // zweiten Knopf auf der Karte, also lange OK.
-            if (!formfaktor.mobil) {
+            if (!formfaktor.mobil && sportErinnern.aktiv) {
                 Spacer(Modifier.height(6.dp))
                 Text(stringResource(R.string.g4k_erinnern_lang_druecken), style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
             }
@@ -348,7 +355,7 @@ private fun TvRegale(
                             .then(if (i == 0 && erstesRegal == -1) Modifier.focusRequester(ersterFokus) else Modifier),
                     )
                     // German4K 3.2 (N7): eigener Knopf neben der Karte — rechts vom Fokus erreichbar.
-                    if (!k.laeuft) {
+                    if (!k.laeuft && erinnern.aktiv) {
                         Spacer(Modifier.width(12.dp))
                         tv.own.owntv.ui.components.OwnTVButton(
                             stringResource(if (erinnern.erinnert(k)) R.string.g4k_erinnern_knopf_gesetzt else R.string.g4k_erinnern_knopf),
@@ -487,7 +494,7 @@ private fun MobilListe(regale: SportRegale, onKlick: (German4kSpiel) -> Unit) {
             val erinnern = LocalSportErinnern.current
             Column {
                 KonferenzKarte(spiel = k, onClick = { onKlick(k) }, modifier = Modifier.fillMaxWidth().height(MOBIL_KONFERENZ_HOEHE))
-                if (!k.laeuft) {
+                if (!k.laeuft && erinnern.aktiv) {
                     Spacer(Modifier.height(6.dp))
                     tv.own.owntv.ui.components.OwnTVButton(
                         stringResource(if (erinnern.erinnert(k)) R.string.g4k_erinnern_knopf_gesetzt else R.string.g4k_erinnern_knopf),
@@ -684,6 +691,10 @@ private const val KONFERENZ_ZEIT_MUSTER = "EEE HH:mm"
  * Platzwahl, nie gespeicherte IDs), lange OK = ⏰ Erinnern.
  */
 @Composable
+private fun konferenzTitel(spiel: German4kSpiel): String =
+    if (spiel.wettbewerb.equals("Bundesliga", ignoreCase = true)) tv.own.owntv.features.german4kText("konferenz_titel_bl", spiel.titel) else spiel.titel
+
+@Composable
 internal fun KonferenzKarte(spiel: German4kSpiel, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val colors = OwnTVTheme.colors
     val erinnern = LocalSportErinnern.current
@@ -702,10 +713,11 @@ internal fun KonferenzKarte(spiel: German4kSpiel, onClick: () -> Unit, modifier:
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // German4K 3.2 (C6): mit Logo steht das Logo statt des roten Punkts vor dem Titel; ohne Logo
                 // bleibt der Kopf wie in 3.2 vorher. Der rote LIVE-Chip rechts bleibt in beiden Fällen.
-                val logo = spiel.wettbewerbLogo
+                val logo = spiel.wettbewerbLogo?.takeIf { tv.own.owntv.features.german4kAn(tv.own.owntv.core.german4k.German4kSchalter.WETTBEWERB_LOGO) }
                 WettbewerbsLogo(logo, if (mobil) WETTBEWERB_LOGO_MOBIL else WETTBEWERB_LOGO_KONFERENZ_TV, abstand = 8.dp)
                 Text(
-                    stringResource(if (logo != null) R.string.g4k_sport_konferenz_kopf_logo else R.string.g4k_sport_konferenz_kopf, spiel.titel, zeit, spiel.gast),
+                    // German4K 3.2: `konfig.texte.konferenz_titel_bl` ersetzt den Server-Titel der Bundesliga-Konferenz.
+                    stringResource(if (logo != null) R.string.g4k_sport_konferenz_kopf_logo else R.string.g4k_sport_konferenz_kopf, konferenzTitel(spiel), zeit, spiel.gast),
                     style = MaterialTheme.typography.titleLarge, color = colors.onSurface, fontWeight = FontWeight.Bold,
                     maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
                 )
